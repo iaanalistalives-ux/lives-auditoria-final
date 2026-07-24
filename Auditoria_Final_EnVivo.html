@@ -86,6 +86,8 @@
   .kbody.wide .donutwrap .dc{width:118px;height:118px;}
   .row2.solo1{grid-template-columns:1fr;}
   .row2.solo1 #panelComparativo{display:none;}
+  .row2.soloDef{grid-template-columns:1fr;}
+  .row2.soloDef #panelDerivados{display:none;}
   .kpanel{background:#fff;border:1px solid var(--warm);border-radius:8px;padding:16px 18px;}
   .kpanel .kh{font-size:14px;font-weight:700;color:#fff;background:var(--sage);margin:-16px -18px 14px;padding:9px 18px;border-radius:8px 8px 0 0;}
   .kpanel.tall .kh{background:var(--slate);}
@@ -193,6 +195,7 @@
       <span class="modesel" id="modeWrap">
         <button id="modeWeek" class="mbtn active" type="button" onclick="setMode('week')">Semana</button>
         <button id="modeMonth" class="mbtn" type="button" onclick="setMode('month')">Mes</button>
+        <button id="modeYear" class="mbtn" type="button" onclick="setMode('year')">Año</button>
       </span>
       <span class="wsel" id="weekWrap">Semana: <select id="weekSel"></select></span>
       <span class="wsel" id="monthWrap" style="display:none">Mes: <select id="monthSel"></select></span>
@@ -239,6 +242,7 @@
               <div class="kcell"><div class="v" id="L_lote">—</div><div class="l">Lote auditado</div></div>
               <div class="kcell"><div class="v ap" id="L_ap">—</div><div class="l">Aprobadas</div></div>
               <div class="kcell"><div class="v re" id="L_re">—</div><div class="l">Rechazadas</div></div>
+              <div class="kcell"><div class="v re" id="L_pzre">—</div><div class="l">Prendas rechazadas</div></div>
             </div>
             <div class="donutwrap">
               <div class="dc"><canvas id="dL"></canvas></div>
@@ -254,6 +258,7 @@
               <div class="kcell tall"><div class="v" id="T_lote">—</div><div class="l">Lote auditado</div></div>
               <div class="kcell"><div class="v ap" id="T_ap">—</div><div class="l">Aprobadas</div></div>
               <div class="kcell"><div class="v re" id="T_re">—</div><div class="l">Rechazadas</div></div>
+              <div class="kcell"><div class="v re" id="T_pzre">—</div><div class="l">Prendas rechazadas</div></div>
             </div>
             <div class="donutwrap">
               <div class="dc"><canvas id="dT"></canvas></div>
@@ -308,7 +313,7 @@
         </div>
       </div>
 
-      <div class="row2">
+      <div class="row2" id="rowDefDer">
         <div class="panel">
           <div class="pt">🔍 Defectos por origen</div>
           <div class="ph" id="defSub">Categoría madre — hallados en la <b>muestra</b> (período seleccionado). Clic en una fila para ver los subtipos.</div>
@@ -316,12 +321,11 @@
           <div id="blkDefL"><div class="hbar-side-title" style="color:var(--sage)">🏭 LIVES</div><div id="listDefL"></div></div>
           <div id="blkDefT"><div class="hbar-side-title" style="color:var(--slate)">🏗 TALLERES</div><div id="listDefT"></div></div>
         </div>
-        <div class="panel">
-          <div class="pt">📦 Derivados por origen</div>
-          <div class="ph" id="derSub">Categoría madre — hallados en el <b>lote completo</b> (período seleccionado). Clic en una fila para ver los subtipos.</div>
+        <div class="panel" id="panelDerivados">
+          <div class="pt">📦 Derivados — Talleres externos</div>
+          <div class="ph" id="derSub">Categoría madre — hallados en el <b>lote completo</b> de talleres externos (período seleccionado). LIVES no tiene este dato (la inspección de lote completo solo aplica a talleres externos). Clic en una fila para ver los subtipos.</div>
           <div class="note" id="derWarn" style="display:none;font-size:11px;"></div>
-          <div id="blkDerL"><div class="hbar-side-title" style="color:var(--sage)">🏭 LIVES</div><div id="listDerL"></div></div>
-          <div id="blkDerT"><div class="hbar-side-title" style="color:var(--slate)">🏗 TALLERES</div><div id="listDerT"></div></div>
+          <div id="listDerT"></div>
         </div>
       </div>
 
@@ -628,10 +632,12 @@ function setMode(m){
   CURMODE = m;
   document.getElementById('modeWeek').classList.toggle('active', m==='week');
   document.getElementById('modeMonth').classList.toggle('active', m==='month');
+  document.getElementById('modeYear').classList.toggle('active', m==='year');
   document.getElementById('weekWrap').style.display = m==='week' ? 'inline-flex' : 'none';
   document.getElementById('monthWrap').style.display = m==='month' ? 'inline-flex' : 'none';
   if(m==='week') render('week', +document.getElementById('weekSel').value);
-  else render('month', +document.getElementById('monthSel').value);
+  else if(m==='month') render('month', +document.getElementById('monthSel').value);
+  else render('year', null);
 }
 
 /* ===================== Render ===================== */
@@ -642,21 +648,24 @@ function kpiFor(rows, prefix, label){
   // Confirmado: hay filas con COMPUTABLE=0 (ej. licencia) que igual traen LOTE_CONTABLE>0 en el Sheet,
   // así que hay que filtrar explícito aquí — no basta con sumar la columna tal cual.
   const lote = rows.reduce((s,r)=> s + (r.computable===1 ? r.loteContable : 0), 0);
+  const loteRe = rows.reduce((s,r)=> s + (r.computable===1 && r.resultado==='RECHAZADO' ? r.loteContable : 0), 0);
   const rePct = pct(re, ap+re);
   document.getElementById(prefix+'_aud').textContent = nf(rows.length);
   document.getElementById(prefix+'_lote').textContent = nf(lote);
   document.getElementById(prefix+'_ap').textContent = nf(ap);
   document.getElementById(prefix+'_re').textContent = nf(re);
+  document.getElementById(prefix+'_pzre').textContent = nf(loteRe);
   document.getElementById(prefix+'_pr').textContent = rePct+'%';
   document.getElementById('kw'+(prefix==='L'?'L':'T')).textContent = label;
-  return {ap, re, lote, n:rows.length};
+  return {ap, re, lote, loteRe, n:rows.length};
 }
 
 function render(mode, value){
   clearCharts();
   CURMODE=mode; CURVAL=value;
   const isMonth = mode==='month';
-  const wrows = isMonth ? ROWS.filter(r=>r.mes===value) : ROWS.filter(r=>r.semana===value);
+  const isYear = mode==='year';
+  const wrows = isYear ? ROWS : (isMonth ? ROWS.filter(r=>r.mes===value) : ROWS.filter(r=>r.semana===value));
   STATE_wrows = wrows;
 
   // Badge "Reprocesos" en la barra superior — dato con peso real (dinero/atrasos), no repetido en los KPIs.
@@ -674,10 +683,10 @@ function render(mode, value){
     ? nf(numReprocesos)+' ('+pctReprocesos+'% del total)'
     : '—';
   document.getElementById('fsClearBtn').style.display = (CURCLI || CURTALLER) ? 'inline-block' : 'none';
-  const plabel = isMonth ? (MESES[value]+' '+YEARS[0]) : ('Sem '+value);
+  const plabel = isYear ? ('Año completo '+YEARS[0]) : (isMonth ? (MESES[value]+' '+YEARS[0]) : ('Sem '+value));
 
   document.getElementById('srcNote').innerHTML =
-    `<b>Fuente:</b> AC-009-25 (en vivo) · Año <b>${YEARS[0]}</b> · ${isMonth?'Mes: '+MESES[value]:'Semana '+value}${CURCLI?' · Cliente: <b>'+CURCLI+'</b>':''}${CURTALLER?' · Origen: <b>'+(CURTALLER==='LIVES'?'LIVES (interno)':CURTALLER)+'</b>':''} · `+
+    `<b>Fuente:</b> AC-009-25 (en vivo) · Año <b>${YEARS[0]}</b> · ${isYear?'Año completo':(isMonth?'Mes: '+MESES[value]:'Semana '+value)}${CURCLI?' · Cliente: <b>'+CURCLI+'</b>':''}${CURTALLER?' · Origen: <b>'+(CURTALLER==='LIVES'?'LIVES (interno)':CURTALLER)+'</b>':''} · `+
     `Se cuentan todas las auditorías registradas (incl. licencias/repetidas) · el Lote auditado solo suma auditorías COMPUTABLE=1, para no inflar por reprocesos ni licencias · "Reprocesos" = auditorías marcadas REPROCESO=SÍ en el Sheet · Tasas = RECHAZADAS / (APROBADAS+RECHAZADAS).`;
 
   const liveRows = wrows.filter(r=>r.intext==='INTERNA');
@@ -697,8 +706,7 @@ function render(mode, value){
   document.getElementById('panelRanking').style.display = soloOrigen ? 'none' : '';
   document.getElementById('blkDefL').style.display = (soloOrigen && !esSoloLives) ? 'none' : '';
   document.getElementById('blkDefT').style.display = (soloOrigen && esSoloLives) ? 'none' : '';
-  document.getElementById('blkDerL').style.display = (soloOrigen && !esSoloLives) ? 'none' : '';
-  document.getElementById('blkDerT').style.display = (soloOrigen && esSoloLives) ? 'none' : '';
+  document.getElementById('rowDefDer').classList.toggle('soloDef', esSoloLives);
   document.querySelectorAll('.kbody').forEach(el=>el.classList.remove('wide'));
   if(soloOrigen){
     const visiblePanel = esSoloLives ? 'panelLives' : 'panelTalleres';
@@ -751,8 +759,9 @@ function render(mode, value){
       plugins:{legend:{position:'top', labels:{boxWidth:14, usePointStyle:true}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+'%'}}},
       scales:{x:{grid:{display:false}, border:{color:WARM}}, y:{min:0, max:100, grid:{color:WARML}, border:{display:false}, ticks:{callback:v=>v+'%'}}}}}));
 
-  // Tendencia semanal (últimas hasta la seleccionada, máx 8)
-  const wKeys = WEEKS.filter(w=> isMonth ? true : w<=value).slice(-8);
+  // Tendencia semanal (últimas hasta la seleccionada, máx 8; en modo Año se muestran todas)
+  const wKeysAll = WEEKS.filter(w=> (isMonth||isYear) ? true : w<=value);
+  const wKeys = isYear ? wKeysAll : wKeysAll.slice(-8);
   const wAp = wKeys.map(w=>{
     const rs = ROWS.filter(r=>r.semana===w);
     const ap=rs.filter(r=>r.resultado==='APROBADO').length, re=rs.filter(r=>r.resultado==='RECHAZADO').length;
@@ -805,6 +814,7 @@ function renderComparativo(wKeys){
 function renderProceso(wrows){
   const groups={};
   wrows.forEach(r=>{
+    if(r.nAuditoria==null || String(r.nAuditoria).trim()==='') return; // fila sin ese dato informado — no cuenta
     const g = (r.nAuditoria==='1ra') ? '1ra auditoría' : '2da/3ra+ (repetida)';
     groups[g] = groups[g] || {ap:0,re:0};
     if(r.resultado==='APROBADO') groups[g].ap++; else if(r.resultado==='RECHAZADO') groups[g].re++;
@@ -933,27 +943,24 @@ function renderDerivados(wrows){
   if(!DER_ROWS.length){
     warn.style.display='block';
     warn.innerHTML = '<b>Sin datos</b> La hoja DERIVADOS respondió pero no tiene filas todavía. Puede ser normal si aún no se registraron derivados en este período.';
-    document.getElementById('listDerL').innerHTML=''; document.getElementById('listDerT').innerHTML='';
+    document.getElementById('listDerT').innerHTML='';
     return;
   }
-  const idsLive = new Set(wrows.filter(r=>r.intext==='INTERNA').map(r=>r.id));
   const idsTal  = new Set(wrows.filter(r=>r.intext==='EXTERNA').map(r=>r.id));
   function top(ids){
     const acc={};
     DER_ROWS.filter(d=>ids.has(d.idAuditoria)).forEach(d=>{ acc[d.categoria]=(acc[d.categoria]||0)+d.cantidad; });
     return Object.keys(acc).map(k=>({k,v:acc[k]})).sort((a,b)=>b.v-a.v).slice(0,7);
   }
-  const tL = top(idsLive), tT = top(idsTal);
-  document.getElementById('listDerL').innerHTML = hbarListHTML(tL, TAN, 'clicDerL');
+  const tT = top(idsTal);
   document.getElementById('listDerT').innerHTML = hbarListHTML(tT, TAUPE, 'clicDerT');
-  if(!tL.length && !tT.length){
+  if(!tT.length){
     warn.style.display='block';
-    warn.innerHTML = '<b>Sin derivados registrados</b> para las auditorías de este período.';
+    warn.innerHTML = '<b>Sin derivados registrados</b> para talleres externos en este período.';
   } else {
     warn.style.display='none';
   }
 }
-function clicDerL(k){ abrirFichaCategoria('Derivado','LIVES', k, curTok()); }
 function clicDerT(k){ abrirFichaCategoria('Derivado','Talleres', k, curTok()); }
 
 function abrirFichaCategoria(tipo, origen, categoria, period){
