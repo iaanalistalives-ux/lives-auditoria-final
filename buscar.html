@@ -25,13 +25,8 @@ input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;
 .hint{font-size:12px;color:#889;margin-top:8px}
 .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .top .txt{min-width:0}
-/* Enlace a Auditoría en Vivo: fuera del panel de título, como su propia franja de acción */
-.actionbar{max-width:1100px;margin:14px auto 0;padding:0 18px;display:flex;justify-content:flex-end}
-.live-link{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--navy);
-  border:1px solid #dce1e7;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;
-  text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:.15s ease}
-.live-link .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(42,157,143,.18)}
-.live-link:hover{border-color:var(--green);color:var(--green);box-shadow:0 3px 10px rgba(42,157,143,.18);transform:translateY(-1px)}
+.top-link{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:9px;padding:9px 14px;font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
+.top-link:hover{background:rgba(255,255,255,.28)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:var(--navy);color:#fff;text-align:left;padding:9px 10px;position:sticky;top:0;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
 td{padding:9px 10px;border-bottom:1px solid #eef1f4}
@@ -43,8 +38,7 @@ tr:hover td{background:#f6f9fb}
 .tablewrap{overflow-x:auto;max-height:62vh;overflow-y:auto}
 .estado{padding:24px;text-align:center;color:#889}
 .count{font-size:13px;color:#667;margin-bottom:10px}
-@media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}
-  .actionbar{justify-content:stretch}.live-link{width:100%;justify-content:center}}
+@media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
 </style>
 </head>
 <body>
@@ -53,10 +47,6 @@ tr:hover td{background:#f6f9fb}
     <h1>Buscar auditorías</h1>
     <div class="sub">AC-009-25 · Calidad Manufactura · LIVES</div>
   </div>
-</div>
-
-<div class="actionbar">
-  <a class="live-link" href="Auditoria_Final_EnVivo.html"><span class="dot"></span>Ver dashboard en vivo</a>
 </div>
 
 <div class="wrap">
