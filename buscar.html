@@ -42,12 +42,33 @@ tr:hover td{background:#f6f9fb}
 
   .fdWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
           align-items:center;justify-content:center;z-index:200;padding:20px;}
-  .fdCard{background:#fff;border-radius:12px;max-width:620px;width:100%;
-          max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);}
-  .fdHead{background:#0E3B36;color:#fff;padding:13px 18px;font-weight:700;font-size:15px;
-          display:flex;justify-content:space-between;align-items:center;
-          position:sticky;top:0;border-bottom:3px solid #10B981;}
-  .fdHead button{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;}
+  .fdCard{background:#fff;border-radius:12px;max-width:1000px;width:100%;
+          max-height:92vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+  .fdFrame{width:100%;height:74vh;border:none;display:block;}
+  .fdLink{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);
+          border-radius:6px;padding:5px 13px;font-size:12px;font-weight:700;
+          text-decoration:none;cursor:pointer;font-family:inherit;}
+  .fdX{background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;margin-left:auto;}
+  .fdCab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+         border-bottom:2px solid #F1F6F4;padding-bottom:12px;margin-bottom:14px;}
+  .fdKick{font-size:11px;font-weight:700;color:#0F7A5A;text-transform:uppercase;letter-spacing:.5px;}
+  .fdH1{font-size:19px;font-weight:700;color:#0E3B36;margin-top:2px;}
+  .fdSub{font-size:12.5px;color:#5F726C;margin-top:2px;}
+  .fdRes{font-size:12.5px;font-weight:700;padding:6px 15px;border-radius:20px;white-space:nowrap;}
+  .fdRes.ok{background:#ECFDF5;color:#065F46;border:1px solid #10B981;}
+  .fdRes.no{background:#FEF2F2;color:#991B1B;border:1px solid #DC2626;}
+  .fdSec{font-size:11px;font-weight:700;color:#4E6B78;text-transform:uppercase;
+         letter-spacing:.5px;margin:16px 0 8px;}
+  .fdGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+  .fdCel{background:#F1F6F4;border-radius:8px;padding:9px 12px;}
+  .fdCel span{display:block;font-size:11px;color:#5F726C;}
+  .fdCel b{font-size:14.5px;color:#333;}
+  .fdLista{display:flex;flex-direction:column;gap:6px;}
+  .fdDef{background:#FEF2F2;border-left:3px solid #DC2626;border-radius:6px;
+         padding:7px 12px;font-size:13.5px;}
+  .fdHead{background:#0E3B36;color:#fff;padding:12px 18px;font-weight:700;font-size:15px;
+          display:flex;gap:14px;align-items:center;position:sticky;top:0;z-index:5;
+          border-bottom:3px solid #10B981;}
   .fdBody{padding:16px 18px;}
   .fdAviso{background:#FFFBEB;border:1px solid #F59E0B;color:#92400E;border-radius:8px;
           padding:10px 13px;font-size:12.5px;margin-bottom:14px;line-height:1.6;}
@@ -114,6 +135,13 @@ const SHEET_ID='1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
    está en las dos fuentes, manda el piloto). Por eso se lee una sola hoja. */
 const CSV_FINAL='https://docs.google.com/spreadsheets/d/e/2PACX-1vTKWLLY0X8T7RtdteQstuEPubtGudtgTpJEa5gRClMFK2PCgDR7wFv07AIYUMJwmtxhL-xX4uEGQkp4/pub?gid=1078730994&single=true&output=csv';
 let ORIGEN='';   // '', 'EN VIVO' o 'DIGITADO'
+/* El origen viene escrito de tres formas según de dónde salga la fila:
+   'EN VIVO' del piloto, 'DIGITADO' del formulario de Athina y 'HISTORICO' de
+   los Excel migrados. Para quien busca solo hay dos casos: capturada en vivo
+   por la auditora, o pasada a mano. Todo lo que no sea en vivo es digitado. */
+function origenDe(cap){
+  return (String(cap||'').trim().toUpperCase()==='EN VIVO') ? 'EN VIVO' : 'DIGITADO';
+}
 let DATA=[];
 // índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
@@ -282,7 +310,7 @@ function buscar(){
     if(aud&&r[C.auditor]!==aud) return false;
     if(resu&&norm(r[C.resFinal]).indexOf(resu)<0) return false;
     if(!fechaOK(r[C.fecha],desde,hasta)) return false;
-    if(ORIGEN&&(r[C.captura]||'').toUpperCase()!==ORIGEN) return false;
+    if(ORIGEN&&origenDe(r[C.captura])!==ORIGEN) return false;
     if(filtroReproceso&&!esVerdadero(r[C.reproceso])) return false;
     if(filtroLicencia&&!esVerdadero(r[C.licencia])) return false;
     return true;
@@ -336,40 +364,88 @@ function pintarMas(){
 /* Un solo escuchador para toda la tabla, en vez de uno por fila. */
 document.getElementById('tbody').addEventListener('click',function(e){
   const b=e.target.closest('[data-ver]');
-  if(b) verDigitada(RES[+b.dataset.ver]);
+  if(!b) return;
+  const r=RES[+b.dataset.ver];
+  if(origenDe(r[C.captura])==='EN VIVO' && r[C.id]) verEnVivo(r);
+  else verDigitada(r);
 });
+
+function abrirFicha(){ document.getElementById('fichaDig').style.display='flex'; }
+function cerrarFicha(){
+  document.getElementById('fichaDig').style.display='none';
+  document.querySelector('#fichaDig .fdBody').innerHTML='';
+}
+
+function verEnVivo(r){
+  const f=document.getElementById('fichaDig');
+  f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
+  f.querySelector('.fdAcc').innerHTML=
+    `<a class="fdLink" href="ver.html?id=${encodeURIComponent(r[C.id])}" target="_blank">Abrir aparte / PDF</a>`;
+  f.querySelector('.fdBody').innerHTML=
+    `<iframe class="fdFrame" src="ver.html?id=${encodeURIComponent(r[C.id])}"></iframe>`;
+  abrirFicha();
+}
 /* Las capturadas en vivo tienen ficha completa con fotos y medidas.
    Las digitadas vienen de la hoja de papel: no hay fotos ni medidas, y por eso
    se abre un resumen en pantalla en vez de mandar a una ficha medio vacía. */
 function origenTag(cap){
-  return (cap||'').toUpperCase()==='EN VIVO'
+  return origenDe(cap)==='EN VIVO'
     ? '<span class="tag ov">EN VIVO</span>'
     : '<span class="tag" style="background:#EEF2F7;color:#4E6B78">DIGITADO</span>';
 }
+/* Todo se abre en una ventana dentro del buscador, sin salir de la página.
+   Las capturadas en vivo cargan la ficha completa (ver.html) dentro de un marco,
+   así conservan sus fotos, sus medidas y su PDF sin duplicar ese código acá. */
 function botonVer(r,i){
-  if((r[C.captura]||'').toUpperCase()==='EN VIVO' && r[C.id])
-    return `<a class="ver" href="ver.html?id=${encodeURIComponent(r[C.id])}">Ver / PDF</a>`;
-  /* Se pasa solo el índice. Antes iba la fila entera en JSON dentro del onclick:
-     con miles de filas eso hacía el HTML varias veces más pesado sin necesidad. */
   return `<button class="ver" type="button" data-ver="${i}">Ver</button>`;
 }
 function verDigitada(r){
   const f=document.getElementById('fichaDig');
-  const li=(t,v)=>v?`<div class="fdRow"><span>${t}</span><b>${v}</b></div>`:'';
-  f.querySelector('.fdBody').innerHTML=
-    `<div class="fdAviso">Registro <b>digitado</b> de la hoja de papel. No tiene fotos ni
-      medidas prenda por prenda: eso solo existe en las auditorías capturadas en vivo.</div>`+
-    li('Fecha', fechaTxt(r[C.fecha])) + li('Cliente', r[C.cliente]) + li('Grupo', r[C.grupo]) +
-    li('Estilo', r[C.estiloL]) + li('Color', r[C.color]) + li('PO', r[C.po]) +
-    li('Proceso', r[C.proceso]) + li('Origen', r[C.intext]) + li('Taller', r[C.servicio]) +
-    li('Destino', r[C.destino]) + li('Lote recibido', r[C.recibido]) +
-    li('Muestra', r[C.lote]) + li('Auditora', r[C.auditor]) +
-    li('N.º de auditoría', r[C.nAud]) + li('Semana', r[C.semana]) +
-    li('Resultado', r[C.resFinal]) +
-    (r[C.defectos]?`<div class="fdRow col"><span>Defectos</span><b>${r[C.defectos].split('-').join('<br>')}</b></div>`:'') +
-    (r[C.derivados]?li('Derivados', r[C.derivados]):'');
-  f.style.display='flex';
+  f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
+  f.querySelector('.fdAcc').innerHTML='<button class="fdLink" type="button" onclick="window.print()">Imprimir</button>';
+
+  const d=(t,v)=>v?`<div class="fdCel"><span>${t}</span><b>${v}</b></div>`:'';
+  const badgeRes = (r[C.resFinal]||'').toUpperCase()==='RECHAZADO'
+      ? '<span class="fdRes no">RECHAZADO</span>' : '<span class="fdRes ok">APROBADO</span>';
+  const defs=(r[C.defectos]||'').split('-').map(x=>x.trim()).filter(Boolean);
+
+  f.querySelector('.fdBody').innerHTML=`
+    <div class="fdCab">
+      <div>
+        <div class="fdKick">Auditoría Final · ${r[C.proceso]||''}</div>
+        <div class="fdH1">${r[C.cliente]||''} · ${r[C.grupo]||''}</div>
+        <div class="fdSub">${fechaTxt(r[C.fecha])} · Semana ${r[C.semana]||''} · ${r[C.intext]||''}</div>
+      </div>
+      ${badgeRes}
+    </div>
+
+    <div class="fdAviso">Registro <b>digitado</b> de la hoja de papel. No tiene fotos ni medidas
+      prenda por prenda: eso solo existe en las auditorías capturadas en vivo por la auditora.</div>
+
+    <div class="fdSec">Identificación</div>
+    <div class="fdGrid">
+      ${d('Estilo', r[C.estiloL])}${d('Estilo cliente', r[C.estiloC])}
+      ${d('Color', r[C.color])}${d('PO', r[C.po])}
+      ${d('Taller', r[C.servicio])}${d('Destino', r[C.destino])}
+    </div>
+
+    <div class="fdSec">Lote y muestra</div>
+    <div class="fdGrid">
+      ${d('Lote recibido', r[C.recibido])}${d('Muestra', r[C.lote])}
+      ${d('N.º de auditoría', r[C.nAud])}
+      ${d('Licencia', r[C.licencia]?'Sí — inspección al 100%':'No')}
+      ${d('Auditora', r[C.auditor])}
+    </div>
+
+    ${defs.length?`<div class="fdSec">Defectos encontrados</div>
+      <div class="fdLista">${defs.map(x=>'<div class="fdDef">'+x+'</div>').join('')}</div>`:''}
+
+    ${r[C.derivados]?`<div class="fdSec">Derivados</div>
+      <div class="fdGrid">${d('Prendas derivadas', r[C.derivados])}</div>`:''}
+  `;
+  abrirFicha();
 }
+
 
 /* Asigna un clic solo si el elemento existe. Un botón que falte no debe
    tumbar la carga entera: eso dejaba la pantalla en «Cargando…» para siempre. */
@@ -417,10 +493,13 @@ cargar();
 <div id="masWrap" style="display:none;text-align:center;margin:14px 0">
   <button id="btnMas" class="chip" type="button">Ver más</button>
 </div>
-<div id="fichaDig" class="fdWrap" onclick="if(event.target===this)this.style.display='none'">
+<div id="fichaDig" class="fdWrap" onclick="if(event.target===this)cerrarFicha()">
   <div class="fdCard">
-    <div class="fdHead">Detalle de la auditoría
-      <button type="button" onclick="document.getElementById('fichaDig').style.display='none'">&times;</button></div>
+    <div class="fdHead">
+      <span class="fdTitulo">Detalle de la auditoría</span>
+      <span class="fdAcc"></span>
+      <button type="button" class="fdX" onclick="cerrarFicha()">&times;</button>
+    </div>
     <div class="fdBody"></div>
   </div>
 </div>
