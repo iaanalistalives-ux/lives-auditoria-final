@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buscar auditorías · LIVES</title>
 <style>
-:root{--navy:#1f3864;--green:#2a9d8f;--red:#e63946;--amber:#e9c46a;--ora:#f4a261;--bg:#eef2f6;--ink:#243040}
+:root{
+  --petrol:#0E3B36; --petrol-2:#12463F; --emer:#10B981;
+  --sage:#0F7A5A; --sage-dark:#0B815E; --slate:#4E6B78;
+  --taupe:#B45309; --rose:#DC2626; --tan:#F59E0B;
+  --warm:#DCE5E2; --warm-light:#F1F6F4; --stone:#5F726C;
+  --card:#fff; --sh:0 1px 3px rgba(14,59,54,.06),0 1px 2px rgba(14,59,54,.04);
+  --r:12px;
+  /* nombres antiguos, apuntando al estándar vigente */
+  --navy:#0E3B36; --azul:#0E3B36; --amber:#F59E0B;
+}
 *{box-sizing:border-box}
 body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 .top{background:var(--navy);color:#fff;padding:16px 20px}
@@ -15,12 +24,12 @@ body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-
 .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
 .filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667;margin-bottom:4px}
-input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;font:inherit;background:#fbfcfd}
+input,select{width:100%;border:1px solid #DCE5E2;border-radius:9px;padding:10px;font:inherit;background:#fbfcfd}
 .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 .btn{border:none;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:14px}
 .btn.prim{background:var(--navy);color:#fff}
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
-.btn.toggle{background:#fff;color:var(--navy);border:1px solid #dce1e7}
+.btn.toggle{background:#fff;color:var(--navy);border:1px solid #DCE5E2}
 .btn.toggle.active{background:var(--amber);color:#5c4400;border-color:var(--amber)}
 .hint{font-size:12px;color:#889;margin-top:8px}
 .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
@@ -41,10 +50,11 @@ tr:hover td{background:#f6f9fb}
 @media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
 
   .fdWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
-          align-items:center;justify-content:center;z-index:200;padding:20px;}
-  .fdCard{background:#fff;border-radius:12px;max-width:1000px;width:100%;
-          max-height:92vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);}
-  .fdFrame{width:100%;height:74vh;border:none;display:block;}
+          align-items:center;justify-content:center;z-index:200;padding:0;}
+  .fdCard{background:#fff;border-radius:12px;width:94vw;max-width:1600px;
+          height:94vh;display:flex;flex-direction:column;overflow:hidden;
+          box-shadow:0 12px 40px rgba(0,0,0,.32);}
+  .fdFrame{width:100%;height:100%;min-height:70vh;border:none;display:block;}
   .fdLink{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);
           border-radius:6px;padding:5px 13px;font-size:12px;font-weight:700;
           text-decoration:none;cursor:pointer;font-family:inherit;}
@@ -69,7 +79,7 @@ tr:hover td{background:#f6f9fb}
   .fdHead{background:#0E3B36;color:#fff;padding:12px 18px;font-weight:700;font-size:15px;
           display:flex;gap:14px;align-items:center;position:sticky;top:0;z-index:5;
           border-bottom:3px solid #10B981;}
-  .fdBody{padding:16px 18px;}
+  .fdBody{padding:16px 18px;flex:1;overflow:auto;}
   .fdAviso{background:#FFFBEB;border:1px solid #F59E0B;color:#92400E;border-radius:8px;
           padding:10px 13px;font-size:12.5px;margin-bottom:14px;line-height:1.6;}
   .fdRow{display:flex;justify-content:space-between;gap:16px;padding:7px 0;
@@ -81,6 +91,38 @@ tr:hover td{background:#f6f9fb}
            align-items:center;gap:10px;flex-wrap:wrap;}
   .tiempos button{background:#0F7A5A;color:#fff;border:none;border-radius:6px;
            padding:4px 12px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
+
+  .fdPie{margin-top:22px;padding-top:10px;border-top:1px solid var(--warm);
+         font-size:11px;color:var(--stone);display:none;}
+
+  /* ===== Impresión de la ficha ===== */
+  @media print{
+    @page{ size:A4 portrait; margin:12mm; }
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+
+    /* Con la ficha abierta se imprime solo ella: el resto de la página estorba. */
+    body.imprimiendo-ficha > *:not(#fichaDig){ display:none!important; }
+    body.imprimiendo-ficha #fichaDig{
+      position:static!important; display:block!important; background:#fff!important;
+      inset:auto!important; padding:0!important;
+    }
+    body.imprimiendo-ficha .fdCard{
+      width:100%!important; max-width:none!important; height:auto!important;
+      box-shadow:none!important; border-radius:0!important; display:block!important;
+    }
+    body.imprimiendo-ficha .fdHead{
+      position:static!important; background:#0E3B36!important; color:#fff!important;
+      border-bottom:3px solid #10B981!important;
+    }
+    body.imprimiendo-ficha .fdAcc, body.imprimiendo-ficha .fdX{ display:none!important; }
+    body.imprimiendo-ficha .fdBody{ overflow:visible!important; padding:16px 0!important; }
+    body.imprimiendo-ficha .fdPie{ display:block!important; }
+    body.imprimiendo-ficha .fdGrid{ break-inside:avoid; }
+    body.imprimiendo-ficha .fdCel{ border:1px solid #DCE5E2; }
+    /* El marco de las auditorías en vivo no se imprime desde acá: esas tienen
+       su propio PDF en «Abrir aparte», que sí incluye fotos y medidas. */
+    body.imprimiendo-ficha .fdFrame{ display:none!important; }
+  }
 </style>
 </head>
 <body>
@@ -370,6 +412,16 @@ document.getElementById('tbody').addEventListener('click',function(e){
   else verDigitada(r);
 });
 
+/* Imprime SOLO la ficha abierta, no la página con la tabla de resultados.
+   Se marca el body y el bloque @media print se encarga del resto. En el
+   diálogo del navegador, «Guardar como PDF» genera el archivo. */
+function imprimirFicha(){
+  document.body.classList.add('imprimiendo-ficha');
+  const limpiar=()=>document.body.classList.remove('imprimiendo-ficha');
+  window.addEventListener('afterprint', limpiar, {once:true});
+  setTimeout(()=>{ window.print(); setTimeout(limpiar, 1500); }, 60);
+}
+
 function abrirFicha(){ document.getElementById('fichaDig').style.display='flex'; }
 function cerrarFicha(){
   document.getElementById('fichaDig').style.display='none';
@@ -381,6 +433,7 @@ function verEnVivo(r){
   f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
   f.querySelector('.fdAcc').innerHTML=
     `<a class="fdLink" href="ver.html?id=${encodeURIComponent(r[C.id])}" target="_blank">Abrir aparte / PDF</a>`;
+  f.querySelector('.fdBody').style.padding='0';
   f.querySelector('.fdBody').innerHTML=
     `<iframe class="fdFrame" src="ver.html?id=${encodeURIComponent(r[C.id])}"></iframe>`;
   abrirFicha();
@@ -401,8 +454,9 @@ function botonVer(r,i){
 }
 function verDigitada(r){
   const f=document.getElementById('fichaDig');
+  f.querySelector('.fdBody').style.padding='16px 18px';
   f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
-  f.querySelector('.fdAcc').innerHTML='<button class="fdLink" type="button" onclick="window.print()">Imprimir</button>';
+  f.querySelector('.fdAcc').innerHTML='<button class="fdLink" type="button" onclick="imprimirFicha()">Imprimir / PDF</button>';
 
   const d=(t,v)=>v?`<div class="fdCel"><span>${t}</span><b>${v}</b></div>`:'';
   const badgeRes = (r[C.resFinal]||'').toUpperCase()==='RECHAZADO'
@@ -442,6 +496,10 @@ function verDigitada(r){
 
     ${r[C.derivados]?`<div class="fdSec">Derivados</div>
       <div class="fdGrid">${d('Prendas derivadas', r[C.derivados])}</div>`:''}
+
+    <div class="fdPie">Calidad Manufactura · LIVES — impreso el
+      ${new Date().toLocaleDateString('es-PE')} a las
+      ${new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}</div>
   `;
   abrirFicha();
 }
