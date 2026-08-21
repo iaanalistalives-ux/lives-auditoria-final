@@ -55,6 +55,11 @@ tr:hover td{background:#f6f9fb}
           border-bottom:1px solid #F1F6F4;font-size:14px;}
   .fdRow span{color:#5F726C;} .fdRow b{color:#333;text-align:right;}
   .fdRow.col{flex-direction:column;} .fdRow.col b{text-align:left;margin-top:4px;line-height:1.7;}
+
+  .tiempos{font-size:11.5px;color:#5F726C;margin:8px 0 4px;display:flex;
+           align-items:center;gap:10px;flex-wrap:wrap;}
+  .tiempos button{background:#0F7A5A;color:#fff;border:none;border-radius:6px;
+           padding:4px 12px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -156,9 +161,35 @@ function leerCSV(txt){
   return filas;
 }
 
-async function cargar(){
+/* Guarda el CSV en el navegador por 5 minutos. En planta lo abren muchas veces
+   al día: la primera carga paga la descarga y las siguientes son instantáneas.
+   El botón «Actualizar» fuerza traerlo de nuevo. */
+const CACHE_KEY='lives_buscar_final', CACHE_MIN=5;
+function leerCache(){
   try{
-    const txt=await (await fetch(CSV_FINAL+'&_='+Date.now(),{cache:'no-store'})).text();
+    const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if(c && (Date.now()-c.t) < CACHE_MIN*60000) return c;
+  }catch(e){}
+  return null;
+}
+
+async function cargar(forzar){
+  const t0=performance.now();
+  const est=document.getElementById('estado');
+  est.style.display='block';
+  try{
+    let txt, deCache=false, tDesc=0;
+    const c = forzar ? null : leerCache();
+    if(c){ txt=c.txt; deCache=true; }
+    else{
+      est.textContent='Descargando auditorías…';
+      const d0=performance.now();
+      txt=await (await fetch(CSV_FINAL+'&_='+Date.now(),{cache:'no-store'})).text();
+      tDesc=performance.now()-d0;
+      try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), txt:txt})); }catch(e){}
+    }
+    est.textContent='Preparando la tabla…';
+    window.__t={t0:t0, desc:tDesc, cache:deCache};
     const tabla=leerCSV(txt);
     if(tabla.length<2) throw new Error('hoja vacía');
     const cab=tabla[0].map(x=>String(x||'').trim());
@@ -183,6 +214,8 @@ async function cargar(){
       return a;
     });
     DATA=rows.filter(r=>r[C.resFinal]);
+    const tProc=performance.now()-t0-(window.__t.desc||0);
+    window.__t.proc=tProc;
     /* Al abrir se muestran los últimos 60 días. Cargar 4 000 filas de golpe hacía
        lenta la pantalla, y casi siempre se busca algo reciente. Con «Limpiar»
        o cambiando las fechas se ve todo el histórico. */
@@ -192,8 +225,24 @@ async function cargar(){
         d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
     }
     // poblar selects de cliente y auditor
-    llenarSelect('fCliente', [...new Set(DATA.map(r=>r[C.cliente]).filter(Boolean))].sort());
-    llenarSelect('fAuditor', [...new Set(DATA.map(r=>r[C.auditor]).filter(Boolean))].sort());
+    const tt=window.__t, total=Math.round(performance.now()-tt.t0);
+    document.getElementById('tiempos').innerHTML =
+      DATA.length.toLocaleString('es-PE')+' auditorías · '+
+      (tt.cache ? 'desde la memoria del navegador'
+                : 'descarga '+Math.round(tt.desc)+' ms')+
+      ' · preparar '+Math.round(tt.proc)+' ms · total '+total+' ms'+
+      ' <button id="btnRefrescar" type="button">Actualizar</button>';
+    document.getElementById('btnRefrescar').onclick=()=>{
+      try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+      cargar(true);
+    };
+    const sCli=new Set(), sAud=new Set();
+    for(let i=0;i<DATA.length;i++){
+      if(DATA[i][C.cliente]) sCli.add(DATA[i][C.cliente]);
+      if(DATA[i][C.auditor]) sAud.add(DATA[i][C.auditor]);
+    }
+    llenarSelect('fCliente',[...sCli].sort());
+    llenarSelect('fAuditor',[...sAud].sort());
     buscar();
   }catch(e){
     document.getElementById('estado').textContent='No se pudo cargar. Revisa tu conexión.';
@@ -355,6 +404,7 @@ document.getElementById('btnLicencias').onclick=()=>{
 
 cargar();
 </script>
+<div id="tiempos" class="tiempos"></div>
 <div id="masWrap" style="display:none;text-align:center;margin:14px 0">
   <button id="btnMas" class="chip" type="button">Ver más</button>
 </div>
