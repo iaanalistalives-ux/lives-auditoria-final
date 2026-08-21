@@ -89,6 +89,8 @@ tr:hover td{background:#f6f9fb}
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
+      <button class="btn toggle" id="btnEnVivo" type="button">Solo en vivo</button>
+      <button class="btn toggle" id="btnDigitado" type="button">Solo digitado</button>
     </div>
     <div class="hint">Deja los campos vacíos y pulsa Buscar para ver las más recientes. Puedes combinar filtros.</div>
   </div>
@@ -232,10 +234,10 @@ async function cargar(forzar){
                 : 'descarga '+Math.round(tt.desc)+' ms')+
       ' · preparar '+Math.round(tt.proc)+' ms · total '+total+' ms'+
       ' <button id="btnRefrescar" type="button">Actualizar</button>';
-    document.getElementById('btnRefrescar').onclick=()=>{
+    alClic('btnRefrescar', ()=>{
       try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
       cargar(true);
-    };
+    });
     const sCli=new Set(), sAud=new Set();
     for(let i=0;i<DATA.length;i++){
       if(DATA[i][C.cliente]) sCli.add(DATA[i][C.cliente]);
@@ -369,36 +371,43 @@ function verDigitada(r){
   f.style.display='flex';
 }
 
-function val(id){return document.getElementById(id).value.trim();}
+/* Asigna un clic solo si el elemento existe. Un botón que falte no debe
+   tumbar la carga entera: eso dejaba la pantalla en «Cargando…» para siempre. */
+function alClic(id, fn){
+  const e=document.getElementById(id);
+  if(e) e.onclick=fn; else console.warn('falta el elemento', id);
+}
+function val(id){const e=document.getElementById(id); return e?e.value.trim():'';}
 
 function setOrigen(v){
   ORIGEN = (ORIGEN===v) ? '' : v;
-  document.getElementById('btnEnVivo').classList.toggle('active', ORIGEN==='EN VIVO');
-  document.getElementById('btnDigitado').classList.toggle('active', ORIGEN==='DIGITADO');
+  const bv=document.getElementById('btnEnVivo'), bd=document.getElementById('btnDigitado');
+  if(bv) bv.classList.toggle('active', ORIGEN==='EN VIVO');
+  if(bd) bd.classList.toggle('active', ORIGEN==='DIGITADO');
   buscar();
 }
-document.getElementById('btnMas').onclick=pintarMas;
-document.getElementById('btnEnVivo').onclick=()=>setOrigen('EN VIVO');
-document.getElementById('btnDigitado').onclick=()=>setOrigen('DIGITADO');
-document.getElementById('btnBuscar').onclick=buscar;
-document.getElementById('btnLimpiar').onclick=()=>{
+alClic('btnMas', pintarMas);
+alClic('btnEnVivo', ()=>setOrigen('EN VIVO'));
+alClic('btnDigitado', ()=>setOrigen('DIGITADO'));
+alClic('btnBuscar', buscar);
+alClic('btnLimpiar', ()=>{
   ['fPo','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
   filtroReproceso=false; filtroLicencia=false;
   document.getElementById('btnReprocesos').classList.remove('active');
   document.getElementById('btnLicencias').classList.remove('active');
   buscar();
-};
-document.getElementById('btnReprocesos').onclick=()=>{
+});
+alClic('btnReprocesos', ()=>{
   filtroReproceso=!filtroReproceso;
   document.getElementById('btnReprocesos').classList.toggle('active',filtroReproceso);
   buscar();
-};
-document.getElementById('btnLicencias').onclick=()=>{
+});
+alClic('btnLicencias', ()=>{
   filtroLicencia=!filtroLicencia;
   document.getElementById('btnLicencias').classList.toggle('active',filtroLicencia);
   buscar();
-};
+});
 // Enter en cualquier input dispara búsqueda
 ['fPo','fGrupo','fEstilo','fColor'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')buscar();}));
 
