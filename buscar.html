@@ -183,6 +183,14 @@ async function cargar(){
       return a;
     });
     DATA=rows.filter(r=>r[C.resFinal]);
+    /* Al abrir se muestran los últimos 60 días. Cargar 4 000 filas de golpe hacía
+       lenta la pantalla, y casi siempre se busca algo reciente. Con «Limpiar»
+       o cambiando las fechas se ve todo el histórico. */
+    if(!document.getElementById('fDesde').value){
+      const d=new Date(Date.now()-60*864e5);
+      document.getElementById('fDesde').value =
+        d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+    }
     // poblar selects de cliente y auditor
     llenarSelect('fCliente', [...new Set(DATA.map(r=>r[C.cliente]).filter(Boolean))].sort());
     llenarSelect('fAuditor', [...new Set(DATA.map(r=>r[C.auditor]).filter(Boolean))].sort());
@@ -232,13 +240,26 @@ function buscar(){
   res.sort((a,b)=>fechaTxt(b[C.fecha]).localeCompare(fechaTxt(a[C.fecha])));
   pintar(res);
 }
+let RES=[], PINTADAS=0;
+const PAGINA=150;
+
 function pintar(res){
+  RES=res; PINTADAS=0;
+  document.getElementById('tbody').innerHTML='';
+  pintarMas();
+}
+
+function pintarMas(){
+  const res=RES;
   const tb=document.getElementById('tbody'), est=document.getElementById('estado'), cnt=document.getElementById('count');
-  tb.innerHTML='';
-  if(!res.length){ est.style.display='block'; est.textContent='Sin resultados. Ajusta los filtros.'; cnt.textContent=''; return; }
+  if(!res.length){ est.style.display='block'; est.textContent='Sin resultados. Ajusta los filtros.';
+    cnt.textContent=''; document.getElementById('masWrap').style.display='none'; return; }
   est.style.display='none';
-  cnt.textContent=res.length+' auditoría(s) encontrada(s)';
-  res.forEach(r=>{
+
+  const hasta=Math.min(PINTADAS+PAGINA, res.length);
+  const frag=document.createDocumentFragment();
+  for(let i=PINTADAS;i<hasta;i++){
+    const r=res[i];
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><b>${r[C.id]||''}</b></td>
       <td>${fechaTxt(r[C.fecha])}</td>
@@ -247,10 +268,25 @@ function pintar(res){
       <td>${r[C.auditor]||''}</td>
       <td>${badge(r[C.resFinal])}</td>
       <td>${origenTag(r[C.captura])}</td>
-      <td>${botonVer(r)}</td>`;
-    tb.appendChild(tr);
-  });
+      <td>${botonVer(r,i)}</td>`;
+    frag.appendChild(tr);
+  }
+  tb.appendChild(frag);
+  PINTADAS=hasta;
+
+  cnt.textContent = res.length.toLocaleString('es-PE')+' auditoría(s) · mostrando '+
+                    PINTADAS.toLocaleString('es-PE');
+  const mw=document.getElementById('masWrap');
+  mw.style.display = PINTADAS<res.length ? 'block' : 'none';
+  document.getElementById('btnMas').textContent =
+    'Ver '+Math.min(PAGINA,res.length-PINTADAS)+' más de '+(res.length-PINTADAS).toLocaleString('es-PE');
 }
+
+/* Un solo escuchador para toda la tabla, en vez de uno por fila. */
+document.getElementById('tbody').addEventListener('click',function(e){
+  const b=e.target.closest('[data-ver]');
+  if(b) verDigitada(RES[+b.dataset.ver]);
+});
 /* Las capturadas en vivo tienen ficha completa con fotos y medidas.
    Las digitadas vienen de la hoja de papel: no hay fotos ni medidas, y por eso
    se abre un resumen en pantalla en vez de mandar a una ficha medio vacía. */
@@ -259,10 +295,12 @@ function origenTag(cap){
     ? '<span class="tag ov">EN VIVO</span>'
     : '<span class="tag" style="background:#EEF2F7;color:#4E6B78">DIGITADO</span>';
 }
-function botonVer(r){
+function botonVer(r,i){
   if((r[C.captura]||'').toUpperCase()==='EN VIVO' && r[C.id])
     return `<a class="ver" href="ver.html?id=${encodeURIComponent(r[C.id])}">Ver / PDF</a>`;
-  return `<button class="ver" type="button" onclick='verDigitada(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Ver</button>`;
+  /* Se pasa solo el índice. Antes iba la fila entera en JSON dentro del onclick:
+     con miles de filas eso hacía el HTML varias veces más pesado sin necesidad. */
+  return `<button class="ver" type="button" data-ver="${i}">Ver</button>`;
 }
 function verDigitada(r){
   const f=document.getElementById('fichaDig');
@@ -290,6 +328,7 @@ function setOrigen(v){
   document.getElementById('btnDigitado').classList.toggle('active', ORIGEN==='DIGITADO');
   buscar();
 }
+document.getElementById('btnMas').onclick=pintarMas;
 document.getElementById('btnEnVivo').onclick=()=>setOrigen('EN VIVO');
 document.getElementById('btnDigitado').onclick=()=>setOrigen('DIGITADO');
 document.getElementById('btnBuscar').onclick=buscar;
@@ -316,6 +355,9 @@ document.getElementById('btnLicencias').onclick=()=>{
 
 cargar();
 </script>
+<div id="masWrap" style="display:none;text-align:center;margin:14px 0">
+  <button id="btnMas" class="chip" type="button">Ver más</button>
+</div>
 <div id="fichaDig" class="fdWrap" onclick="if(event.target===this)this.style.display='none'">
   <div class="fdCard">
     <div class="fdHead">Detalle de la auditoría
