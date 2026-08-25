@@ -156,13 +156,6 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <input id="ordinal" readonly placeholder="—" style="background:#eef3f1;font-weight:700;color:var(--navy);text-align:center">
         <div class="hint" id="ordHint">Se calcula según las auditorías previas del mismo tipo.</div>
       </div>
-      <div><label>¿Reproceso?</label>
-        <div class="toggle ovr" style="margin:0;padding:9px 12px">
-          <div style="font-weight:600;font-size:13px">Reproceso</div>
-          <label class="switch"><input type="checkbox" id="reproSwitch"><span class="slider"></span></label>
-        </div>
-        <div class="hint">Si es reproceso, no suma al reporte.</div>
-      </div>
     </div>
     <div class="field"><label>Proceso *</label>
       <select id="proceso">
@@ -175,6 +168,14 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <div class="field" id="tallerWrap" style="display:none"><label>Taller *</label>
       <select id="taller"><option value="">— Seleccionar —</option></select>
       <div class="hint">Solo se muestran los talleres del proceso elegido.</div>
+    </div>
+    <div class="field"><label>OP (Orden de Producción)</label>
+      <input id="opInput" inputmode="numeric" autocomplete="off" placeholder="70085">
+      <div class="hint" id="opHint">Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.</div>
+    </div>
+    <div id="opSelector" style="display:none;margin:-6px 0 10px;padding:10px 12px;background:#fff4e0;border:1px solid #e9c46a;border-radius:10px">
+      <div style="font-size:12px;font-weight:700;color:#7a5a12;margin-bottom:8px">Esta OP tiene varias opciones — toca la que corresponde:</div>
+      <div id="opSelectorList" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
     <div class="grid">
       <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="EFI-102">
@@ -222,6 +223,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <div><div style="font-weight:600;font-size:14px">¿Es licencia? (inspección 100%)</div>
         <div class="hint" style="margin-top:2px">La muestra pasa a ser el total recibido y el lote queda aprobado.</div></div>
       <label class="switch"><input type="checkbox" id="licSwitch"><span class="slider"></span></label>
+    </div>
+    <div class="toggle ovr" id="reproWrap" style="opacity:.45">
+      <div><div style="font-weight:600;font-size:14px">¿Reproceso?</div>
+        <div class="hint" id="reproHint" style="margin-top:2px">Escribe la OP arriba para habilitar esta marca.</div></div>
+      <label class="switch"><input type="checkbox" id="reproSwitch" disabled><span class="slider"></span></label>
     </div>
     <div class="field"><label>Nivel AQL</label>
       <div class="seg" id="segA"><button data-v="1.0">1.0</button><button data-v="1.5" class="on">1.5</button><button data-v="2.5">2.5</button></div>
@@ -663,7 +669,7 @@ function fillTaller(proc){
 }
 
 /* ===== ESTADO ===== */
-const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[]};
+const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:''};
 let AUD_CACHE=null;       // filas de la hoja AUDITORÍAS (para ordinal/pedido/panel)
 let ordTimer=null;
 let defId=0;
@@ -698,7 +704,85 @@ $('proceso').onchange=()=>{
 };
 $('taller').onchange=validate;
 
-/* ===== reproceso ===== */
+/* ===== Base de OPs: escribir la OP completa los datos del pedido =====
+   Reglas (confirmadas con la fuente de la base):
+   - OP sola determina grupo/estilo/tela (únicos por OP).
+   - OP NO determina color ni PO: si hay varias filas, se ofrecen para elegir.
+   - Si la OP no está en la base (ej. anterior a 2025), NO se bloquea nada:
+     los campos quedan libres para digitar a mano, igual que siempre.
+   - Reproceso empieza bloqueado (candado) y se habilita apenas se intenta
+     buscar la OP, se encuentre o no — nunca se automarca solo. */
+let OPS_DB=[];
+const CAMPOS_OP=['grupo','estiloL','po','color','destino','pedido'];
+function lockField(id,val){
+  const el=$(id); if(!el) return;
+  el.value = (val==null?'':val);
+  el.readOnly=true; el.style.background='#eef3f1'; el.style.color='var(--green)'; el.style.fontWeight='600';
+}
+function unlockField(id){
+  const el=$(id); if(!el) return;
+  el.readOnly=false; el.style.background=''; el.style.color=''; el.style.fontWeight='';
+}
+function fijarReproWrap(habilitado){
+  const wrap=$('reproWrap'), sw=$('reproSwitch'), hint=$('reproHint');
+  if(!wrap||!sw) return;
+  sw.disabled=!habilitado;
+  wrap.style.opacity=habilitado?'1':'.45';
+  if(hint) hint.textContent = habilitado ? 'Si es reproceso, no suma al reporte.' : 'Escribe la OP arriba para habilitar esta marca.';
+  if(!habilitado){ S.reproceso=false; sw.checked=false; }
+}
+function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
+function liberarCamposOP(){ CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; }
+function autocompletarDesdeOP(m){
+  lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('po',m.po);
+  lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
+  S.codTela=m.codTela||''; S.descTela=m.descTela||'';
+  aplicarCliente(); validate(); fijarReproWrap(true);
+  const h=$('opHint'); if(h){ h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
+}
+function buscarOP(){
+  clearTimeout(opTimer);
+  const op=($('opInput').value||'').trim();
+  const h=$('opHint');
+  if(!op){
+    ocultarSelectorOP(); liberarCamposOP(); fijarReproWrap(false);
+    if(h){ h.className='hint'; h.textContent='Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.'; }
+    validate(); return;
+  }
+  const matches=OPS_DB.filter(r=>r.op===op);
+  if(matches.length>1){
+    // Si ya está mostrando exactamente estas opciones, no tocar nada (evita que un
+    // recálculo tardío del buscador borre un botón justo cuando lo están tocando).
+    const listYa=$('opSelectorList');
+    if($('opSelector').style.display==='block' && listYa.dataset.op===op) return;
+  }
+  ocultarSelectorOP();
+  if(matches.length===0){
+    liberarCamposOP(); fijarReproWrap(true);
+    if(h){ h.className='hint warn'; h.textContent='OP no encontrada en la base (puede ser anterior a 2025). Completa los datos abajo a mano.'; }
+    validate();
+  } else if(matches.length===1){
+    autocompletarDesdeOP(matches[0]);
+  } else {
+    fijarReproWrap(false);
+    if(h){ h.className='hint'; h.textContent='Esta OP tiene varias opciones — elige abajo.'; }
+    const sel=$('opSelector'), list=$('opSelectorList');
+    list.innerHTML=''; list.dataset.op=op;
+    matches.forEach(m=>{
+      const b=document.createElement('button'); b.type='button';
+      b.style.cssText='text-align:left;padding:9px 12px;border-radius:8px;border:1px solid #e9c46a;background:#fff;font-size:13px;cursor:pointer';
+      b.textContent=[m.color,m.destino?('Destino '+m.destino):'',m.po?('PO '+m.po):''].filter(Boolean).join(' · ');
+      b.onclick=()=>{ ocultarSelectorOP(); autocompletarDesdeOP(m); };
+      list.appendChild(b);
+    });
+    sel.style.display='block';
+  }
+}
+let opTimer=null;
+$('opInput').addEventListener('input',()=>{ clearTimeout(opTimer); opTimer=setTimeout(buscarOP,350); });
+$('opInput').addEventListener('blur',buscarOP);
+
+/* ===== reproceso (el candado lo maneja fijarReproWrap, ver bloque de OP arriba) ===== */
 $('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;recalc();};
 
 $('inMed').onchange=e=>{agregarFotos(e.target.files,'med');e.target.value='';};
@@ -1156,6 +1240,7 @@ function armarPayload(){
     servicio:interno?'Acabados Final':v('taller'),grupo:v('grupo'),estilo_lives:v('estiloL'),estilo_cliente:v('estiloC'),
     po:v('po'),color:v('color'),destino:v('destino'),cant_pedido:parseInt(v('pedido'))||'',total_recibido:recibido,
     lote_real:recibido,licencia:S.licencia?'SÍ':'NO',nivel_aql:parseFloat(S.nivel),
+    cod_tela:S.codTela||'',desc_tela:S.descTela||'',
     override:S.override?'SÍ':'NO',override_autoriza:v('ovWho'),override_motivo:v('ovWhy'),
     muestra_medidas:parseInt(v('medMuestra'))||'',def_medidas:parseInt(v('medDef'))||'',resultado_medidas:v('medRes'),
     auditor:v('auditor'),
@@ -1337,6 +1422,7 @@ function cargarParaEditar(id){
   // licencia / reproceso
   S.licencia=(norm(r[16]).indexOf('s')===0); if($('licSwitch')) $('licSwitch').checked=S.licencia;
   S.reproceso=(norm(r[39]).indexOf('s')===0); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
+  fijarReproWrap(true); // es una auditoría ya existente, no una nueva a medio llenar: el candado no aplica aquí
   // marcar modo edición
   S.editId=id;
   $('editId').textContent=id;
@@ -1449,6 +1535,7 @@ function restaurarBorrador(){
   if(b.proceso){ const selP=$('proceso'); if(selP) selP.value=b.proceso; }
   S.proceso=b.proceso||''; S.int_ext=b.int_ext||''; S.nAud=b.nAud||''; S.nivel=b.nivel||'1.5';
   S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso;
+  fijarReproWrap(true); // el borrador ya traía datos en curso; el candado inicial solo aplica a un formulario recién abierto
   if(b.editId){ S.editId=b.editId; const ei=$('editId'); if(ei) ei.textContent=b.editId; const me=$('modoEdicion'); if(me) me.style.display='block'; }
 
   document.querySelectorAll('#segA button').forEach(x=>{ x.classList.toggle('on', x.dataset.v===S.nivel); });
@@ -1489,7 +1576,15 @@ function restaurarBorrador(){
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) guardarBorradorAhora(); });
 window.addEventListener('pagehide', guardarBorradorAhora);
 
-Promise.all([loadLists(), cargarAud()]).then(()=>{
+async function cargarOPS(){
+  try{
+    const r=await fetch(APP_URL+'?accion=ops');
+    const j=await r.json();
+    OPS_DB=(j&&j.rows)?j.rows:[];
+  }catch(e){ OPS_DB=[]; /* si falla, el campo OP simplemente no encuentra nada y no bloquea (comportamiento normal) */ }
+}
+
+Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   refrescarCascada();
   generarChecklistDefectos();
   generarChecklistDerivados();
