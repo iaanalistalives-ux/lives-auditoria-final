@@ -713,7 +713,7 @@ $('taller').onchange=validate;
    - Reproceso empieza bloqueado (candado) y se habilita apenas se intenta
      buscar la OP, se encuentre o no — nunca se automarca solo. */
 let OPS_DB=[];
-const CAMPOS_OP=['grupo','estiloL','po','color','destino','pedido'];
+const CAMPOS_OP=['grupo','estiloL','estiloC','po','color','destino','pedido'];
 function lockField(id,val){
   const el=$(id); if(!el) return;
   el.value = (val==null?'':val);
@@ -734,10 +734,10 @@ function fijarReproWrap(habilitado){
 function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
 function liberarCamposOP(){ CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; }
 function autocompletarDesdeOP(m){
-  lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('po',m.po);
+  lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('estiloC',m.estiloCli); lockField('po',m.po);
   lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
   S.codTela=m.codTela||''; S.descTela=m.descTela||'';
-  aplicarCliente(); validate(); fijarReproWrap(true);
+  aplicarCliente(); refrescarCascada(); validate(); fijarReproWrap(true);
   const h=$('opHint'); if(h){ h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
 }
 function buscarOP(){
