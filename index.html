@@ -771,7 +771,7 @@ function buscarOP(){
     matches.forEach(m=>{
       const b=document.createElement('button'); b.type='button';
       b.style.cssText='text-align:left;padding:9px 12px;border-radius:8px;border:1px solid #e9c46a;background:#fff;font-size:13px;cursor:pointer';
-      b.textContent=[m.color,m.destino?('Destino '+m.destino):'',m.po?('PO '+m.po):''].filter(Boolean).join(' · ');
+      b.textContent=[m.color,m.destino?('Destino '+m.destino):'',m.po?('PO '+m.po):'',(m.pedido!=null&&m.pedido!=='')?(m.pedido+' prendas'):''].filter(Boolean).join(' · ');
       b.onclick=()=>{ ocultarSelectorOP(); autocompletarDesdeOP(m); };
       list.appendChild(b);
     });
