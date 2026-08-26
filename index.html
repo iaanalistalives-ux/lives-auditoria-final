@@ -1394,7 +1394,40 @@ async function buscarMisAud(){
   cont.innerHTML=h;
 }
 
-function cargarParaEditar(id){
+// Aplica filas reales de la hoja DEFECTOS/DERIVADOS (formato plano: id,seccion,categoria,subtipo,cantidad,detalle,foto_url)
+// sobre los bloques ya generados (S.defs o S.ders), emparejando por sección+categoría(+subtipo).
+function aplicarDetalleDesdeSheet(bloques, filas){
+  filas.forEach(f=>{
+    const seccion=f[1], categoria=f[2], subtipo=f[3], cant=parseInt(f[4])||0, detalle=f[5]||'', foto=f[6]||'';
+    const b=bloques.find(x=>x.categoria===categoria && x.seccion===seccion);
+    if(!b) return;
+    if(detalle) b.detalle=detalle;
+    if(subtipo && b.subs && b.subs.length){
+      const s=b.subs.find(x=>x.subtipo===subtipo);
+      if(s){ s.cant=cant; s.foto=foto; }
+    } else {
+      b.cant=cant; b.foto=foto;
+    }
+  });
+}
+// Trae los defectos/derivados YA guardados de esta auditoría (id) y los mete en el checklist recién generado.
+// Sin esto, corregir una auditoría mostraba el checklist vacío aunque ya tuviera defectos cargados —
+// con el riesgo de guardar por encima y borrarlos sin querer.
+async function cargarDetalleParaEditar(id){
+  try{
+    const [defRows,derRows]=await Promise.all([gviz('DEFECTOS'),gviz('DERIVADOS')]);
+    const idTxt=String(id).trim();
+    aplicarDetalleDesdeSheet(S.defs, defRows.filter(r=>String(r[0]).trim()===idTxt));
+    aplicarDetalleDesdeSheet(S.ders, derRows.filter(r=>String(r[0]).trim()===idTxt));
+    repintarChecklistDefectos();
+    pintarChecklistConSecciones($('derChecklist'), [['Derivados',S.ders]]);
+    recalc();
+  }catch(e){
+    toast('No se pudieron recargar los defectos/derivados ya guardados — revísalos con cuidado antes de guardar','err');
+  }
+}
+
+async function cargarParaEditar(id){
   const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
   if(!r){ toast('No se encontró la auditoría','err'); return; }
   // Cargar campos en el formulario
@@ -1415,6 +1448,8 @@ function cargarParaEditar(id){
   const esCosturaEd = proc==='Costura (taller)';
   const derCardEd=$('derivadosCard'); if(derCardEd) derCardEd.style.display = esCosturaEd ? 'block' : 'none';
   generarChecklistDefectos();
+  generarChecklistDerivados();
+  await cargarDetalleParaEditar(id);
   // medidas
   $('medMuestra').value=r[28]||''; $('medDef').value=r[29]||''; $('medRes').value=r[30]||'';
   // comentario
