@@ -208,7 +208,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       </div>
       <div class="full"><label>Auditor *</label><input id="auditor" list="auditoras" autocomplete="off" placeholder="Escribe y selecciona tu nombre">
         <datalist id="auditoras"></datalist></div>
-      <div class="full"><label>Fecha *</label><input id="fecha" type="date"></div>
+      <div class="full"><label>Fecha (automática)</label><input id="fecha" type="date" readonly style="background:#eef3f1;font-weight:600;color:var(--green)"></div>
     </div>
     <div id="panelPrev" style="display:none;margin-top:12px;padding:12px;border-radius:12px;background:#eef3f8;border:1px solid #d4e0ee">
       <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:6px">📋 Auditorías previas de este lote</div>
@@ -509,6 +509,29 @@ function opcionesDe(campo, filtros){
   });
   return [...set].sort();
 }
+// Igual que opcionesDe(), pero leyendo de la base de OPs (fuente autoritativa) en vez del historial de auditorías
+const OPS_FIELD_MAP={grupo:'grupo',estiloL:'estilo',po:'po',color:'color',estiloC:'estiloCli',destino:'destino'};
+function opcionesDeOPS(campo,filtros){
+  const key=OPS_FIELD_MAP[campo]; if(!key) return [];
+  const set=new Set();
+  OPS_DB.forEach(r=>{
+    let ok=true;
+    for(const k in filtros){
+      const ok2=OPS_FIELD_MAP[k];
+      if(filtros[k] && ok2 && norm(r[ok2])!==norm(filtros[k])){ ok=false; break; }
+    }
+    if(ok){ const v=String(r[key]||'').trim(); if(v) set.add(v); }
+  });
+  return [...set].sort();
+}
+// Combina ambas fuentes: primero lo que hay en la base de OPs (más confiable), y solo si falta algo,
+// completa con lo que ya se ha digitado antes en AUDITORÍAS. Así, mientras la OP no se encuentre,
+// las sugerencias al escribir a mano siguen siendo lo más certeras posible.
+function opcionesCombinadas(campo,filtros){
+  const set=new Set(opcionesDeOPS(campo,filtros));
+  opcionesDe(campo,filtros).forEach(v=>set.add(v));
+  return [...set];
+}
 function setDatalist(dlId, valores){
   const dl=document.getElementById(dlId); if(!dl) return;
   dl.innerHTML=''; valores.forEach(v=>{const o=document.createElement('option');o.value=v;dl.appendChild(o);});
@@ -516,17 +539,17 @@ function setDatalist(dlId, valores){
 function refrescarCascada(){
   const g=$('grupo').value, e=$('estiloL').value, p=$('po').value, c=$('color').value, ec=$('estiloC').value;
   // Grupos (siempre todos)
-  setDatalist('grupos', opcionesDe('grupo',{}));
+  setDatalist('grupos', opcionesCombinadas('grupo',{}));
   // Estilo según grupo
-  setDatalist('dlEstilo', opcionesDe('estiloL',{grupo:g}));
+  setDatalist('dlEstilo', opcionesCombinadas('estiloL',{grupo:g}));
   // PO según grupo+estilo
-  setDatalist('dlPo', opcionesDe('po',{grupo:g,estiloL:e}));
+  setDatalist('dlPo', opcionesCombinadas('po',{grupo:g,estiloL:e}));
   // Color según grupo+estilo+po
-  setDatalist('dlColor', opcionesDe('color',{grupo:g,estiloL:e,po:p}));
+  setDatalist('dlColor', opcionesCombinadas('color',{grupo:g,estiloL:e,po:p}));
   // Estilo cliente según grupo+estilo+po+color
-  setDatalist('dlEstC', opcionesDe('estiloC',{grupo:g,estiloL:e,po:p,color:c}));
+  setDatalist('dlEstC', opcionesCombinadas('estiloC',{grupo:g,estiloL:e,po:p,color:c}));
   // Destino según todo lo anterior
-  setDatalist('dlDest', opcionesDe('destino',{grupo:g,estiloL:e,po:p,color:c,estiloC:ec}));
+  setDatalist('dlDest', opcionesCombinadas('destino',{grupo:g,estiloL:e,po:p,color:c,estiloC:ec}));
 }
 // Cuando una PO existe y es única, autocompletar lo que falte hacia abajo
 function autocompletarPorPO(){
