@@ -1458,22 +1458,26 @@ async function buscarMisAud(){
   const nom=($('miNombre').value||'').trim();
   const opBuscar=($('miOpBuscar').value||'').trim();
   const cont=$('misAudList');
-  if(!nom){ cont.innerHTML='<div class="hint">Escribe tu nombre primero.</div>'; return; }
+  if(!nom && !opBuscar){ cont.innerHTML='<div class="hint">Escribe tu nombre o una OP para buscar.</div>'; return; }
   cont.innerHTML='<div class="hint">Buscando…</div>';
   if(!AUD_CACHE) await cargarAud();
-  const nomN=nombreNorm(nom);
-  // Filtrar por nombre tolerante (sin tildes, espacios/saltos colapsados, por palabras)
-  let candidatos=(AUD_CACHE||[]).filter(r=>{
-    if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return false;
-    const audN=nombreNorm(r[31]);
-    if(!audN) return false;
-    if(audN.indexOf(nomN)>=0 || nomN.indexOf(audN)>=0) return true;
-    const palabras=nomN.split(' ').filter(Boolean);
-    return palabras.length>0 && palabras.every(p=>audN.indexOf(p)>=0);
-  });
-  // Si escribió una OP, filtra además por esa OP exacta (columna AY=50) — solo funciona con
-  // auditorías guardadas desde que se agregó esta columna, las anteriores no la tienen.
-  if(opBuscar){ candidatos=candidatos.filter(r=>norm(r[50])===norm(opBuscar)); }
+  let candidatos=(AUD_CACHE||[]).filter(r=>r&&r[0]!=null&&norm(r[0])!=='ID_AUDITORIA');
+  if(opBuscar){
+    // Buscando por OP: se busca en TODAS las auditorías, de cualquier auditor — no solo las propias.
+    // Así, si alguien más hizo la auditoría que salió rechazada, quien va a reprocesarla igual la encuentra.
+    // (El nombre se ve en la lista de resultados, no se usa aquí para filtrar.)
+    candidatos=candidatos.filter(r=>norm(r[50])===norm(opBuscar));
+  } else if(nom){
+    // Sin OP: "Mis auditorías" — solo lo propio, por nombre tolerante (sin tildes, por palabras)
+    const nomN=nombreNorm(nom);
+    candidatos=candidatos.filter(r=>{
+      const audN=nombreNorm(r[31]);
+      if(!audN) return false;
+      if(audN.indexOf(nomN)>=0 || nomN.indexOf(audN)>=0) return true;
+      const palabras=nomN.split(' ').filter(Boolean);
+      return palabras.length>0 && palabras.every(p=>audN.indexOf(p)>=0);
+    });
+  }
   // ordenar por año+semana desc y por id (la más reciente primero)
   candidatos.sort((a,b)=>{
     const ya=Number(a[37])||0, yb=Number(b[37])||0;
@@ -1486,14 +1490,14 @@ async function buscarMisAud(){
   const mias=candidatos;
   if(!mias.length){
     cont.innerHTML = opBuscar
-      ? '<div class="hint">No encontré auditorías tuyas con esa OP. (Las OPs solo quedaron guardadas desde hace poco — si es de antes, no va a aparecer así.)</div>'
+      ? '<div class="hint">No encontré ninguna auditoría con esa OP. (Las OPs solo quedaron guardadas desde hace poco — si es de antes, no va a aparecer así.)</div>'
       : '<div class="hint">No encontré auditorías con ese nombre.</div>';
     return;
   }
   let h=`<div class="hint" style="margin-bottom:8px">${mias.length} auditoría(s) encontrada(s):</div>`;
   mias.forEach(r=>{
     const id=r[0], fecha=fechaTxtForm(r[1]), grupo=r[7]||'—', estiloL=r[8]||'—', estiloC=r[9]||'—';
-    const po=r[10]||'', color=r[11]||'—', proc=r[3]||'—';
+    const po=r[10]||'', color=r[11]||'—', proc=r[3]||'—', aud=r[31]||'—';
     const res=(r[27]||'').toUpperCase();
     const medRes=(r[30]||'').toUpperCase();
     let tag='';
@@ -1507,7 +1511,7 @@ async function buscarMisAud(){
       ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#fdeceb;color:#7a2318;border:1px solid #e6a4a0" onclick="iniciarReproceso('${id}')">🔁 Reprocesar</button>` : '';
     h+=`<div style="border:1px solid #d8e0ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
-        <div style="font-size:13px"><b>${id}</b> ${tag}<br><span style="color:#778">${fecha} · ${proc}</span></div>
+        <div style="font-size:13px"><b>${id}</b> ${tag}<br><span style="color:#778">${fecha} · ${proc} · Auditor: <b>${esc(aud)}</b></span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${medBtn}${reproBtn}
           <button class="addbtn" style="white-space:nowrap;padding:8px 12px" onclick="cargarParaEditar('${id}')">✏️ Corregir</button>
