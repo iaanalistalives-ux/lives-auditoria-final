@@ -136,15 +136,15 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <div class="full"><label>Mi nombre</label><input id="miNombre" list="auditoras2" autocomplete="off" placeholder="Escribe tu nombre">
         <datalist id="auditoras2"></datalist></div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted);cursor:pointer">
-      <input type="checkbox" id="soloSinPO" style="width:16px;height:16px">
-      Solo auditorías <b>sin PO</b> (para completarlo cuando ya lo tengan)
-    </label>
     <button class="addbtn" id="btnMisAud" style="margin-top:8px">📋 Ver mis auditorías</button>
     <div id="misAudList" style="margin-top:10px"></div>
     <div id="modoEdicion" style="display:none;margin-top:10px;padding:10px 12px;background:#fff4e0;border:1px solid #e9c46a;border-radius:10px;font-size:13px;color:#7a5a12">
       ✏️ <b>Estás corrigiendo la auditoría <span id="editId"></span>.</b> Cambia lo que necesites abajo y guarda.
       <button class="addbtn" id="btnCancelEdit" style="margin-top:8px;background:#fff;color:#c32030;border:1px solid #e63946">Cancelar corrección</button>
+    </div>
+    <div id="modoReproceso" style="display:none;margin-top:10px;padding:10px 12px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px;font-size:13px;color:#7a2318">
+      🔁 <b>Estás reprocesando la auditoría rechazada <span id="reprocesaDeId"></span>.</b> Esto crea una auditoría nueva — la rechazada original no se toca. Pon el total recibido y, si encuentras algún defecto, regístralo abajo normal.
+      <button class="addbtn" id="btnCancelRepro" style="margin-top:8px;background:#fff;color:#c32030;border:1px solid #e63946">Cancelar reproceso</button>
     </div>
   </div>
 
@@ -229,6 +229,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <div class="hint" id="reproHint" style="margin-top:2px">Escribe la OP arriba para habilitar esta marca.</div></div>
       <label class="switch"><input type="checkbox" id="reproSwitch" disabled><span class="slider"></span></label>
     </div>
+    <div class="field" id="motivoReprocesoWrap" style="display:none">
+      <label>Motivo del reproceso *</label>
+      <input id="motivoReproceso" placeholder="Ej. Se corrigió el pespunte torcido del hombro">
+      <div class="hint">Obligatorio: qué se corrigió para que ahora pase.</div>
+    </div>
     <div class="field"><label>Nivel AQL</label>
       <div class="seg" id="segA"><button data-v="1.0">1.0</button><button data-v="1.5" class="on">1.5</button><button data-v="2.5">2.5</button></div>
     </div>
@@ -243,7 +248,10 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   <!-- DEFECTOS -->
   <div class="card">
     <div class="sec"><span class="dot"></span>Defectos de calidad</div>
-    <div class="hint" style="margin:-6px 0 10px">Sobre la muestra. Cuentan para el AQL. Toca las categorías que apliquen y pon la cantidad.</div>
+    <div class="hint" style="margin:-6px 0 10px">Busca el defecto que encontraste, o toca una sección para ver todas sus categorías.</div>
+    <input id="buscarDef" type="text" autocomplete="off" placeholder="🔍 Busca el defecto (ej. mancha, basta, hilo...)" style="margin-bottom:8px">
+    <div id="resultadosDef" style="display:none;margin-bottom:10px"></div>
+    <div id="activoDef" style="display:none;margin-bottom:10px"></div>
     <div id="defChecklist"></div>
     <div class="total-def"><span>Total de defectos</span><b id="totDef">0</b></div>
   </div>
@@ -251,7 +259,10 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   <!-- DERIVADOS (solo aplica a Costura (taller)) -->
   <div class="card" id="derivadosCard" style="display:none">
     <div class="sec"><span class="dot"></span>Derivados</div>
-    <div class="hint" style="margin:-6px 0 10px">Sobre el lote recibido. NO cuentan para el AQL. Opcional. Toca las categorías que apliquen.</div>
+    <div class="hint" style="margin:-6px 0 10px">Sobre el lote recibido. NO cuentan para el AQL. Opcional. Busca la categoría que aplique.</div>
+    <input id="buscarDer" type="text" autocomplete="off" placeholder="🔍 Busca el derivado..." style="margin-bottom:8px">
+    <div id="resultadosDer" style="display:none;margin-bottom:10px"></div>
+    <div id="activoDer" style="display:none;margin-bottom:10px"></div>
     <div id="derChecklist"></div>
     <div class="total-def"><span>Total de derivados</span><b id="totDer">0</b></div>
   </div>
@@ -692,7 +703,7 @@ function fillTaller(proc){
 }
 
 /* ===== ESTADO ===== */
-const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:''};
+const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null};
 let AUD_CACHE=null;       // filas de la hoja AUDITORÍAS (para ordinal/pedido/panel)
 let ordTimer=null;
 let defId=0;
@@ -1012,6 +1023,56 @@ function repintarChecklistDefectos(){
   pintarChecklistConSecciones($('defChecklist'), [['Costura',costura],['Acabados',acabados]]);
 }
 // Genera el checklist completo de DERIVADOS (siempre sección "Derivados", una sola vez)
+/* ===== Buscador de defectos/derivados: filtra en vivo por categoría o subtipo (todas las
+   secciones a la vez), y al elegir uno abre un único espacio para poner cantidad/foto —
+   con un "+" para cerrarlo y quedar lista para buscar el siguiente. Si no hay texto escrito,
+   sigue funcionando el acordeón normal (por sección) para cuando no recuerdan el nombre exacto. */
+function normBuscar(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+function bloqueCoincide(b,textoNorm){
+  if(normBuscar(b.categoria).indexOf(textoNorm)>=0) return true;
+  if(b.subs&&b.subs.length) return b.subs.some(s=>normBuscar(s.subtipo).indexOf(textoNorm)>=0);
+  return false;
+}
+function crearBuscadorChecklist(cfg){
+  const input=$(cfg.inputId), results=$(cfg.resultsId), activo=$(cfg.activoId), listCont=$(cfg.listContId);
+  if(!input) return;
+  function mostrarNormal(){
+    results.style.display='none'; results.innerHTML='';
+    activo.style.display='none'; activo.innerHTML='';
+    listCont.style.display='';
+    input.value='';
+  }
+  function abrirActivo(b){
+    results.style.display='none'; results.innerHTML='';
+    listCont.style.display='none';
+    activo.innerHTML='';
+    const fila=crearFilaCategoria(b);
+    activo.appendChild(fila);
+    const head=fila.querySelector('.catHead'); if(head) head.click(); // abrirla directo, aunque empiece en 0
+    const masBtn=document.createElement('button'); masBtn.type='button'; masBtn.className='masBtnBuscador';
+    masBtn.textContent='+ Listo, buscar otro defecto';
+    masBtn.style.cssText='margin-top:8px;width:100%;padding:11px;border-radius:10px;border:1.5px dashed var(--green);background:#eef7f4;color:var(--green);font-weight:700;font-size:14px;cursor:pointer';
+    masBtn.onclick=()=>{ mostrarNormal(); input.focus(); };
+    activo.appendChild(masBtn);
+    activo.style.display='block';
+  }
+  input.addEventListener('input',()=>{
+    const texto=normBuscar(input.value);
+    activo.style.display='none'; activo.innerHTML='';
+    if(!texto){ results.style.display='none'; results.innerHTML=''; listCont.style.display=''; return; }
+    listCont.style.display='none';
+    const matches=cfg.getBloques().filter(b=>bloqueCoincide(b,texto)).slice(0,12);
+    results.innerHTML = matches.length
+      ? matches.map((b,i)=>`<div class="buscarFila" data-i="${i}" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;background:#fff">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">${esc(b.seccion)}</span><br>${esc(b.categoria)}</div>`).join('')
+      : '<div class="hint" style="padding:8px 0">Sin resultados — prueba otra palabra, o toca una sección abajo.</div>';
+    results.querySelectorAll('.buscarFila').forEach(row=>{
+      row.onclick=()=>abrirActivo(matches[parseInt(row.dataset.i)]);
+    });
+    results.style.display='block';
+  });
+}
+
 function generarChecklistDerivados(){
   S.ders = madresPorSeccion('Derivados').map(m=>crearBloqueCategoria('Derivados',m));
   pintarChecklistConSecciones($('derChecklist'), [['Derivados',S.ders]]);
@@ -1196,6 +1257,7 @@ function calcularFaltantes(){
   if(!fotoMedOK) faltan.push('Foto de hojas de medidas');
   if(S.proceso&&S.int_ext==='EXTERNA'&&!v('taller')) faltan.push('Taller');
   if(S.override&&(!v('ovWho')||!v('ovWhy'))) faltan.push('Datos del override');
+  if(S.reprocesaDe&&!v('motivoReproceso')) faltan.push('Motivo del reproceso');
   return faltan;
 }
 // Se sigue llamando en cada cambio del formulario (para el autoguardado del borrador),
@@ -1264,6 +1326,7 @@ function armarPayload(){
     po:v('po'),color:v('color'),destino:v('destino'),cant_pedido:parseInt(v('pedido'))||'',total_recibido:recibido,
     lote_real:recibido,licencia:S.licencia?'SÍ':'NO',nivel_aql:parseFloat(S.nivel),
     cod_tela:S.codTela||'',desc_tela:S.descTela||'',
+    motivo_reproceso:v('motivoReproceso')||'',reprocesa_de:S.reprocesaDe||'',
     override:S.override?'SÍ':'NO',override_autoriza:v('ovWho'),override_motivo:v('ovWhy'),
     muestra_medidas:parseInt(v('medMuestra'))||'',def_medidas:parseInt(v('medDef'))||'',resultado_medidas:v('medRes'),
     auditor:v('auditor'),
@@ -1362,7 +1425,6 @@ function nombreNorm(s){return String(s||'').toLowerCase().normalize('NFD').repla
 async function buscarMisAud(){
   const nom=($('miNombre').value||'').trim();
   const cont=$('misAudList');
-  const soloSinPO=$('soloSinPO')&&$('soloSinPO').checked;
   if(!nom){ cont.innerHTML='<div class="hint">Escribe tu nombre primero.</div>'; return; }
   cont.innerHTML='<div class="hint">Buscando…</div>';
   if(!AUD_CACHE) await cargarAud();
@@ -1376,7 +1438,6 @@ async function buscarMisAud(){
     const palabras=nomN.split(' ').filter(Boolean);
     return palabras.length>0 && palabras.every(p=>audN.indexOf(p)>=0);
   });
-  if(soloSinPO){ candidatos=candidatos.filter(r=>!String(r[10]||'').trim()); }
   // ordenar por año+semana desc y por id (la más reciente primero)
   candidatos.sort((a,b)=>{
     const ya=Number(a[37])||0, yb=Number(b[37])||0;
@@ -1388,9 +1449,7 @@ async function buscarMisAud(){
   // Sin límite artificial: muestra TODAS las que encontró (antes solo mostraba 5)
   const mias=candidatos;
   if(!mias.length){
-    cont.innerHTML = soloSinPO
-      ? '<div class="hint">No encontré auditorías tuyas sin PO. ✓</div>'
-      : '<div class="hint">No encontré auditorías con ese nombre.</div>';
+    cont.innerHTML = '<div class="hint">No encontré auditorías con ese nombre.</div>';
     return;
   }
   let h=`<div class="hint" style="margin-bottom:8px">${mias.length} auditoría(s) encontrada(s):</div>`;
@@ -1398,15 +1457,23 @@ async function buscarMisAud(){
     const id=r[0], fecha=fechaTxtForm(r[1]), grupo=r[7]||'—', estiloL=r[8]||'—', estiloC=r[9]||'—';
     const po=r[10]||'', color=r[11]||'—', proc=r[3]||'—';
     const res=(r[27]||'').toUpperCase();
+    const medRes=(r[30]||'').toUpperCase();
     let tag='';
     if(res.indexOf('APROB')>=0) tag='<span style="color:#1c7a6e;font-weight:800">APROBADO</span>';
     else if(res.indexOf('RECH')>=0) tag='<span style="color:#c32030;font-weight:800">RECHAZADO</span>';
     else if(res) tag='<span style="color:#9a7415;font-weight:800">'+res+'</span>';
     const poTxt = po ? ('PO '+po) : '<span style="color:#c32030;font-weight:700">SIN PO</span>';
+    const medBtn = medRes.indexOf('RECH')>=0
+      ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#eef7f4;color:#1c7a6e;border:1px solid #bfe3da" onclick="aprobarMedidaRapido('${id}',this)">✅ Aprobar medida</button>` : '';
+    const reproBtn = res.indexOf('RECH')>=0
+      ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#fdeceb;color:#7a2318;border:1px solid #e6a4a0" onclick="iniciarReproceso('${id}')">🔁 Reprocesar</button>` : '';
     h+=`<div style="border:1px solid #d8e0ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div style="font-size:13px"><b>${id}</b> ${tag}<br><span style="color:#778">${fecha} · ${proc}</span></div>
-        <button class="addbtn" style="white-space:nowrap;padding:8px 12px" onclick="cargarParaEditar('${id}')">✏️ Corregir</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${medBtn}${reproBtn}
+          <button class="addbtn" style="white-space:nowrap;padding:8px 12px" onclick="cargarParaEditar('${id}')">✏️ Corregir</button>
+        </div>
       </div>
       <div style="margin-top:6px;font-size:12.5px;color:#334;line-height:1.5">
         <b>Grupo:</b> ${grupo} · <b>Estilo LIVES:</b> ${estiloL} · <b>Estilo cliente:</b> ${estiloC}<br>
@@ -1450,13 +1517,28 @@ async function cargarDetalleParaEditar(id){
   }
 }
 
+async function aprobarMedidaRapido(id, btnEl){
+  if(!confirm('¿Marcar el resultado de medidas de '+id+' como Aprobado?\n\nEsto NO cuenta como reproceso — es solo un dato informativo.')) return;
+  btnEl.disabled=true; const txtOrig=btnEl.textContent; btnEl.textContent='Guardando…';
+  try{
+    const res=await fetch(APP_URL,{method:'POST',body:JSON.stringify({modo:'aprobar_medida',edit_id:id}),headers:{'Content-Type':'text/plain;charset=utf-8'}});
+    const j=await res.json();
+    if(j.ok){ toast('Medida de '+id+' marcada como Aprobado ✓','ok'); await cargarAud(); buscarMisAud(); }
+    else { toast('No se pudo actualizar: '+(j.error||''),'err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
+  }catch(e){ toast('Sin señal — inténtalo de nuevo con internet','err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
+}
+
 async function cargarParaEditar(id){
   const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
   if(!r){ toast('No se encontró la auditoría','err'); return; }
-  // Cargar campos en el formulario
-  $('grupo').value=r[7]||''; $('estiloL').value=r[8]||''; $('estiloC').value=r[9]||'';
-  $('po').value=r[10]||''; $('color').value=r[11]||''; $('destino').value=r[12]||'';
-  $('pedido').value=r[13]||''; $('recibido').value=r[14]||'';
+  // Cargar campos en el formulario — los que vienen de la OP quedan BLOQUEADOS al corregir:
+  // una corrección es para cantidades de lote, defectos/derivados, medidas u observación,
+  // nunca para tocar datos que ya se extraen de la base de OPs (evita que alguien los
+  // "corrija" a mano y se desincronicen del pedido real).
+  lockField('grupo',r[7]); lockField('estiloL',r[8]); lockField('estiloC',r[9]);
+  lockField('po',r[10]); lockField('color',r[11]); lockField('destino',r[12]); lockField('pedido',r[13]);
+  $('recibido').value=r[14]||'';
+  S.codTela=r[45]||''; S.descTela=r[46]||''; // AT/AU: se conservan tal cual, no se piden de nuevo al corregir
   $('auditor').value=r[31]||''; $('fecha').value=fechaTxtForm(r[1]);
   // proceso
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
@@ -1481,10 +1563,13 @@ async function cargarParaEditar(id){
   S.licencia=(norm(r[16]).indexOf('s')===0); if($('licSwitch')) $('licSwitch').checked=S.licencia;
   S.reproceso=(norm(r[39]).indexOf('s')===0); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
   fijarReproWrap(true); // es una auditoría ya existente, no una nueva a medio llenar: el candado no aplica aquí
-  // marcar modo edición
-  S.editId=id;
+  // marcar modo edición (y limpiar cualquier resto de un modo reproceso que hubiera quedado a medias)
+  S.editId=id; S.reprocesaDe=null;
   $('editId').textContent=id;
   $('modoEdicion').style.display='block';
+  $('modoReproceso').style.display='none';
+  $('reproSwitch').disabled=false;
+  const mrw=$('motivoReprocesoWrap'); if(mrw) mrw.style.display='none';
   $('btnMisAud').textContent='📋 Ver mis auditorías';
   // Recalcular y refrescar
   if(typeof aplicarCliente==='function') aplicarCliente();
@@ -1493,6 +1578,53 @@ async function cargarParaEditar(id){
   recalc(); refrescarCascada(); calcAvance();
   toast('Auditoría '+id+' cargada para corregir','ok');
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// Reprocesar: crea una auditoría NUEVA (nunca toca la rechazada original), heredando de ella
+// todo lo que viene de la OP (bloqueado, igual que al corregir), pero con el lote, defectos y
+// medidas en blanco para volver a registrarlos — porque es una vuelta a auditar de verdad.
+async function iniciarReproceso(id){
+  const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
+  if(!r){ toast('No se encontró la auditoría','err'); return; }
+  lockField('grupo',r[7]); lockField('estiloL',r[8]); lockField('estiloC',r[9]);
+  lockField('po',r[10]); lockField('color',r[11]); lockField('destino',r[12]); lockField('pedido',r[13]);
+  S.codTela=r[45]||''; S.descTela=r[46]||'';
+  $('recibido').value=''; // el lote reprocesado puede ser distinto al original (reproceso parcial)
+  $('auditor').value='';
+  $('fecha').valueAsDate=new Date(); // fecha real de hoy, no la de la auditoría rechazada
+  const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
+  S.int_ext=(norm(proc).indexOf('interno')>=0)?'INTERNA':(proc?'EXTERNA':'');
+  const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('interno')>=0)?'flex':'none';
+  const esCosturaRp=proc==='Costura (taller)';
+  const derCardRp=$('derivadosCard'); if(derCardRp) derCardRp.style.display=esCosturaRp?'block':'none';
+  generarChecklistDefectos(); generarChecklistDerivados(); // vacíos: se registra normal si encuentra algo
+  $('medMuestra').value=''; $('medDef').value=''; $('medRes').value='';
+  $('comentario').value='';
+  S.licencia=false; if($('licSwitch')) $('licSwitch').checked=false;
+  // Reproceso: siempre marcado y sin poder desmarcarlo — para eso se entró aquí
+  S.reproceso=true; if($('reproSwitch')) $('reproSwitch').checked=true;
+  fijarReproWrap(true); $('reproSwitch').disabled=true;
+  const rh=$('reproHint'); if(rh) rh.textContent='Marcado: estás reprocesando una auditoría que salió rechazada.';
+  const mrw=$('motivoReprocesoWrap'); if(mrw) mrw.style.display='block';
+  if($('motivoReproceso')) $('motivoReproceso').value='';
+  // Es una auditoría NUEVA: no se preserva el N° ni el editId de la rechazada
+  S.editId=null; S.reprocesaDe=id;
+  $('reprocesaDeId').textContent=id;
+  $('modoReproceso').style.display='block';
+  $('modoEdicion').style.display='none';
+  if(typeof aplicarCliente==='function') aplicarCliente();
+  if(typeof fillTaller==='function' && S.proceso) fillTaller(S.proceso);
+  if(typeof actualizarCardProceso==='function') actualizarCardProceso();
+  refrescarCascada(); await calcOrdinal(); recalc(); calcAvance();
+  toast('Reprocesando '+id+' — pon el total recibido y registra defectos si encuentras algo','ok');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelarReproceso(){
+  S.reprocesaDe=null;
+  $('modoReproceso').style.display='none';
+  $('reproSwitch').disabled=false;
+  const mrw=$('motivoReprocesoWrap'); if(mrw) mrw.style.display='none';
+  recargarLimpio();
 }
 
 function recargarLimpio(){
@@ -1512,6 +1644,7 @@ function descartarBorradorYEmpezar(){
 
 $('btnMisAud').onclick=buscarMisAud;
 $('btnCancelEdit').onclick=cancelarEdicion;
+$('btnCancelRepro').onclick=cancelarReproceso;
 
 /* =================== BORRADOR AUTOMÁTICO (no perder el trabajo al cambiar de app) =================== */
 const BORRADOR_KEY='ac009_borrador_v1';
@@ -1641,6 +1774,21 @@ async function cargarOPS(){
     OPS_DB=(j&&j.rows)?j.rows:[];
   }catch(e){ OPS_DB=[]; /* si falla, el campo OP simplemente no encuentra nada y no bloquea (comportamiento normal) */ }
 }
+
+crearBuscadorChecklist({inputId:'buscarDef',resultsId:'resultadosDef',activoId:'activoDef',listContId:'defChecklist',getBloques:()=>S.defs});
+crearBuscadorChecklist({inputId:'buscarDer',resultsId:'resultadosDer',activoId:'activoDer',listContId:'derChecklist',getBloques:()=>S.ders});
+
+// Nombre automático desde el portal (?nombre=...) — se llena solo, pero se queda editable
+// por si alguna vez se abre esta página fuera del portal (nunca se bloquea sin salida).
+(function aplicarNombreDesdePortal(){
+  const params=new URLSearchParams(location.search);
+  const nombreUrl=params.get('nombre')||params.get('usuario')||'';
+  if(!nombreUrl) return;
+  const nombre=nombreUrl.trim().toUpperCase();
+  if(!nombre) return;
+  if($('auditor')&&!$('auditor').value) $('auditor').value=nombre;
+  if($('miNombre')&&!$('miNombre').value) $('miNombre').value=nombre;
+})();
 
 Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   refrescarCascada();
