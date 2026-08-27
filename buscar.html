@@ -64,12 +64,11 @@ tr:hover td{background:#f6f9fb}
       <div><label>Hasta</label><input id="fHasta" type="date"></div>
     </div>
     <div class="btns">
-      <button class="btn prim" id="btnBuscar">Buscar</button>
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
     </div>
-    <div class="hint">Deja los campos vacíos y pulsa Buscar para ver las más recientes. Puedes combinar filtros.</div>
+    <div class="hint">Los resultados se actualizan solos según vas eligiendo o escribiendo. Puedes combinar filtros.</div>
   </div>
 
   <div class="card">
@@ -191,7 +190,6 @@ function pintar(res){
 }
 function val(id){return document.getElementById(id).value.trim();}
 
-document.getElementById('btnBuscar').onclick=buscar;
 document.getElementById('btnLimpiar').onclick=()=>{
   ['fPo','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
@@ -210,8 +208,12 @@ document.getElementById('btnLicencias').onclick=()=>{
   document.getElementById('btnLicencias').classList.toggle('active',filtroLicencia);
   buscar();
 };
-// Enter en cualquier input dispara búsqueda
-['fPo','fGrupo','fEstilo','fColor'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')buscar();}));
+// Filtros en vivo: los selects y fechas filtran apenas cambian; los campos de texto
+// filtran mientras se escribe, con una pausa corta para no recalcular en cada tecla.
+let _buscarTimer=null;
+function buscarDebounced(){ clearTimeout(_buscarTimer); _buscarTimer=setTimeout(buscar,200); }
+['fGrupo','fEstilo','fColor','fPo'].forEach(id=>document.getElementById(id).addEventListener('input',buscarDebounced));
+['fProceso','fCliente','fAuditor','fResultado','fDesde','fHasta'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
 
 cargar();
 </script>
