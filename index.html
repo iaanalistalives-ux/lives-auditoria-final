@@ -821,6 +821,8 @@ function autocompletarDesdeOP(m){
   lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
   S.codTela=m.codTela||''; S.descTela=m.descTela||'';
   aplicarCliente(); refrescarCascada(); validate();
+  pedirOrdinal(); // los campos se llenaron por código (lockField), no por tecleo, así que hay que
+                  // disparar el cálculo del N° de auditoría a mano — si no, se queda en "—" para siempre.
   const h=$('opHint'); if(h){ h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
 }
 function buscarOP(){
