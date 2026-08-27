@@ -136,7 +136,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <datalist id="auditoras2"></datalist></div>
       <div class="full"><label>OP</label><input id="miOpBuscar" inputmode="numeric" autocomplete="off" placeholder="Ej. 24978"></div>
     </div>
-    <button class="addbtn" id="btnMisAud" style="margin-top:8px">📋 Ver mis auditorías</button>
+    <button class="addbtn" id="btnMisAud" style="margin-top:8px">📋 Ver auditorías</button>
     <div id="misAudList" style="margin-top:10px;max-height:55vh;overflow-y:auto;border:1px solid #d8e0ea;border-radius:12px;padding:8px"></div>
     <div id="modoEdicion" style="display:none;margin-top:10px;padding:10px 12px;background:#fff4e0;border:1px solid #e9c46a;border-radius:10px;font-size:13px;color:#7a5a12">
       ✏️ <b>Estás corrigiendo la auditoría <span id="editId"></span>.</b> Cambia lo que necesites abajo y guarda.
@@ -1643,7 +1643,7 @@ async function cargarParaEditar(id){
   $('modoEdicion').style.display='block';
   $('modoReproceso').style.display='none';
   const mrw=$('motivoReprocesoWrap'); if(mrw) mrw.style.display='none';
-  $('btnMisAud').textContent='📋 Ver mis auditorías';
+  $('btnMisAud').textContent='📋 Ver auditorías';
   // Recalcular y refrescar
   if(typeof aplicarCliente==='function') aplicarCliente();
   if(typeof fillTaller==='function' && S.proceso) fillTaller(S.proceso);
@@ -1715,7 +1715,18 @@ function descartarBorradorYEmpezar(){
   recargarLimpio();
 }
 
-$('btnMisAud').onclick=buscarMisAud;
+// El mismo botón abre y cierra: si ya hay algo mostrado (resultados o un mensaje), lo cierra;
+// si está vacío, busca y muestra. Así no hace falta un botón aparte para cerrar la ventanita.
+function toggleMisAud(){
+  const cont=$('misAudList'), btn=$('btnMisAud');
+  if(cont.innerHTML.trim()!==''){
+    cont.innerHTML='';
+    btn.textContent='📋 Ver auditorías';
+  } else {
+    buscarMisAud().then(()=>{ btn.textContent='✕ Cerrar'; });
+  }
+}
+$('btnMisAud').onclick=toggleMisAud;
 $('btnCancelEdit').onclick=cancelarEdicion;
 $('btnCancelRepro').onclick=cancelarReproceso;
 
