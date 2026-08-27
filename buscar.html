@@ -5,16 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buscar auditorías · LIVES</title>
 <style>
-:root{
-  --petrol:#0E3B36; --petrol-2:#12463F; --emer:#10B981;
-  --sage:#0F7A5A; --sage-dark:#0B815E; --slate:#4E6B78;
-  --taupe:#B45309; --rose:#DC2626; --tan:#F59E0B;
-  --warm:#DCE5E2; --warm-light:#F1F6F4; --stone:#5F726C;
-  --card:#fff; --sh:0 1px 3px rgba(14,59,54,.06),0 1px 2px rgba(14,59,54,.04);
-  --r:12px;
-  /* nombres antiguos, apuntando al estándar vigente */
-  --navy:#0E3B36; --azul:#0E3B36; --amber:#F59E0B;
-}
+:root{--navy:#1f3864;--green:#2a9d8f;--red:#e63946;--amber:#e9c46a;--ora:#f4a261;--bg:#eef2f6;--ink:#243040}
 *{box-sizing:border-box}
 body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 .top{background:var(--navy);color:#fff;padding:16px 20px}
@@ -24,12 +15,12 @@ body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-
 .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
 .filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667;margin-bottom:4px}
-input,select{width:100%;border:1px solid #DCE5E2;border-radius:9px;padding:10px;font:inherit;background:#fbfcfd}
+input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;font:inherit;background:#fbfcfd}
 .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 .btn{border:none;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:14px}
 .btn.prim{background:var(--navy);color:#fff}
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
-.btn.toggle{background:#fff;color:var(--navy);border:1px solid #DCE5E2}
+.btn.toggle{background:#fff;color:var(--navy);border:1px solid #dce1e7}
 .btn.toggle.active{background:var(--amber);color:#5c4400;border-color:var(--amber)}
 .hint{font-size:12px;color:#889;margin-top:8px}
 .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
@@ -48,81 +39,6 @@ tr:hover td{background:#f6f9fb}
 .estado{padding:24px;text-align:center;color:#889}
 .count{font-size:13px;color:#667;margin-bottom:10px}
 @media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
-
-  .fdWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
-          align-items:center;justify-content:center;z-index:200;padding:0;}
-  .fdCard{background:#fff;border-radius:12px;width:94vw;max-width:1600px;
-          height:94vh;display:flex;flex-direction:column;overflow:hidden;
-          box-shadow:0 12px 40px rgba(0,0,0,.32);}
-  .fdFrame{width:100%;height:100%;min-height:70vh;border:none;display:block;}
-  .fdLink{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);
-          border-radius:6px;padding:5px 13px;font-size:12px;font-weight:700;
-          text-decoration:none;cursor:pointer;font-family:inherit;}
-  .fdX{background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;margin-left:auto;}
-  .fdCab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
-         border-bottom:2px solid #F1F6F4;padding-bottom:12px;margin-bottom:14px;}
-  .fdKick{font-size:11px;font-weight:700;color:#0F7A5A;text-transform:uppercase;letter-spacing:.5px;}
-  .fdH1{font-size:19px;font-weight:700;color:#0E3B36;margin-top:2px;}
-  .fdSub{font-size:12.5px;color:#5F726C;margin-top:2px;}
-  .fdRes{font-size:12.5px;font-weight:700;padding:6px 15px;border-radius:20px;white-space:nowrap;}
-  .fdRes.ok{background:#ECFDF5;color:#065F46;border:1px solid #10B981;}
-  .fdRes.no{background:#FEF2F2;color:#991B1B;border:1px solid #DC2626;}
-  .fdSec{font-size:11px;font-weight:700;color:#4E6B78;text-transform:uppercase;
-         letter-spacing:.5px;margin:16px 0 8px;}
-  .fdGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
-  .fdCel{background:#F1F6F4;border-radius:8px;padding:9px 12px;}
-  .fdCel span{display:block;font-size:11px;color:#5F726C;}
-  .fdCel b{font-size:14.5px;color:#333;}
-  .fdLista{display:flex;flex-direction:column;gap:6px;}
-  .fdDef{background:#FEF2F2;border-left:3px solid #DC2626;border-radius:6px;
-         padding:7px 12px;font-size:13.5px;}
-  .fdHead{background:#0E3B36;color:#fff;padding:12px 18px;font-weight:700;font-size:15px;
-          display:flex;gap:14px;align-items:center;position:sticky;top:0;z-index:5;
-          border-bottom:3px solid #10B981;}
-  .fdBody{padding:16px 18px;flex:1;overflow:auto;}
-  .fdAviso{background:#FFFBEB;border:1px solid #F59E0B;color:#92400E;border-radius:8px;
-          padding:10px 13px;font-size:12.5px;margin-bottom:14px;line-height:1.6;}
-  .fdRow{display:flex;justify-content:space-between;gap:16px;padding:7px 0;
-          border-bottom:1px solid #F1F6F4;font-size:14px;}
-  .fdRow span{color:#5F726C;} .fdRow b{color:#333;text-align:right;}
-  .fdRow.col{flex-direction:column;} .fdRow.col b{text-align:left;margin-top:4px;line-height:1.7;}
-
-  .tiempos{font-size:11.5px;color:#5F726C;margin:8px 0 4px;display:flex;
-           align-items:center;gap:10px;flex-wrap:wrap;}
-  .tiempos button{background:#0F7A5A;color:#fff;border:none;border-radius:6px;
-           padding:4px 12px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
-
-  .fdPie{margin-top:22px;padding-top:10px;border-top:1px solid var(--warm);
-         font-size:11px;color:var(--stone);display:none;}
-
-  /* ===== Impresión de la ficha ===== */
-  @media print{
-    @page{ size:A4 portrait; margin:12mm; }
-    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-
-    /* Con la ficha abierta se imprime solo ella: el resto de la página estorba. */
-    body.imprimiendo-ficha > *:not(#fichaDig){ display:none!important; }
-    body.imprimiendo-ficha #fichaDig{
-      position:static!important; display:block!important; background:#fff!important;
-      inset:auto!important; padding:0!important;
-    }
-    body.imprimiendo-ficha .fdCard{
-      width:100%!important; max-width:none!important; height:auto!important;
-      box-shadow:none!important; border-radius:0!important; display:block!important;
-    }
-    body.imprimiendo-ficha .fdHead{
-      position:static!important; background:#0E3B36!important; color:#fff!important;
-      border-bottom:3px solid #10B981!important;
-    }
-    body.imprimiendo-ficha .fdAcc, body.imprimiendo-ficha .fdX{ display:none!important; }
-    body.imprimiendo-ficha .fdBody{ overflow:visible!important; padding:16px 0!important; }
-    body.imprimiendo-ficha .fdPie{ display:block!important; }
-    body.imprimiendo-ficha .fdGrid{ break-inside:avoid; }
-    body.imprimiendo-ficha .fdCel{ border:1px solid #DCE5E2; }
-    /* El marco de las auditorías en vivo no se imprime desde acá: esas tienen
-       su propio PDF en «Abrir aparte», que sí incluye fotos y medidas. */
-    body.imprimiendo-ficha .fdFrame{ display:none!important; }
-  }
 </style>
 </head>
 <body>
@@ -152,8 +68,6 @@ tr:hover td{background:#f6f9fb}
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
-      <button class="btn toggle" id="btnEnVivo" type="button">Solo en vivo</button>
-      <button class="btn toggle" id="btnDigitado" type="button">Solo digitado</button>
     </div>
     <div class="hint">Deja los campos vacíos y pulsa Buscar para ver las más recientes. Puedes combinar filtros.</div>
   </div>
@@ -162,7 +76,7 @@ tr:hover td{background:#f6f9fb}
     <div class="count" id="count"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>ID</th><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Auditor</th><th>Resultado</th><th>Origen</th><th></th></tr></thead>
+        <thead><tr><th>ID</th><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -172,23 +86,11 @@ tr:hover td{background:#f6f9fb}
 
 <script>
 const SHEET_ID='1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
-/* Hoja PUBLICO_FINAL del Sheet maestro: ya trae lo capturado en vivo por las
-   auditoras y lo digitado por Athina, unidos y sin duplicar (cuando un lote
-   está en las dos fuentes, manda el piloto). Por eso se lee una sola hoja. */
-const CSV_FINAL='https://docs.google.com/spreadsheets/d/e/2PACX-1vTKWLLY0X8T7RtdteQstuEPubtGudtgTpJEa5gRClMFK2PCgDR7wFv07AIYUMJwmtxhL-xX4uEGQkp4/pub?gid=1078730994&single=true&output=csv';
-let ORIGEN='';   // '', 'EN VIVO' o 'DIGITADO'
-/* El origen viene escrito de tres formas según de dónde salga la fila:
-   'EN VIVO' del piloto, 'DIGITADO' del formulario de Athina y 'HISTORICO' de
-   los Excel migrados. Para quien busca solo hay dos casos: capturada en vivo
-   por la auditora, o pasada a mano. Todo lo que no sea en vivo es digitado. */
-function origenDe(cap){
-  return (String(cap||'').trim().toUpperCase()==='EN VIVO') ? 'EN VIVO' : 'DIGITADO';
-}
 let DATA=[];
 // índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
          destino:12,pedido:13,recibido:14,lote:15,licencia:16,resAql:23,override:24,resFinal:27,auditor:31,semana:32,
-         computable:38,reproceso:39,captura:50,defectos:51,derivados:52};
+         computable:38,reproceso:39};
 // Filtros toggle (Reprocesos / Licencias) — no van como columnas en la tabla, solo filtran
 let filtroReproceso=false, filtroLicencia=false;
 function esVerdadero(v){
@@ -217,104 +119,13 @@ function fechaTxt(v){
 }
 function esEnc(r){return !r[0]||norm(r[0])==='id_auditoria'||norm(r[0])==='';}
 
-/* CSV que respeta comillas: un defecto puede traer comas en el texto. */
-function leerCSV(txt){
-  if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
-  const filas=[]; let campo='', fila=[], dentro=false;
-  for(let i=0;i<txt.length;i++){
-    const c=txt[i];
-    if(dentro){ if(c==='"'){ if(txt[i+1]==='"'){campo+='"';i++;} else dentro=false; } else campo+=c; }
-    else if(c==='"') dentro=true;
-    else if(c===','){ fila.push(campo); campo=''; }
-    else if(c==='\n'){ fila.push(campo); filas.push(fila); fila=[]; campo=''; }
-    else if(c!=='\r') campo+=c;
-  }
-  if(campo!==''||fila.length){ fila.push(campo); filas.push(fila); }
-  return filas;
-}
-
-/* Guarda el CSV en el navegador por 5 minutos. En planta lo abren muchas veces
-   al día: la primera carga paga la descarga y las siguientes son instantáneas.
-   El botón «Actualizar» fuerza traerlo de nuevo. */
-const CACHE_KEY='lives_buscar_final', CACHE_MIN=5;
-function leerCache(){
+async function cargar(){
   try{
-    const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-    if(c && (Date.now()-c.t) < CACHE_MIN*60000) return c;
-  }catch(e){}
-  return null;
-}
-
-async function cargar(forzar){
-  const t0=performance.now();
-  const est=document.getElementById('estado');
-  est.style.display='block';
-  try{
-    let txt, deCache=false, tDesc=0;
-    const c = forzar ? null : leerCache();
-    if(c){ txt=c.txt; deCache=true; }
-    else{
-      est.textContent='Descargando auditorías…';
-      const d0=performance.now();
-      txt=await (await fetch(CSV_FINAL+'&_='+Date.now(),{cache:'no-store'})).text();
-      tDesc=performance.now()-d0;
-      try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), txt:txt})); }catch(e){}
-    }
-    est.textContent='Preparando la tabla…';
-    window.__t={t0:t0, desc:tDesc, cache:deCache};
-    const tabla=leerCSV(txt);
-    if(tabla.length<2) throw new Error('hoja vacía');
-    const cab=tabla[0].map(x=>String(x||'').trim());
-    const ix={}; cab.forEach((c,k)=>{ if(c) ix[c]=k; });
-    /* Se reconstruye el mismo arreglo por índice que ya usaba el buscador,
-       para no tocar ni los filtros ni el pintado. */
-    const rows=tabla.slice(1).filter(f=>f && f.length>2).map(f=>{
-      const g=n=>(ix[n]!==undefined? String(f[ix[n]]??'').trim() : '');
-      const a=[];
-      a[C.id]=g('ID_AUDITORIA');      a[C.fecha]=g('FECHA');
-      a[C.nAud]=g('N° DE AUDITORÍA'); a[C.proceso]=g('TIPO');
-      a[C.intext]=g('INT/EXT');       a[C.servicio]=g('SERVICIO');
-      a[C.cliente]=g('CLIENTE');      a[C.grupo]=g('GRUPO');
-      a[C.estiloL]=g('ESTILO');       a[C.estiloC]=g('E.CLIENTE');
-      a[C.po]=g('PO');                a[C.color]=g('COLOR');
-      a[C.destino]=g('DESTINO');      a[C.recibido]=g('LOTE');
-      a[C.lote]=g('MUESTRA');         a[C.licencia]=g('TIPO_LIC').toUpperCase()==='LICENCIA'?'1':'';
-      a[C.resFinal]=g('RESULTADO');   a[C.auditor]=g('AUDITOR');
-      a[C.semana]=g('SEMANA');        a[C.computable]=g('COMPUTABLE');
-      a[C.reproceso]=g('REPROCESO');  a[C.captura]=g('CAPTURA')||'DIGITADO';
-      a[C.defectos]=g('DEFECTOS');    a[C.derivados]=g('DERIVADOS');
-      return a;
-    });
-    DATA=rows.filter(r=>r[C.resFinal]);
-    const tProc=performance.now()-t0-(window.__t.desc||0);
-    window.__t.proc=tProc;
-    /* Al abrir se muestran los últimos 60 días. Cargar 4 000 filas de golpe hacía
-       lenta la pantalla, y casi siempre se busca algo reciente. Con «Limpiar»
-       o cambiando las fechas se ve todo el histórico. */
-    if(!document.getElementById('fDesde').value){
-      const d=new Date(Date.now()-60*864e5);
-      document.getElementById('fDesde').value =
-        d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
-    }
+    const rows=await gviz('AUDITORÍAS');
+    DATA=rows.filter(r=>!esEnc(r));
     // poblar selects de cliente y auditor
-    const tt=window.__t, total=Math.round(performance.now()-tt.t0);
-    document.getElementById('tiempos').innerHTML =
-      DATA.length.toLocaleString('es-PE')+' auditorías · '+
-      (tt.cache ? 'desde la memoria del navegador'
-                : 'descarga '+Math.round(tt.desc)+' ms')+
-      ' · preparar '+Math.round(tt.proc)+' ms · total '+total+' ms'+
-      ' <button id="btnRefrescar" type="button">Actualizar</button>';
-    alClic('btnRefrescar', ()=>{
-      try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
-      cargar(true);
-    });
-    const sCli=new Set(), sAud=new Set();
-    for(let i=0;i<DATA.length;i++){
-      if(DATA[i][C.cliente]) sCli.add(DATA[i][C.cliente]);
-      if(DATA[i][C.auditor]) sAud.add(DATA[i][C.auditor]);
-    }
-    llenarSelect('fCliente',[...sCli].sort());
-    llenarSelect('fAuditor',[...sAud].sort());
+    llenarSelect('fCliente', [...new Set(DATA.map(r=>r[C.cliente]).filter(Boolean))].sort());
+    llenarSelect('fAuditor', [...new Set(DATA.map(r=>r[C.auditor]).filter(Boolean))].sort());
     buscar();
   }catch(e){
     document.getElementById('estado').textContent='No se pudo cargar. Revisa tu conexión.';
@@ -352,7 +163,6 @@ function buscar(){
     if(aud&&r[C.auditor]!==aud) return false;
     if(resu&&norm(r[C.resFinal]).indexOf(resu)<0) return false;
     if(!fechaOK(r[C.fecha],desde,hasta)) return false;
-    if(ORIGEN&&origenDe(r[C.captura])!==ORIGEN) return false;
     if(filtroReproceso&&!esVerdadero(r[C.reproceso])) return false;
     if(filtroLicencia&&!esVerdadero(r[C.licencia])) return false;
     return true;
@@ -361,26 +171,13 @@ function buscar(){
   res.sort((a,b)=>fechaTxt(b[C.fecha]).localeCompare(fechaTxt(a[C.fecha])));
   pintar(res);
 }
-let RES=[], PINTADAS=0;
-const PAGINA=150;
-
 function pintar(res){
-  RES=res; PINTADAS=0;
-  document.getElementById('tbody').innerHTML='';
-  pintarMas();
-}
-
-function pintarMas(){
-  const res=RES;
   const tb=document.getElementById('tbody'), est=document.getElementById('estado'), cnt=document.getElementById('count');
-  if(!res.length){ est.style.display='block'; est.textContent='Sin resultados. Ajusta los filtros.';
-    cnt.textContent=''; document.getElementById('masWrap').style.display='none'; return; }
+  tb.innerHTML='';
+  if(!res.length){ est.style.display='block'; est.textContent='Sin resultados. Ajusta los filtros.'; cnt.textContent=''; return; }
   est.style.display='none';
-
-  const hasta=Math.min(PINTADAS+PAGINA, res.length);
-  const frag=document.createDocumentFragment();
-  for(let i=PINTADAS;i<hasta;i++){
-    const r=res[i];
+  cnt.textContent=res.length+' auditoría(s) encontrada(s)';
+  res.forEach(r=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><b>${r[C.id]||''}</b></td>
       <td>${fechaTxt(r[C.fecha])}</td>
@@ -388,178 +185,35 @@ function pintarMas(){
       <td>${r[C.estiloL]||''}<br><span style="color:#889">${r[C.po]||''}</span></td>
       <td>${r[C.auditor]||''}</td>
       <td>${badge(r[C.resFinal])}</td>
-      <td>${origenTag(r[C.captura])}</td>
-      <td>${botonVer(r,i)}</td>`;
-    frag.appendChild(tr);
-  }
-  tb.appendChild(frag);
-  PINTADAS=hasta;
-
-  cnt.textContent = res.length.toLocaleString('es-PE')+' auditoría(s) · mostrando '+
-                    PINTADAS.toLocaleString('es-PE');
-  const mw=document.getElementById('masWrap');
-  mw.style.display = PINTADAS<res.length ? 'block' : 'none';
-  document.getElementById('btnMas').textContent =
-    'Ver '+Math.min(PAGINA,res.length-PINTADAS)+' más de '+(res.length-PINTADAS).toLocaleString('es-PE');
+      <td><a class="ver" href="ver.html?id=${encodeURIComponent(r[C.id])}">Ver / PDF</a></td>`;
+    tb.appendChild(tr);
+  });
 }
+function val(id){return document.getElementById(id).value.trim();}
 
-/* Un solo escuchador para toda la tabla, en vez de uno por fila. */
-document.getElementById('tbody').addEventListener('click',function(e){
-  const b=e.target.closest('[data-ver]');
-  if(!b) return;
-  const r=RES[+b.dataset.ver];
-  if(origenDe(r[C.captura])==='EN VIVO' && r[C.id]) verEnVivo(r);
-  else verDigitada(r);
-});
-
-/* Imprime SOLO la ficha abierta, no la página con la tabla de resultados.
-   Se marca el body y el bloque @media print se encarga del resto. En el
-   diálogo del navegador, «Guardar como PDF» genera el archivo. */
-function imprimirFicha(){
-  document.body.classList.add('imprimiendo-ficha');
-  const limpiar=()=>document.body.classList.remove('imprimiendo-ficha');
-  window.addEventListener('afterprint', limpiar, {once:true});
-  setTimeout(()=>{ window.print(); setTimeout(limpiar, 1500); }, 60);
-}
-
-function abrirFicha(){ document.getElementById('fichaDig').style.display='flex'; }
-function cerrarFicha(){
-  document.getElementById('fichaDig').style.display='none';
-  document.querySelector('#fichaDig .fdBody').innerHTML='';
-}
-
-function verEnVivo(r){
-  const f=document.getElementById('fichaDig');
-  f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
-  f.querySelector('.fdAcc').innerHTML=
-    `<a class="fdLink" href="ver.html?id=${encodeURIComponent(r[C.id])}" target="_blank">Abrir aparte / PDF</a>`;
-  f.querySelector('.fdBody').style.padding='0';
-  f.querySelector('.fdBody').innerHTML=
-    `<iframe class="fdFrame" src="ver.html?id=${encodeURIComponent(r[C.id])}"></iframe>`;
-  abrirFicha();
-}
-/* Las capturadas en vivo tienen ficha completa con fotos y medidas.
-   Las digitadas vienen de la hoja de papel: no hay fotos ni medidas, y por eso
-   se abre un resumen en pantalla en vez de mandar a una ficha medio vacía. */
-function origenTag(cap){
-  return origenDe(cap)==='EN VIVO'
-    ? '<span class="tag ov">EN VIVO</span>'
-    : '<span class="tag" style="background:#EEF2F7;color:#4E6B78">DIGITADO</span>';
-}
-/* Todo se abre en una ventana dentro del buscador, sin salir de la página.
-   Las capturadas en vivo cargan la ficha completa (ver.html) dentro de un marco,
-   así conservan sus fotos, sus medidas y su PDF sin duplicar ese código acá. */
-function botonVer(r,i){
-  return `<button class="ver" type="button" data-ver="${i}">Ver</button>`;
-}
-function verDigitada(r){
-  const f=document.getElementById('fichaDig');
-  f.querySelector('.fdBody').style.padding='16px 18px';
-  f.querySelector('.fdTitulo').textContent='Auditoría '+(r[C.id]||'');
-  f.querySelector('.fdAcc').innerHTML='<button class="fdLink" type="button" onclick="imprimirFicha()">Imprimir / PDF</button>';
-
-  const d=(t,v)=>v?`<div class="fdCel"><span>${t}</span><b>${v}</b></div>`:'';
-  const badgeRes = (r[C.resFinal]||'').toUpperCase()==='RECHAZADO'
-      ? '<span class="fdRes no">RECHAZADO</span>' : '<span class="fdRes ok">APROBADO</span>';
-  const defs=(r[C.defectos]||'').split('-').map(x=>x.trim()).filter(Boolean);
-
-  f.querySelector('.fdBody').innerHTML=`
-    <div class="fdCab">
-      <div>
-        <div class="fdKick">Auditoría Final · ${r[C.proceso]||''}</div>
-        <div class="fdH1">${r[C.cliente]||''} · ${r[C.grupo]||''}</div>
-        <div class="fdSub">${fechaTxt(r[C.fecha])} · Semana ${r[C.semana]||''} · ${r[C.intext]||''}</div>
-      </div>
-      ${badgeRes}
-    </div>
-
-    <div class="fdAviso">Registro <b>digitado</b> de la hoja de papel. No tiene fotos ni medidas
-      prenda por prenda: eso solo existe en las auditorías capturadas en vivo por la auditora.</div>
-
-    <div class="fdSec">Identificación</div>
-    <div class="fdGrid">
-      ${d('Estilo', r[C.estiloL])}${d('Estilo cliente', r[C.estiloC])}
-      ${d('Color', r[C.color])}${d('PO', r[C.po])}
-      ${d('Taller', r[C.servicio])}${d('Destino', r[C.destino])}
-    </div>
-
-    <div class="fdSec">Lote y muestra</div>
-    <div class="fdGrid">
-      ${d('Lote recibido', r[C.recibido])}${d('Muestra', r[C.lote])}
-      ${d('N.º de auditoría', r[C.nAud])}
-      ${d('Licencia', r[C.licencia]?'Sí — inspección al 100%':'No')}
-      ${d('Auditora', r[C.auditor])}
-    </div>
-
-    ${defs.length?`<div class="fdSec">Defectos encontrados</div>
-      <div class="fdLista">${defs.map(x=>'<div class="fdDef">'+x+'</div>').join('')}</div>`:''}
-
-    ${r[C.derivados]?`<div class="fdSec">Derivados</div>
-      <div class="fdGrid">${d('Prendas derivadas', r[C.derivados])}</div>`:''}
-
-    <div class="fdPie">Calidad Manufactura · LIVES — impreso el
-      ${new Date().toLocaleDateString('es-PE')} a las
-      ${new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}</div>
-  `;
-  abrirFicha();
-}
-
-
-/* Asigna un clic solo si el elemento existe. Un botón que falte no debe
-   tumbar la carga entera: eso dejaba la pantalla en «Cargando…» para siempre. */
-function alClic(id, fn){
-  const e=document.getElementById(id);
-  if(e) e.onclick=fn; else console.warn('falta el elemento', id);
-}
-function val(id){const e=document.getElementById(id); return e?e.value.trim():'';}
-
-function setOrigen(v){
-  ORIGEN = (ORIGEN===v) ? '' : v;
-  const bv=document.getElementById('btnEnVivo'), bd=document.getElementById('btnDigitado');
-  if(bv) bv.classList.toggle('active', ORIGEN==='EN VIVO');
-  if(bd) bd.classList.toggle('active', ORIGEN==='DIGITADO');
-  buscar();
-}
-alClic('btnMas', pintarMas);
-alClic('btnEnVivo', ()=>setOrigen('EN VIVO'));
-alClic('btnDigitado', ()=>setOrigen('DIGITADO'));
-alClic('btnBuscar', buscar);
-alClic('btnLimpiar', ()=>{
+document.getElementById('btnBuscar').onclick=buscar;
+document.getElementById('btnLimpiar').onclick=()=>{
   ['fPo','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
   filtroReproceso=false; filtroLicencia=false;
   document.getElementById('btnReprocesos').classList.remove('active');
   document.getElementById('btnLicencias').classList.remove('active');
   buscar();
-});
-alClic('btnReprocesos', ()=>{
+};
+document.getElementById('btnReprocesos').onclick=()=>{
   filtroReproceso=!filtroReproceso;
   document.getElementById('btnReprocesos').classList.toggle('active',filtroReproceso);
   buscar();
-});
-alClic('btnLicencias', ()=>{
+};
+document.getElementById('btnLicencias').onclick=()=>{
   filtroLicencia=!filtroLicencia;
   document.getElementById('btnLicencias').classList.toggle('active',filtroLicencia);
   buscar();
-});
+};
 // Enter en cualquier input dispara búsqueda
 ['fPo','fGrupo','fEstilo','fColor'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')buscar();}));
 
 cargar();
 </script>
-<div id="tiempos" class="tiempos"></div>
-<div id="masWrap" style="display:none;text-align:center;margin:14px 0">
-  <button id="btnMas" class="chip" type="button">Ver más</button>
-</div>
-<div id="fichaDig" class="fdWrap" onclick="if(event.target===this)cerrarFicha()">
-  <div class="fdCard">
-    <div class="fdHead">
-      <span class="fdTitulo">Detalle de la auditoría</span>
-      <span class="fdAcc"></span>
-      <button type="button" class="fdX" onclick="cerrarFicha()">&times;</button>
-    </div>
-    <div class="fdBody"></div>
-  </div>
-</div>
 </body>
 </html>
