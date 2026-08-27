@@ -224,9 +224,9 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <div class="hint" style="margin-top:2px">La muestra pasa a ser el total recibido y el lote queda aprobado.</div></div>
       <label class="switch"><input type="checkbox" id="licSwitch"><span class="slider"></span></label>
     </div>
-    <div class="toggle ovr" id="reproWrap" style="opacity:.45">
+    <div class="toggle ovr" id="reproWrap" style="display:none">
       <div><div style="font-weight:600;font-size:14px">¿Reproceso?</div>
-        <div class="hint" id="reproHint" style="margin-top:2px">Escribe la OP arriba para habilitar esta marca.</div></div>
+        <div class="hint" id="reproHint" style="margin-top:2px">Marcado porque estás reprocesando una auditoría rechazada.</div></div>
       <label class="switch"><input type="checkbox" id="reproSwitch" disabled><span class="slider"></span></label>
     </div>
     <div class="field" id="motivoReprocesoWrap" style="display:none">
@@ -757,13 +757,13 @@ function unlockField(id){
   const el=$(id); if(!el) return;
   el.readOnly=false; el.style.background=''; el.style.color=''; el.style.fontWeight='';
 }
-function fijarReproWrap(habilitado){
-  const wrap=$('reproWrap'), sw=$('reproSwitch'), hint=$('reproHint');
+// Ahora Reproceso SOLO aparece dentro del flujo dedicado "🔁 Reprocesar" (ver iniciarReproceso más abajo).
+// En el formulario normal (alta nueva o Corregir) queda oculto siempre, para no confundir.
+function fijarReproWrap(mostrar){
+  const wrap=$('reproWrap'), sw=$('reproSwitch');
   if(!wrap||!sw) return;
-  sw.disabled=!habilitado;
-  wrap.style.opacity=habilitado?'1':'.45';
-  if(hint) hint.textContent = habilitado ? 'Si es reproceso, no suma al reporte.' : 'Escribe la OP arriba para habilitar esta marca.';
-  if(!habilitado){ S.reproceso=false; sw.checked=false; }
+  wrap.style.display=mostrar?'flex':'none';
+  sw.disabled=!mostrar;
 }
 function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
 function liberarCamposOP(){ CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; }
@@ -771,7 +771,7 @@ function autocompletarDesdeOP(m){
   lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('estiloC',m.estiloCli); lockField('po',m.po);
   lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
   S.codTela=m.codTela||''; S.descTela=m.descTela||'';
-  aplicarCliente(); refrescarCascada(); validate(); fijarReproWrap(true);
+  aplicarCliente(); refrescarCascada(); validate();
   const h=$('opHint'); if(h){ h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
 }
 function buscarOP(){
@@ -779,7 +779,7 @@ function buscarOP(){
   const op=($('opInput').value||'').trim();
   const h=$('opHint');
   if(!op){
-    ocultarSelectorOP(); liberarCamposOP(); fijarReproWrap(false);
+    ocultarSelectorOP(); liberarCamposOP();
     if(h){ h.className='hint'; h.textContent='Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.'; }
     validate(); return;
   }
@@ -792,13 +792,12 @@ function buscarOP(){
   }
   ocultarSelectorOP();
   if(matches.length===0){
-    liberarCamposOP(); fijarReproWrap(true);
+    liberarCamposOP();
     if(h){ h.className='hint warn'; h.textContent='OP no encontrada en la base (puede ser anterior a 2025). Completa los datos abajo a mano.'; }
     validate();
   } else if(matches.length===1){
     autocompletarDesdeOP(matches[0]);
   } else {
-    fijarReproWrap(false);
     if(h){ h.className='hint'; h.textContent='Esta OP tiene varias opciones — elige abajo.'; }
     const sel=$('opSelector'), list=$('opSelectorList');
     list.innerHTML=''; list.dataset.op=op;
@@ -816,7 +815,7 @@ let opTimer=null;
 $('opInput').addEventListener('input',()=>{ clearTimeout(opTimer); opTimer=setTimeout(buscarOP,350); });
 $('opInput').addEventListener('blur',buscarOP);
 
-/* ===== reproceso (el candado lo maneja fijarReproWrap, ver bloque de OP arriba) ===== */
+/* ===== reproceso (solo visible/editable dentro del flujo dedicado "Reprocesar") ===== */
 $('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;recalc();};
 
 $('inMed').onchange=e=>{agregarFotos(e.target.files,'med');e.target.value='';};
@@ -1559,16 +1558,16 @@ async function cargarParaEditar(id){
   $('medMuestra').value=r[28]||''; $('medDef').value=r[29]||''; $('medRes').value=r[30]||'';
   // comentario
   $('comentario').value=r[40]||'';
-  // licencia / reproceso
-  S.licencia=(norm(r[16]).indexOf('s')===0); if($('licSwitch')) $('licSwitch').checked=S.licencia;
-  S.reproceso=(norm(r[39]).indexOf('s')===0); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
-  fijarReproWrap(true); // es una auditoría ya existente, no una nueva a medio llenar: el candado no aplica aquí
+  // licencia / reproceso — Reproceso ya no se muestra al corregir (solo existe en el flujo dedicado
+  // "Reprocesar"); si esta auditoría ya lo traía marcado de antes, el valor se conserva igual al guardar.
+  S.licencia=(norm(r[16]).indexOf('S')===0); if($('licSwitch')) $('licSwitch').checked=S.licencia;
+  S.reproceso=(norm(r[39]).indexOf('S')===0); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
+  fijarReproWrap(false);
   // marcar modo edición (y limpiar cualquier resto de un modo reproceso que hubiera quedado a medias)
   S.editId=id; S.reprocesaDe=null;
   $('editId').textContent=id;
   $('modoEdicion').style.display='block';
   $('modoReproceso').style.display='none';
-  $('reproSwitch').disabled=false;
   const mrw=$('motivoReprocesoWrap'); if(mrw) mrw.style.display='none';
   $('btnMisAud').textContent='📋 Ver mis auditorías';
   // Recalcular y refrescar
@@ -1726,7 +1725,7 @@ function restaurarBorrador(){
   if(b.proceso){ const selP=$('proceso'); if(selP) selP.value=b.proceso; }
   S.proceso=b.proceso||''; S.int_ext=b.int_ext||''; S.nAud=b.nAud||''; S.nivel=b.nivel||'1.5';
   S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso;
-  fijarReproWrap(true); // el borrador ya traía datos en curso; el candado inicial solo aplica a un formulario recién abierto
+  fijarReproWrap(false);
   if(b.editId){ S.editId=b.editId; const ei=$('editId'); if(ei) ei.textContent=b.editId; const me=$('modoEdicion'); if(me) me.style.display='block'; }
 
   document.querySelectorAll('#segA button').forEach(x=>{ x.classList.toggle('on', x.dataset.v===S.nivel); });
