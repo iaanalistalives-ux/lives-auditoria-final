@@ -385,8 +385,23 @@ async function gviz(tab){
 }
 
 /* ===== AUDITORÍAS en vivo (para ordinal, pedido y panel) ===== */
+// ===== Respaldo local (localStorage) para cuando se recarga la pantalla SIN señal =====
+// Cada vez que una de las 3 cargas (OPs, historial, catálogo/talleres/auditoras) trae datos
+// frescos con éxito, se guarda una copia en el celular. Si en un recargo posterior falla la
+// descarga (sin señal), se usa esa última copia buena en vez de quedarse con todo vacío.
+// Nunca reemplaza una carga exitosa — solo entra quieta a tapar el hueco cuando algo falla.
+function cacheGuardar(clave, datos){
+  try{ localStorage.setItem('lives_cache_'+clave, JSON.stringify({t:Date.now(), d:datos})); }
+  catch(e){ /* si el celular no tiene espacio, no pasa nada grave: sigue funcionando como hoy */ }
+}
+function cacheLeer(clave){
+  try{ const raw=localStorage.getItem('lives_cache_'+clave); if(!raw) return null; const o=JSON.parse(raw); return (o&&o.d!==undefined)?o.d:null; }
+  catch(e){ return null; }
+}
+
 async function cargarAud(){
-  try{ AUD_CACHE=await gviz('AUDITORÍAS'); }catch(e){ AUD_CACHE=[]; }
+  try{ AUD_CACHE=await gviz('AUDITORÍAS'); cacheGuardar('aud', AUD_CACHE); }
+  catch(e){ const c=cacheLeer('aud'); AUD_CACHE=(c&&c.length)?c:[]; }
   return AUD_CACHE;
 }
 function norm(v){ return String(v==null?'':v).trim().toUpperCase(); }
@@ -681,22 +696,38 @@ async function loadLists(){
   try{
     TALLERES=(await gviz('TALLERES')).filter(r=>r[1]&&!r[1].startsWith('—'));
     AUDITORAS=(await gviz('AUDITORAS')).map(r=>r[0]).filter(n=>n&&!n.startsWith('—'));
+    cacheGuardar('talleres', TALLERES); cacheGuardar('auditoras', AUDITORAS);
     const dl=document.getElementById('auditoras'); dl.innerHTML='';
     const dl2=document.getElementById('auditoras2'); if(dl2) dl2.innerHTML='';
     AUDITORAS.forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o); if(dl2){const o2=document.createElement('option');o2.value=n;dl2.appendChild(o2);}});
     if(S.proceso) fillTaller(S.proceso);
-  }catch(e){/* si falla, el form sigue usable y las listas se llenan luego */}
+  }catch(e){
+    // sin señal: usar la última copia buena guardada en el celular, si existe
+    const ct=cacheLeer('talleres'), ca=cacheLeer('auditoras');
+    if(ct&&ct.length) TALLERES=ct;
+    if(ca&&ca.length){
+      AUDITORAS=ca;
+      const dl=document.getElementById('auditoras'); if(dl){ dl.innerHTML=''; AUDITORAS.forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);}); }
+      const dl2=document.getElementById('auditoras2'); if(dl2){ dl2.innerHTML=''; AUDITORAS.forEach(n=>{const o2=document.createElement('option');o2.value=n;dl2.appendChild(o2);}); }
+      if(S.proceso) fillTaller(S.proceso);
+    }
+  }
   try{
     const rows=await gviz('CATÁLOGO');               // A=COD, B=SECCIÓN, C=CATEGORIA_MADRE, D=SUBTIPO (fila1 = encabezados)
     const cat=rows.filter(r=>r[0]&&r[0].toUpperCase()!=='COD'&&r[2])
                   .map(r=>[r[0].trim(), normSec(r[1]), r[2].trim(), (r[3]||'').toString().trim()]);
-    if(cat.length){ CAT=cat; }
-  }catch(e){/* si falla, CAT queda vacío y se avisa */}
+    if(cat.length){ CAT=cat; cacheGuardar('cat', CAT); }
+  }catch(e){
+    const c=cacheLeer('cat'); if(c&&c.length) CAT=c;
+  }
   try{
     const rows=await gviz('CLIENTES');               // A=PREFIJO, B=CLIENTE
     CLIENTES=rows.filter(r=>r[0]&&r[0].toUpperCase()!=='PREFIJO'&&r[1])
                  .map(r=>[r[0].trim().toUpperCase(), r[1].trim()]);
-  }catch(e){/* si falla, cliente queda manual-vacío */}
+    cacheGuardar('clientes', CLIENTES);
+  }catch(e){
+    const c=cacheLeer('clientes'); if(c&&c.length) CLIENTES=c;
+  }
 }
 
 /* ===== cliente automático desde el prefijo del grupo ===== */
@@ -1814,7 +1845,11 @@ async function cargarOPS(){
     const r=await fetch(APP_URL+'?accion=ops');
     const j=await r.json();
     OPS_DB=(j&&j.rows)?j.rows:[];
-  }catch(e){ OPS_DB=[]; /* si falla, el campo OP simplemente no encuentra nada y no bloquea (comportamiento normal) */ }
+    cacheGuardar('ops', OPS_DB);
+  }catch(e){
+    const c=cacheLeer('ops'); OPS_DB=(c&&c.length)?c:[];
+    /* si tampoco hay copia guardada, el campo OP simplemente no encuentra nada y no bloquea (comportamiento normal) */
+  }
 }
 
 crearBuscadorChecklist({inputId:'buscarDef',resultsId:'resultadosDef',activoId:'activoDef',listContId:'defChecklist',getBloques:()=>S.defs});
