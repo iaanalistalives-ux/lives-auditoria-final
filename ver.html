@@ -73,6 +73,40 @@ td{padding:7px 9px;border-bottom:1px solid #eef1f4}
 #lb .hint{color:#cdd; margin-top:12px;font-size:13px}
 .estado{padding:40px;text-align:center;color:#889}
 .foot{margin-top:24px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:#99a;display:flex;justify-content:space-between}
+/* ===== Ventana emergente de Hojas de medidas / Medidas de proceso (dentro de la misma pestaña, no abre nada aparte) ===== */
+#fotosOverlay{display:none;position:fixed;inset:0;background:#3a3f47;z-index:200;overflow-y:auto;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#fotosOverlay.show{display:block}
+.fobar{position:sticky;top:0;background:#0E3B36;padding:12px 18px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;z-index:5;color:#fff}
+.fobar h2{font-size:15px;margin:0;font-weight:700}
+.fobar .facts{display:flex;flex-wrap:wrap;gap:8px}
+.fobar button{border:none;border-radius:8px;padding:0 16px;height:38px;line-height:1;font-weight:700;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.fobar .fclose{background:#fff;color:#0E3B36}
+.fobar .fprint{background:#F59E0B;color:#0E3B36}
+.fowrap{padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.fotip{color:#dfe4ea;font-size:13px;text-align:center;max-width:600px;margin:0 auto 6px}
+.hoja{margin:0;background:#fff;border-radius:10px;padding:14px;max-width:96vw;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hoja .lab{color:#0E3B36;font-weight:700;font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hoja .lab .girar{background:#0F7A5A;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
+.hoja .imgbox{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.hoja img{display:block;max-width:100%;height:auto;border-radius:6px;transition:transform .15s}
+.hoja[data-deg="90"] img,.hoja[data-deg="270"] img{max-width:none;max-height:70vh}
+@media print{
+  /* Mientras la ventana de fotos está abierta, imprimir SOLO eso — el reporte de datos queda oculto */
+  body.viendoFotos .toolbar, body.viendoFotos .page{display:none!important}
+  body.viendoFotos #fotosOverlay{position:static;display:block!important;background:#fff;overflow:visible}
+  body.viendoFotos .fobar, body.viendoFotos .fotip, body.viendoFotos .girar{display:none!important}
+  body.viendoFotos .fowrap{padding:0;gap:0}
+  body.viendoFotos .hoja{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border-radius:0;padding:0;margin:0;
+    width:210mm;height:297mm;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  body.viendoFotos .hoja + .hoja{break-before:page;page-break-before:always}
+  body.viendoFotos .hoja .lab{display:block;font-size:11px;font-weight:700;color:#0E3B36;padding:3mm 0 1mm;text-align:center}
+  body.viendoFotos .hoja .imgbox{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  body.viendoFotos .hoja[data-deg="0"] img, body.viendoFotos .hoja[data-deg="180"] img{width:auto;height:auto;max-width:200mm;max-height:287mm;object-fit:contain}
+  body.viendoFotos .hoja[data-deg="180"] img{transform:rotate(180deg)}
+  body.viendoFotos .hoja[data-deg="90"] img, body.viendoFotos .hoja[data-deg="270"] img{transform-origin:center;width:285mm;height:auto;max-height:200mm;object-fit:contain}
+  body.viendoFotos .hoja[data-deg="90"] img{transform:rotate(90deg)}
+  body.viendoFotos .hoja[data-deg="270"] img{transform:rotate(270deg)}
+}
 @media print{
   @page{ size: portrait; margin:10mm; }
   .toolbar{display:none}
@@ -102,6 +136,17 @@ td{padding:7px 9px;border-bottom:1px solid #eef1f4}
 </div>
 
 <div class="page" id="page"><div class="estado" id="estado">Cargando auditoría…</div></div>
+
+<div id="fotosOverlay">
+  <div class="fobar">
+    <h2 id="fotosOverlayTitulo">Fotos</h2>
+    <div class="facts">
+      <button class="fclose" onclick="cerrarFotosOverlay()">✕ Cerrar</button>
+      <button class="fprint" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+  <div class="fowrap" id="fotosOverlayBody"></div>
+</div>
 
 <div id="lb" onclick="cerrarLb(event)">
   <button class="close" onclick="cerrarLb(event,true)">×</button>
@@ -307,8 +352,9 @@ function verFotos(tipo){
   if(!todas.length){ alert('Esta auditoría no tiene fotos de ese tipo.'); return; }
 
   const nombreTipo = (tipo==='proc') ? 'Medidas de proceso' : 'Hojas de medidas';
-  const titulo=nombreTipo+' · '+ID;
-  let cuerpo='';
+  document.getElementById('fotosOverlayTitulo').textContent = nombreTipo+' · '+ID;
+
+  let cuerpo='<div class="fotip">Si una foto sale de lado o de cabeza, usa "⟳ Girar esta foto" hasta verla derecha. Lo que ves aquí es lo que se imprime. Luego pulsa "Imprimir / Guardar PDF".</div>';
   todas.forEach((f,i)=>{
     cuerpo+=`<figure class="hoja" data-deg="0">
       <div class="lab">${f.tag}${todas.length>1?(' · '+(i+1)+'/'+todas.length):''}
@@ -316,63 +362,20 @@ function verFotos(tipo){
       <div class="imgbox"><img src="${f.src}" alt="medida"></div>
     </figure>`;
   });
-
-  const doc=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${titulo}</title>
-<style>
-  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#3a3f47;color:#fff}
-  .bar{position:sticky;top:0;background:#0E3B36;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;z-index:5}
-  .bar h1{font-size:15px;margin:0;font-weight:700}
-  .bar button{background:#F59E0B;color:#0E3B36;border:none;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer;font-size:13px}
-  .wrap{padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px}
-  figure{margin:0;background:#fff;border-radius:10px;padding:14px;max-width:96vw;box-shadow:0 2px 10px rgba(0,0,0,.3)}
-  figure .lab{color:#0E3B36;font-weight:700;font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-  figure .lab .girar{background:#0F7A5A;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
-  .imgbox{display:flex;align-items:center;justify-content:center;overflow:hidden}
-  figure img{display:block;max-width:100%;height:auto;border-radius:6px;transition:transform .15s}
-  /* rotaciones en pantalla */
-  figure[data-deg="90"] img,figure[data-deg="270"] img{max-width:none;max-height:70vh}
-  .tip{color:#dfe4ea;font-size:13px;text-align:center;max-width:600px;margin:0 auto 6px}
-  @media print{
-    @page{ size: portrait; margin:0; }
-    body{background:#fff}
-    .bar,.tip,.girar{display:none}
-    .wrap{padding:0;gap:0}
-    figure{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border-radius:0;padding:0;margin:0;
-      width:210mm;height:297mm;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    figure + figure{break-before:page;page-break-before:always}
-    figure .lab{display:block;font-size:11px;font-weight:700;color:#0E3B36;padding:3mm 0 1mm;text-align:center}
-    .imgbox{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-    /* sin rotar: foto horizontal normal */
-    figure[data-deg="0"] img,figure[data-deg="180"] img{width:auto;height:auto;max-width:200mm;max-height:287mm;object-fit:contain}
-    figure[data-deg="180"] img{transform:rotate(180deg)}
-    /* rotada 90/270: la imagen se para y llena la hoja vertical */
-    figure[data-deg="90"] img,figure[data-deg="270"] img{transform-origin:center;width:285mm;height:auto;max-height:200mm;object-fit:contain}
-    figure[data-deg="90"] img{transform:rotate(90deg)}
-    figure[data-deg="270"] img{transform:rotate(270deg)}
-  }
-</style>
-</head><body>
-<div class="bar"><h1>${titulo}</h1><button onclick="window.print()">🖨 Imprimir / Guardar PDF</button></div>
-<div class="wrap">
-  <div class="tip">Si una foto sale de lado o de cabeza, usa "⟳ Girar esta foto" hasta verla derecha. Lo que ves aquí es lo que se imprime. Luego pulsa "Imprimir / Guardar PDF".</div>
-  ${cuerpo}
-</div>
-<script>
+  document.getElementById('fotosOverlayBody').innerHTML = cuerpo;
+  document.getElementById('fotosOverlay').classList.add('show');
+  document.body.classList.add('viendoFotos'); // activa las reglas de impresión propias de esta ventana
+}
+function cerrarFotosOverlay(){
+  document.getElementById('fotosOverlay').classList.remove('show');
+  document.body.classList.remove('viendoFotos');
+}
 function girarFoto(btn){
   const fig=btn.closest('figure');
   let d=parseInt(fig.getAttribute('data-deg'))||0;
   d=(d+90)%360; fig.setAttribute('data-deg',d);
   const img=fig.querySelector('img');
   img.style.transform='rotate('+d+'deg)';
-}
-<\/script>
-</body></html>`;
-
-  const w=window.open('','_blank');
-  if(!w){ alert('Permite las ventanas emergentes para ver las fotos.'); return; }
-  w.document.open(); w.document.write(doc); w.document.close();
 }
 
 /* ===== COMPARTIR REPORTE (PDF sin fotos, por WhatsApp/menú nativo) ===== */
