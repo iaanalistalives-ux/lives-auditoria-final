@@ -22,6 +22,7 @@ input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
 .btn.toggle{background:#fff;color:var(--navy);border:1px solid #dce1e7}
 .btn.toggle.active{background:var(--amber);color:#5c4400;border-color:var(--amber)}
+.btn.toggle.excluir{background:var(--red);color:#fff;border-color:var(--red)}
 .hint{font-size:12px;color:#889;margin-top:8px}
 .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .top .txt{min-width:0}
@@ -67,8 +68,9 @@ tr:hover td{background:#f6f9fb}
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
+      <button class="btn toggle" id="btnLiquidados" type="button">Liquidados</button>
     </div>
-    <div class="hint">Los resultados se actualizan solos según vas eligiendo o escribiendo. Puedes combinar filtros.</div>
+    <div class="hint">Los resultados se actualizan solos según vas eligiendo o escribiendo. Puedes combinar filtros. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
   </div>
 
   <div class="card">
@@ -89,13 +91,18 @@ let DATA=[];
 // índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
          destino:12,pedido:13,recibido:14,lote:15,licencia:16,resAql:23,override:24,resFinal:27,auditor:31,semana:32,
-         computable:38,reproceso:39};
-// Filtros toggle (Reprocesos / Licencias) — no van como columnas en la tabla, solo filtran
-let filtroReproceso=false, filtroLicencia=false;
+         computable:38,reproceso:39,liquidado:51};
+// Filtros de 3 estados: null = sin filtro, true = mostrar SOLO esas, false = EXCLUIRLAS (mostrar solo las que no)
+let filtroReproceso=null, filtroLicencia=null, filtroLiquidado=null;
 function esVerdadero(v){
   const s=norm(v);
   if(!s) return false;
   return !['0','no','false','n/a','na'].includes(s);
+}
+// Identifica el lote (mismo grupo+estilo+color+po+destino+proceso) para agrupar el historial de un liquidado
+function llaveLote(r){
+  return [norm(r[C.grupo]),norm(r[C.estiloL]),norm(r[C.estiloC]),norm(r[C.color]),norm(r[C.po]),
+    norm(r[C.destino]).substring(0,3),norm(r[C.proceso])].join('|');
 }
 
 async function gviz(tab){
@@ -162,10 +169,22 @@ function buscar(){
     if(aud&&r[C.auditor]!==aud) return false;
     if(resu&&norm(r[C.resFinal]).indexOf(resu)<0) return false;
     if(!fechaOK(r[C.fecha],desde,hasta)) return false;
-    if(filtroReproceso&&!esVerdadero(r[C.reproceso])) return false;
-    if(filtroLicencia&&!esVerdadero(r[C.licencia])) return false;
+    if(filtroReproceso===true&&!esVerdadero(r[C.reproceso])) return false;
+    if(filtroReproceso===false&&esVerdadero(r[C.reproceso])) return false;
+    if(filtroLicencia===true&&!esVerdadero(r[C.licencia])) return false;
+    if(filtroLicencia===false&&esVerdadero(r[C.licencia])) return false;
+    if(filtroLiquidado===false&&esVerdadero(r[C.liquidado])) return false;
+    // filtroLiquidado===true (mostrar solo liquidados) se aplica aparte abajo, porque además de las
+    // filas liquidadas, hay que sumar el resto del historial de ese mismo lote (ver más abajo).
     return true;
   });
+  if(filtroLiquidado===true){
+    // Cualquier fila que comparta el mismo lote (grupo+estilo+color+po+destino+proceso) con una fila
+    // liquidada entra también, aunque esa fila en sí no esté marcada liquidada — así se ve el historial
+    // completo del lote (reprocesos, intentos previos, etc.), no solo la fila final que quedó liquidada.
+    const clavesLiquidadas=new Set(DATA.filter(r=>esVerdadero(r[C.liquidado])).map(llaveLote));
+    res=res.filter(r=>clavesLiquidadas.has(llaveLote(r)));
+  }
   // más recientes primero
   res.sort((a,b)=>fechaTxt(b[C.fecha]).localeCompare(fechaTxt(a[C.fecha])));
   pintar(res);
@@ -193,19 +212,34 @@ function val(id){return document.getElementById(id).value.trim();}
 document.getElementById('btnLimpiar').onclick=()=>{
   ['fPo','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
-  filtroReproceso=false; filtroLicencia=false;
-  document.getElementById('btnReprocesos').classList.remove('active');
-  document.getElementById('btnLicencias').classList.remove('active');
+  filtroReproceso=null; filtroLicencia=null; filtroLiquidado=null;
+  pintarBotonFiltro('btnReprocesos', null, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
+  pintarBotonFiltro('btnLicencias', null, 'Licencias', 'Solo licencias', 'Sin licencias');
+  pintarBotonFiltro('btnLiquidados', null, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
   buscar();
 };
+// Cicla neutro -> solo esas -> excluirlas -> neutro otra vez, y pinta el botón según el estado.
+function siguienteEstado(actual){ return actual===null ? true : (actual===true ? false : null); }
+function pintarBotonFiltro(id, estado, nombreBase, nombreSolo, nombreExcluir){
+  const btn=document.getElementById(id);
+  btn.classList.remove('active','excluir');
+  if(estado===true){ btn.classList.add('active'); btn.textContent='✓ '+nombreSolo; }
+  else if(estado===false){ btn.classList.add('excluir'); btn.textContent='✕ '+nombreExcluir; }
+  else{ btn.textContent=nombreBase; }
+}
 document.getElementById('btnReprocesos').onclick=()=>{
-  filtroReproceso=!filtroReproceso;
-  document.getElementById('btnReprocesos').classList.toggle('active',filtroReproceso);
+  filtroReproceso=siguienteEstado(filtroReproceso);
+  pintarBotonFiltro('btnReprocesos', filtroReproceso, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
   buscar();
 };
 document.getElementById('btnLicencias').onclick=()=>{
-  filtroLicencia=!filtroLicencia;
-  document.getElementById('btnLicencias').classList.toggle('active',filtroLicencia);
+  filtroLicencia=siguienteEstado(filtroLicencia);
+  pintarBotonFiltro('btnLicencias', filtroLicencia, 'Licencias', 'Solo licencias', 'Sin licencias');
+  buscar();
+};
+document.getElementById('btnLiquidados').onclick=()=>{
+  filtroLiquidado=siguienteEstado(filtroLiquidado);
+  pintarBotonFiltro('btnLiquidados', filtroLiquidado, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
   buscar();
 };
 // Filtros en vivo: los selects y fechas filtran apenas cambian; los campos de texto
