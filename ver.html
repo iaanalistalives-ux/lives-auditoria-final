@@ -392,10 +392,34 @@ function cerrarFotosOverlay(){
   document.body.classList.remove('viendoFotos');
   const st=document.getElementById('fotosPageStyle'); if(st) st.remove();
 }
-// Gira y acerca combinados en un mismo transform, sobre la foto grande directamente (sin ventana aparte)
+// Gira y acerca combinados sobre la foto grande directamente (sin ventana aparte). No basta con
+// "rotate()" en CSS — eso solo gira lo que se VE, pero la caja que envuelve la foto se queda con el
+// tamaño de ANTES de girar, por eso se veía cortada o con barra para deslizar. Aquí se recalcula el
+// tamaño real de la foto (ancho/alto en píxeles) cada vez que gira o hace zoom, para que la caja se
+// acomode de verdad al nuevo tamaño.
 function aplicarTransformFoto(img){
-  const deg=img.getAttribute('data-deg')||'0', escala=img.getAttribute('data-escala')||'1';
-  img.style.transform='rotate('+deg+'deg) scale('+escala+')';
+  const deg=parseInt(img.getAttribute('data-deg'))||0;
+  const escala=parseFloat(img.getAttribute('data-escala'))||1;
+  const rotado = (deg===90||deg===270);
+  const box=img.closest('.imgbox');
+  if(img.naturalWidth && img.naturalHeight){
+    // Espacio disponible en pantalla para la foto YA GIRADA (si está de lado, el ancho disponible
+    // pasa a ser la altura de la ventana, y viceversa — por eso se intercambian aquí).
+    const dispW = rotado ? window.innerHeight*0.60 : Math.min(window.innerWidth*0.9, 640);
+    const dispH = rotado ? Math.min(window.innerWidth*0.9, 640) : window.innerHeight*0.60;
+    // Girada: lo que hoy es el ALTO de la foto pasa a ocupar el ANCHO visual (y viceversa) — por eso
+    // aquí también se comparan cruzados, si no, el cálculo queda mal y la caja se sigue quedando chica.
+    const s = rotado
+      ? Math.min(dispW/img.naturalHeight, dispH/img.naturalWidth) * escala
+      : Math.min(dispW/img.naturalWidth, dispH/img.naturalHeight) * escala;
+    const w0=img.naturalWidth*s, h0=img.naturalHeight*s; // tamaño ANTES de girar (lo que usa el layout)
+    img.style.width=w0+'px'; img.style.height=h0+'px';
+    // "transform:rotate()" solo cambia lo que se VE, nunca el espacio que reserva el layout — por eso
+    // la CAJA que envuelve la foto también se fija a mano, con el tamaño YA GIRADO (visual). Si no se
+    // hace esto, la foto se ve del tamaño correcto pero la caja se queda chica y pide hacer scroll.
+    if(box){ box.style.width=(rotado?h0:w0)+'px'; box.style.height=(rotado?w0:h0)+'px'; }
+  }
+  img.style.transform='rotate('+deg+'deg)';
 }
 function girarFoto(btn){
   const fig=btn.closest('figure');
@@ -409,6 +433,9 @@ function girarFoto(btn){
 function activarZoomFotos(){
   document.querySelectorAll('#fotosOverlayBody .imgbox img').forEach(img=>{
     img.style.cursor='zoom-in';
+    // Tamaño inicial correcto apenas carga la foto (si ya estaba en caché, "complete" ya es true)
+    if(img.complete) aplicarTransformFoto(img);
+    else img.addEventListener('load', ()=>aplicarTransformFoto(img));
     img.addEventListener('dblclick', ()=>{
       const cur=parseFloat(img.getAttribute('data-escala'))||1;
       const nuevo = cur>1 ? 1 : 2.5;
@@ -426,12 +453,19 @@ function activarZoomFotos(){
     }, {passive:false});
   });
 }
-// Antes de imprimir, se quita el acercamiento (pero se conserva el giro) para que no salga recortado
+// Antes de imprimir: se quita el tamaño en línea (calculado en píxeles para la pantalla) para que
+// mande el CSS de impresión (calculado en milímetros para la hoja) — si no, el tamaño de pantalla
+// pisaría al de impresión y saldría mal. Después de imprimir, se recalcula para la pantalla otra vez.
 window.addEventListener('beforeprint', ()=>{
-  document.querySelectorAll('#fotosOverlayBody .imgbox img').forEach(img=>{
-    img.setAttribute('data-escala','1');
-    aplicarTransformFoto(img);
+  document.querySelectorAll('#fotosOverlayBody .imgbox').forEach(box=>{
+    const img=box.querySelector('img');
+    if(img) img.setAttribute('data-escala','1');
+    if(img) img.style.width=img.style.height=img.style.transform='';
+    box.style.width=box.style.height='';
   });
+});
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('#fotosOverlayBody .imgbox img').forEach(img=>aplicarTransformFoto(img));
 });
 
 /* ===== COMPARTIR REPORTE (PDF sin fotos, por WhatsApp/menú nativo) ===== */
