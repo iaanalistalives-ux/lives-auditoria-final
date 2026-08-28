@@ -179,7 +179,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     </div>
     <div class="grid">
       <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="EFI-102">
-        <div class="hint">Escribe las 3 letras y el número: el "-" sale solo (ej. EFI102 → EFI-102).</div>
+        <div class="hint" id="grupoHint">Escribe las 3 letras y el número: el "-" sale solo (ej. EFI102 → EFI-102).</div>
         <datalist id="grupos"></datalist></div>
       <div class="full"><label>Cliente (automático)</label>
         <input id="cliente" readonly placeholder="Se completa según el grupo" style="background:#eef3f1;font-weight:600;color:var(--green)">
@@ -498,6 +498,33 @@ function calcAvance(){
   } else {
     txt += `<span style="color:#889">Ingresa tu lote para ver el nuevo avance.</span>`;
   }
+
+  // Aviso informativo: si esta misma OP/lote ya tiene auditorías en OTROS procesos (Costura, Acabados, Final…),
+  // se muestra aquí para que la auditora lo sepa — no bloquea ni obliga ningún orden todavía (eso viene más
+  // adelante, cuando se conecten los procesos). Por ahora es solo un aviso de contexto.
+  const otros={};
+  (AUD_CACHE||[]).forEach(r=>{
+    if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return;
+    if(norm(r[39]).indexOf('S')===0) return; // reprocesos no cuentan aquí tampoco
+    if(llaveFila(r)===key && norm(r[3])!==proc){
+      const p=r[3]||'—';
+      if(!otros[p]) otros[p]={n:0, resultados:{}};
+      otros[p].n++;
+      const res=r[27]||'—';
+      otros[p].resultados[res]=(otros[p].resultados[res]||0)+1;
+    }
+  });
+  const otrosKeys=Object.keys(otros);
+  if(otrosKeys.length){
+    txt += `<hr style="border:none;border-top:1px solid #e3e9ef;margin:8px 0">`;
+    txt += `<div style="font-size:12.5px;color:#556"><b>ℹ️ Esta misma OP ya tiene auditorías en otro proceso:</b><br>`;
+    otrosKeys.forEach(p=>{
+      const info=otros[p];
+      const resTxt=Object.entries(info.resultados).map(([res,c])=>`${c} ${res}`).join(', ');
+      txt += `${esc(p)}: ${info.n} auditoría(s) · ${esc(resTxt)}<br>`;
+    });
+    txt += `</div>`;
+  }
   $('avanceTxt').innerHTML = txt;
   $('avanceBar').style.width = Math.min(100, loteActual>0?pctActual:pctPrev) + '%';
 }
@@ -686,6 +713,11 @@ function aplicarPedido(){
   if(prevPedido){
     inp.value=prevPedido; inp.readOnly=true; inp.style.background='#eef3f1';
     h.className='hint'; h.textContent='Pedido ya registrado para este lote. Bloqueado.';
+  } else if(S.pedidoDeOP && inp.value){
+    // El pedido ya vino de la base de OPs (fuente confiable) — no hay que desbloquearlo solo
+    // porque todavía no exista ninguna auditoría previa de este lote en el historial.
+    inp.readOnly=true; inp.style.background='#eef3f1';
+    h.className='hint'; h.textContent='Dato de la base de OPs. Bloqueado.';
   } else {
     inp.readOnly=false; inp.style.background='#fbfcfd';
     h.className='hint'; h.textContent='Aún nadie puso el pedido de este lote. Escríbelo tú.';
@@ -741,7 +773,9 @@ function aplicarCliente(){
   const cli=clienteDeGrupo($('grupo').value);
   $('cliente').value=cli;
   const h=$('cliHint');
+  const deOP=$('grupo').readOnly; // si el grupo vino bloqueado de la OP, la instrucción de "escríbelo" no aplica
   if($('grupo').value && !cli){ h.className='hint warn'; h.textContent='Ese prefijo no está en la lista de clientes. Revisa el grupo.'; }
+  else if(deOP){ h.className='hint'; h.textContent=''; }
   else { h.className='hint'; h.textContent='Escribe el grupo y el cliente aparece solo.'; }
   validate();
 }
@@ -752,7 +786,7 @@ function fillTaller(proc){
 }
 
 /* ===== ESTADO ===== */
-const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null};
+const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null,pedidoDeOP:false};
 let AUD_CACHE=null;       // filas de la hoja AUDITORÍAS (para ordinal/pedido/panel)
 let ordTimer=null;
 let defId=0;
@@ -815,11 +849,16 @@ function fijarReproWrap(mostrar){
   sw.disabled=!mostrar;
 }
 function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
-function liberarCamposOP(){ CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; }
+function liberarCamposOP(){
+  CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; S.pedidoDeOP=false;
+  const gh=$('grupoHint'); if(gh) gh.style.display='';
+}
 function autocompletarDesdeOP(m){
   lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('estiloC',m.estiloCli); lockField('po',m.po);
   lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
   S.codTela=m.codTela||''; S.descTela=m.descTela||'';
+  S.pedidoDeOP=true; // el pedido vino de la base de OPs — que aplicarPedido() no lo desbloquee por su cuenta
+  const gh=$('grupoHint'); if(gh) gh.style.display='none'; // esa instrucción es para cuando se tipea a mano
   aplicarCliente(); refrescarCascada(); validate();
   pedirOrdinal(); // los campos se llenaron por código (lockField), no por tecleo, así que hay que
                   // disparar el cálculo del N° de auditoría a mano — si no, se queda en "—" para siempre.
@@ -1664,6 +1703,7 @@ async function iniciarReproceso(id){
   lockField('grupo',r[7]); lockField('estiloL',r[8]); lockField('estiloC',r[9]);
   lockField('po',r[10]); lockField('color',r[11]); lockField('destino',r[12]); lockField('pedido',r[13]);
   S.codTela=r[45]||''; S.descTela=r[46]||'';
+  S.pedidoDeOP=true; // viene de la auditoría rechazada original — igual de confiable, que no se desbloquee
   $('recibido').value=''; // el lote reprocesado puede ser distinto al original (reproceso parcial)
   $('auditor').value='';
   $('fecha').valueAsDate=new Date(); // fecha real de hoy, no la de la auditoría rechazada
