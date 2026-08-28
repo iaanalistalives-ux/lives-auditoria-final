@@ -326,6 +326,15 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <div class="sec"><span class="dot"></span>Comentario final</div>
     <textarea id="comentario" rows="3" placeholder="Observaciones generales de la auditoría (opcional)"></textarea>
   </div>
+
+  <!-- LIQUIDADO (solo Costura/Acabados taller) -->
+  <div class="card" id="liquidadoCard" style="display:none">
+    <div class="toggle" id="liquidadoWrap">
+      <div><div style="font-weight:600;font-size:14px">¿Liquidado?</div>
+        <div class="hint" style="margin-top:2px">Marca esto cuando ya no vas a auditar más este lote — quedó cerrado.</div></div>
+      <label class="switch"><input type="checkbox" id="liquidadoSwitch"><span class="slider"></span></label>
+    </div>
+  </div>
 </div>
 
 <div class="bar"><div class="inner">
@@ -786,7 +795,7 @@ function fillTaller(proc){
 }
 
 /* ===== ESTADO ===== */
-const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null,pedidoDeOP:false};
+const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null,pedidoDeOP:false,liquidado:false};
 let AUD_CACHE=null;       // filas de la hoja AUDITORÍAS (para ordinal/pedido/panel)
 let ordTimer=null;
 let defId=0;
@@ -814,6 +823,11 @@ $('proceso').onchange=()=>{
   // Derivados SOLO aplica a Costura (taller). En Acabados y Auditoría Final no se muestra ni se guarda.
   const derCard=$('derivadosCard');
   if(derCard) derCard.style.display = esCostura ? 'block' : 'none';
+  // Liquidado: activo en Costura y Acabados (taller). En Auditoría Final no existe esa marca.
+  const esAcabadosTaller = S.proceso==='Acabados (taller)';
+  const liqCard=$('liquidadoCard');
+  if(liqCard) liqCard.style.display = (esCostura||esAcabadosTaller) ? 'block' : 'none';
+  if(!(esCostura||esAcabadosTaller) && S.liquidado){ S.liquidado=false; if($('liquidadoSwitch')) $('liquidadoSwitch').checked=false; }
   if(!esCostura){ limpiarDerivados(); }
   fillTaller(S.proceso);
   actualizarCardProceso();
@@ -915,6 +929,7 @@ $('inPro').onchange=e=>{agregarFotos(e.target.files,'pro');e.target.value='';};
 $('licSwitch').onchange=()=>{S.licencia=$('licSwitch').checked;
   // En licencia la muestra = recibido (100%): el formulario ya lo refleja en el panel AQL.
   recalc();};
+$('liquidadoSwitch').onchange=()=>{S.liquidado=$('liquidadoSwitch').checked;};
 
 /* ===== AQL en vivo ===== */
 // Suma la cantidad total de un bloque (con subtipos o sin ellos)
@@ -1433,7 +1448,7 @@ function armarPayload(){
     po:v('po'),color:v('color'),destino:v('destino'),cant_pedido:parseInt(v('pedido'))||'',total_recibido:recibido,
     lote_real:recibido,licencia:S.licencia?'SÍ':'NO',nivel_aql:parseFloat(S.nivel),
     cod_tela:S.codTela||'',desc_tela:S.descTela||'',
-    motivo_reproceso:v('motivoReproceso')||'',reprocesa_de:S.reprocesaDe||'',op:v('opInput')||'',
+    motivo_reproceso:v('motivoReproceso')||'',reprocesa_de:S.reprocesaDe||'',op:v('opInput')||'',liquidado:S.liquidado?'SÍ':'NO',
     override:S.override?'SÍ':'NO',override_autoriza:v('ovWho'),override_motivo:v('ovWhy'),
     muestra_medidas:parseInt(v('medMuestra'))||'',def_medidas:parseInt(v('medDef'))||'',resultado_medidas:v('medRes'),
     auditor:v('auditor'),
@@ -1785,7 +1800,7 @@ function recolectarBorrador(){
   return {
     ts: Date.now(), campos, checks,
     proceso:S.proceso, nAud:S.nAud, int_ext:S.int_ext, nivel:S.nivel,
-    override:S.override, licencia:S.licencia, reproceso:S.reproceso, editId:S.editId||null,
+    override:S.override, licencia:S.licencia, reproceso:S.reproceso, liquidado:S.liquidado, editId:S.editId||null,
     defs:S.defs.map(b=>({seccion:b.seccion,categoria:b.categoria,detalle:b.detalle,cant:b.cant,foto:b.foto,subs:(b.subs||[]).map(s=>({subtipo:s.subtipo,cant:s.cant,foto:s.foto}))})),
     ders:S.ders.map(b=>({categoria:b.categoria,detalle:b.detalle,cant:b.cant,foto:b.foto,subs:(b.subs||[]).map(s=>({subtipo:s.subtipo,cant:s.cant,foto:s.foto}))})),
     fotosMed:S.fotosMed, fotosPro:S.fotosPro
@@ -1851,7 +1866,8 @@ function restaurarBorrador(){
 
   if(b.proceso){ const selP=$('proceso'); if(selP) selP.value=b.proceso; }
   S.proceso=b.proceso||''; S.int_ext=b.int_ext||''; S.nAud=b.nAud||''; S.nivel=b.nivel||'1.5';
-  S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso;
+  S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso; S.liquidado=!!b.liquidado;
+  if($('liquidadoSwitch')) $('liquidadoSwitch').checked=S.liquidado;
   fijarReproWrap(false);
   if(b.editId){ S.editId=b.editId; const ei=$('editId'); if(ei) ei.textContent=b.editId; const me=$('modoEdicion'); if(me) me.style.display='block'; }
 
