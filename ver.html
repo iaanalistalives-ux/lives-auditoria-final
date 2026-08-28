@@ -365,10 +365,20 @@ function verFotos(tipo){
   document.getElementById('fotosOverlayBody').innerHTML = cuerpo;
   document.getElementById('fotosOverlay').classList.add('show');
   document.body.classList.add('viendoFotos'); // activa las reglas de impresión propias de esta ventana
+  // @page no se puede limitar con una clase — aplica a toda la hoja siempre. Por eso, mientras esta
+  // ventana está abierta, se reemplaza a 0 margen (así no aparece el encabezado/pie automático de
+  // Chrome ni sobra espacio); al cerrar, se quita y el reporte normal vuelve a sus 10mm de siempre.
+  if(!document.getElementById('fotosPageStyle')){
+    const st=document.createElement('style');
+    st.id='fotosPageStyle';
+    st.textContent='@media print{ @page{ size:portrait; margin:0; } }';
+    document.head.appendChild(st);
+  }
 }
 function cerrarFotosOverlay(){
   document.getElementById('fotosOverlay').classList.remove('show');
   document.body.classList.remove('viendoFotos');
+  const st=document.getElementById('fotosPageStyle'); if(st) st.remove();
 }
 function girarFoto(btn){
   const fig=btn.closest('figure');
