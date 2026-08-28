@@ -29,7 +29,7 @@ body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-
   .tbtn{min-width:0;max-width:none;flex:1 1 calc(50% - 6px);padding:0 6px;font-size:12px}
 }
 .tbtn.print{background:var(--tan);color:#3b2600}
-.tbtn.fotos{background:var(--sage);color:#fff}
+.tbtn.medbtn{background:var(--sage);color:#fff}
 .tbtn.proc{background:var(--slate);color:#fff}
 .tbtn.back{background:#0F7A5A;color:#fff}
 .tbtn.share{background:#25D366;color:#fff}
@@ -94,7 +94,7 @@ td{padding:7px 9px;border-bottom:1px solid #eef1f4}
   <h1 id="ttl">Reporte de auditoría</h1>
   <div class="acts">
     <button class="tbtn back" onclick="volverAtras()">← Volver a buscar</button>
-    <button class="tbtn fotos" id="btnMed" onclick="verFotos('med')" style="display:none">🖼 Hojas de medidas</button>
+    <button class="tbtn medbtn" id="btnMed" onclick="verFotos('med')" style="display:none">🖼 Hojas de medidas</button>
     <button class="tbtn proc" id="btnProc" onclick="verFotos('proc')" style="display:none">🖼 Medidas de proceso</button>
     <button class="tbtn share" id="btnShare" onclick="compartirReporte()">📤 Compartir</button>
     <button class="tbtn print" onclick="window.print()">🖨 Imprimir datos</button>
