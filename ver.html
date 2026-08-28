@@ -194,7 +194,7 @@ function driveImg(url){
 function driveImgFull(url){
   if(!url) return '';
   const m=String(url).match(/[-\w]{25,}/);
-  return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w2400` : url;
+  return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w3600` : url;
 }
 function fotosDe(celda){
   if(!celda) return [];
@@ -446,7 +446,7 @@ function activarZoomFotos(){
     img.addEventListener('wheel', (e)=>{
       e.preventDefault();
       let cur=parseFloat(img.getAttribute('data-escala'))||1;
-      cur += (e.deltaY<0?0.2:-0.2); cur=Math.max(1,Math.min(5,cur));
+      cur += (e.deltaY<0?0.2:-0.2); cur=Math.max(1,Math.min(3,cur));
       img.setAttribute('data-escala', cur);
       img.style.cursor = cur>1 ? 'zoom-out' : 'zoom-in';
       aplicarTransformFoto(img);
