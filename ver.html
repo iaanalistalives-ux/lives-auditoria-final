@@ -169,7 +169,7 @@ const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,est
   destino:12,pedido:13,recibido:14,lote:15,licencia:16,loteAql:17,muestra:18,nivel:19,aceptaMax:20,rechazaMin:21,
   totalDef:22,resAql:23,override:24,ovWho:25,ovWhy:26,resFinal:27,medMuestra:28,medDef:29,medRes:30,auditor:31,
   semana:32,fotoGen:33,loteKey:34,repetido:35,loteCont:36,anio:37,computable:38,reproceso:39,coment:40,totalDer:41,
-  fotosMed:42,fotosPro:43};
+  fotosMed:42,fotosPro:43,op:50,liquidado:51};
 
 const qs=new URLSearchParams(location.search), ID=qs.get('id');
 let FOTOS_MED=[], FOTOS_PRO=[], ES_COSTURA=false;
@@ -234,6 +234,15 @@ function render(r,defs,ders){
 
   function fil(k,v){return `<div class="f"><div class="k">${k}</div><div class="v">${esc(v)||'—'}</div></div>`;}
 
+  // Liquidado solo existe para Costura/Acabados (taller) — en Auditoría Final no se muestra, aunque
+  // la columna siempre traiga "NO" guardado (ahí ese dato no significa nada).
+  const procNorm=norm(r[C.proceso]);
+  const aplicaLiquidado = procNorm.indexOf('costura (taller)')>=0 || procNorm.indexOf('acabados (taller)')>=0;
+  const esLiquidado = norm(r[C.liquidado]).indexOf('s')===0;
+  const liquidadoHtml = aplicaLiquidado
+    ? `<div class="code" style="margin-top:6px;font-weight:700;color:${esLiquidado?'#1c7a6e':'#99a'}">${esLiquidado?'✓ Liquidado':'Sin liquidar'}</div>`
+    : '';
+
   let html=`
   <div class="head">
     <div>
@@ -244,6 +253,7 @@ function render(r,defs,ders){
     <div class="res">
       <div class="bigres ${cls}">${esc(resF)}</div>
       <div class="code" style="margin-top:6px">Semana ${esc(r[C.semana])} · ${esc(fechaTxt(r[C.fecha]))}</div>
+      ${liquidadoHtml}
     </div>
   </div>
 
@@ -252,6 +262,7 @@ function render(r,defs,ders){
     ${fil('Cliente',r[C.cliente])}
     ${fil('Grupo',r[C.grupo])}
     ${fil('Proceso',r[C.proceso])}
+    ${fil('OP',r[C.op])}
     ${fil('Estilo LIVES',r[C.estiloL])}
     ${fil('Estilo cliente',r[C.estiloC])}
     ${fil('PO',r[C.po])}
