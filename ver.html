@@ -3,108 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Buscar auditorías · LIVES</title>
+<title>Reporte de auditoría · LIVES</title>
 <style>
-:root{--navy:#1f3864;--green:#2a9d8f;--red:#e63946;--amber:#e9c46a;--ora:#f4a261;--bg:#eef2f6;--ink:#243040}
+:root{
+  --petrol:#0E3B36; --petrol-2:#12463F; --emer:#10B981;
+  --sage:#0F7A5A; --sage-dark:#0B815E; --slate:#4E6B78;
+  --taupe:#B45309; --rose:#DC2626; --tan:#F59E0B;
+  --warm:#DCE5E2; --warm-light:#F1F6F4; --stone:#5F726C;
+  --card:#fff; --sh:0 1px 3px rgba(14,59,54,.06),0 1px 2px rgba(14,59,54,.04);
+  --r:12px;
+  /* nombres antiguos, apuntando al estándar vigente */
+  --navy:#0E3B36; --azul:#0E3B36; --amber:#F59E0B;
+}
 *{box-sizing:border-box}
-body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-.top{background:var(--navy);color:#fff;padding:16px 20px}
-.top h1{margin:0;font-size:19px;font-weight:800;letter-spacing:.3px}
-.top .sub{font-size:12px;opacity:.8;margin-top:2px}
-.wrap{max-width:1100px;margin:0 auto;padding:18px}
-.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
-.filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#667;margin-bottom:4px}
-input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;font:inherit;background:#fbfcfd}
-.btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
-.btn{border:none;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:14px}
-.btn.prim{background:var(--navy);color:#fff}
-.btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
-.btn.toggle{background:#fff;color:var(--navy);border:1px solid #dce1e7}
-.btn.toggle.active{background:var(--amber);color:#5c4400;border-color:var(--amber)}
-.btn.toggle.excluir{background:var(--red);color:#fff;border-color:var(--red)}
-.hint{font-size:12px;color:#889;margin-top:8px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.top .txt{min-width:0}
-.top-link{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:9px;padding:9px 14px;font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
-.top-link:hover{background:rgba(255,255,255,.28)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:var(--navy);color:#fff;text-align:left;padding:9px 10px;position:sticky;top:0;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
-td{padding:9px 10px;border-bottom:1px solid #eef1f4}
-tr:hover td{background:#f6f9fb}
-.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
-.ap{background:#e3f4f1;color:#1c7a6e}.re{background:#fde7e9;color:#c32030}.ov{background:#fcf3df;color:#9a7415}
-.ver{color:var(--navy);font-weight:700;text-decoration:none;border:1px solid var(--navy);padding:5px 12px;border-radius:7px;font-size:12px;white-space:nowrap}
-.ver:hover{background:var(--navy);color:#fff}
-.tablewrap{overflow-x:auto;max-height:62vh;overflow-y:auto}
-.estado{padding:24px;text-align:center;color:#889}
-.count{font-size:13px;color:#667;margin-bottom:10px}
-@media(max-width:560px){th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none}}
+body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#e9edf2;color:var(--ink)}
+.toolbar{position:sticky;top:0;background:var(--navy);color:#fff;padding:8px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;z-index:10}
+.toolbar h1{font-size:14px;margin:0;font-weight:700}
+.toolbar .acts{display:flex;flex-wrap:wrap;gap:6px}
+.tbtn{border:none;border-radius:7px;padding:0 12px;height:32px;line-height:1;font-weight:700;cursor:pointer;font-size:12.5px;min-width:0;max-width:170px;flex:0 0 auto;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+/* En pantallas angostas (celular/tablet en vertical) los botones se acomodan en varias filas,
+   más chicos y repartiendo el ancho — nunca se salen de la pantalla ni hay que arrastrar. */
+@media (max-width:700px){
+  .toolbar{padding:8px 12px}
+  .toolbar .acts{gap:6px;width:100%}
+  .tbtn{min-width:0;max-width:none;flex:1 1 calc(50% - 6px);padding:0 6px;height:34px;font-size:12px}
+}
+.tbtn.print{background:var(--tan);color:#3b2600}
+.tbtn.medbtn{background:var(--sage);color:#fff}
+.tbtn.proc{background:var(--slate);color:#fff}
+.tbtn.back{background:#0F7A5A;color:#fff}
+.tbtn.share{background:#25D366;color:#fff}
+.page{max-width:820px;margin:18px auto;background:#fff;padding:30px 34px;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--navy);padding-bottom:12px;margin-bottom:16px}
+.head .brand{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:.5px}
+.head .code{font-size:12px;color:#778}
+.head .res{text-align:right}
+.bigres{font-size:20px;font-weight:800;padding:6px 16px;border-radius:8px;display:inline-block}
+.bigres.ap{background:#e3f4f1;color:#1c7a6e}.bigres.re{background:#fde7e9;color:#c32030}.bigres.ov{background:#fcf3df;color:#9a7415}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px}
+.f .k{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#889}
+.f .v{font-size:14px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+th{background:#f0f3f7;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;color:#556;border-bottom:1px solid var(--line)}
+td{padding:7px 9px;border-bottom:1px solid #eef1f4}
+.deffotoWrap{display:flex;flex-direction:column;gap:3px}
+.deflab{font-size:10px;font-weight:700;color:var(--navy)}
+.deffoto{width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;display:block}
+.aqlbox{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.aqlbox .b{background:#f6f8fb;border-radius:8px;padding:10px;text-align:center}
+.aqlbox .b .k{font-size:10px;text-transform:uppercase;color:#889}
+.aqlbox .b .v{font-size:18px;font-weight:800;color:var(--navy)}
+.ovbox{background:#fcf3df;border:1px solid #F59E0B;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13px}
+.coment{background:#f6f8fb;border-radius:8px;padding:12px;font-size:14px;white-space:pre-wrap;min-height:20px}
+.fotos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+.fotos figure{margin:0}
+.fotos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;background:#f3f5f8}
+.fotoblock{margin-top:14px}
+.fotoblock .lab{font-weight:700;font-size:12px;color:var(--navy);background:#eef2f7;padding:5px 10px;border-radius:6px;display:inline-block;margin-bottom:6px}
+/* lightbox */
+#lb{display:none;position:fixed;inset:0;background:rgba(15,20,30,.92);z-index:100;align-items:center;justify-content:center;flex-direction:column}
+#lb.show{display:flex}
+#lb .lbScroll{max-width:96vw;max-height:88vh;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pinch-zoom}
+#lb img{max-width:96vw;max-height:88vh;object-fit:contain;border-radius:6px;transition:transform .15s;transform-origin:center;cursor:zoom-in;display:block}
+#lb img.zoom{max-width:none;max-height:none;cursor:zoom-out}
+#lb img[data-deg="90"]:not(.zoom),#lb img[data-deg="270"]:not(.zoom){max-width:88vh;max-height:96vw}
+#lb #lbTitle{position:absolute;top:18px;left:50%;transform:translateX(-50%);color:#fff;font-weight:700;font-size:15px;background:rgba(31,56,100,.85);padding:8px 18px;border-radius:8px;max-width:80vw;text-align:center}
+#lb .rotbtn{position:absolute;top:16px;left:20px;background:#F59E0B;color:#0E3B36;border:none;border-radius:10px;padding:10px 16px;font-size:14px;cursor:pointer;font-weight:700}
+#lb .close{position:absolute;top:16px;right:20px;background:#fff;border:none;border-radius:50%;width:42px;height:42px;font-size:22px;cursor:pointer;font-weight:700}
+#lb .hint{color:#cdd; margin-top:12px;font-size:13px}
+.estado{padding:40px;text-align:center;color:#889}
+.foot{margin-top:24px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:#99a;display:flex;justify-content:space-between}
+/* ===== Ventana emergente de Hojas de medidas / Medidas de proceso (dentro de la misma pestaña, no abre nada aparte) ===== */
+#fotosOverlay{display:none;position:fixed;inset:0;background:#3a3f47;z-index:200;overflow:auto;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#fotosOverlay.show{display:block}
+.fobar{position:sticky;top:0;background:#0E3B36;padding:8px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;z-index:5;color:#fff}
+.fobar h2{font-size:14px;margin:0;font-weight:700}
+.fobar .facts{display:flex;flex-wrap:wrap;gap:6px}
+.fobar button{border:none;border-radius:7px;padding:0 12px;height:32px;line-height:1;font-weight:700;cursor:pointer;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.fobar .fclose{background:#fff;color:#0E3B36}
+.fobar .fprint{background:#F59E0B;color:#0E3B36}
+.fotabs{display:none;flex-wrap:wrap;gap:6px;padding:8px 16px 0;background:#2f353d}
+.ftab{border:1px solid #55606b;background:transparent;color:#dfe4ea;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
+.ftab.on{background:#F59E0B;color:#0E3B36;border-color:#F59E0B}
+.fowrap{padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px;background:#2f353d;min-height:calc(100vh - 60px)}
+.fotip{color:#dfe4ea;font-size:13px;text-align:center;max-width:600px;margin:0 auto 6px}
+.hoja{margin:0;background:#fff;border-radius:10px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hoja .lab{color:#0E3B36;font-weight:700;font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hoja .lab .girar{background:#0F7A5A;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
+/* La caja YA NO recorta la foto (overflow:auto en vez de hidden) — así, al girar 90°, la foto se ve
+   completa y con su propio scroll si no cabe, en vez de quedar cortada por un marco que no se ajusta. */
+.hoja .imgbox{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.hoja img{display:block;border-radius:6px;transition:transform .15s;transform-origin:center;flex-shrink:0}
+@media print{
+  /* Mientras la ventana de fotos está abierta, imprimir SOLO eso — el reporte de datos queda oculto */
+  body.viendoFotos .toolbar, body.viendoFotos .page{display:none!important}
+  body.viendoFotos #fotosOverlay{position:static;display:block!important;background:#fff;overflow:visible}
+  body.viendoFotos .fobar, body.viendoFotos .fotip, body.viendoFotos .girar, body.viendoFotos .fotabs{display:none!important}
+  body.viendoFotos .fowrap{padding:0;gap:0;min-height:0}
+  body.viendoFotos .hoja .imgbox{max-height:none}
+  body.viendoFotos .hoja{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border-radius:0;padding:0;margin:0;
+    width:210mm;height:297mm;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  body.viendoFotos .hoja + .hoja{break-before:page;page-break-before:always}
+  body.viendoFotos .hoja .lab{display:block;font-size:11px;font-weight:700;color:#0E3B36;padding:3mm 0 1mm;text-align:center}
+  body.viendoFotos .hoja .imgbox{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  body.viendoFotos .hoja[data-deg="0"] img, body.viendoFotos .hoja[data-deg="180"] img{width:auto;height:auto;max-width:200mm;max-height:287mm;object-fit:contain}
+  body.viendoFotos .hoja[data-deg="180"] img{transform:rotate(180deg)}
+  body.viendoFotos .hoja[data-deg="90"] img, body.viendoFotos .hoja[data-deg="270"] img{transform-origin:center;width:285mm;height:auto;max-height:200mm;object-fit:contain}
+  body.viendoFotos .hoja[data-deg="90"] img{transform:rotate(90deg)}
+  body.viendoFotos .hoja[data-deg="270"] img{transform:rotate(270deg)}
+}
+@media print{
+  @page{ size: portrait; margin:10mm; }
+  .toolbar{display:none}
+  #lb{display:none!important}
+  body{background:#fff}
+  .page{box-shadow:none;margin:0;max-width:none;padding:0}
+  h2{break-after:avoid}
+  /* Imprimir SOLO los datos (vertical, limpio). Las fotos se ven/imprimen aparte. */
+  .fotoblock, #fotosSec{display:none!important}
+  .deffoto{width:40px;height:40px}
+  .foot{break-before:avoid}
+}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-<div class="top">
-  <div class="txt">
-    <h1>Buscar auditorías</h1>
-    <div class="sub">AC-009-25 · Calidad Manufactura · LIVES</div>
+<div class="toolbar">
+  <h1 id="ttl">Reporte de auditoría</h1>
+  <div class="acts">
+    <button class="tbtn back" onclick="volverAtras()">← Volver a buscar</button>
+    <button class="tbtn medbtn" id="btnFotos" onclick="abrirVerFotos()" style="display:none">🖼 Ver fotos</button>
+    <button class="tbtn share" id="btnShare" onclick="compartirReporte()">📤 Compartir</button>
+    <button class="tbtn print" onclick="window.print()">🖨 Imprimir datos</button>
   </div>
 </div>
 
-<div class="wrap">
-  <div class="card">
-    <div class="filtros">
-      <div><label>Proceso</label><select id="fProceso"><option value="">Todos</option><option>Costura (taller)</option><option>Acabados (taller)</option><option>Acabados Final (interno)</option></select></div>
-      <div><label>Grupo</label><input id="fGrupo" placeholder="EFI-102"></div>
-      <div><label>OP</label><input id="fOp" placeholder="24978"></div>
-      <div><label>Estilo LIVES</label><input id="fEstilo" placeholder="24647"></div>
-      <div><label>Color</label><input id="fColor" placeholder="White"></div>
-      <div><label>PO</label><input id="fPo" placeholder="6002469"></div>
-      <div><label>Cliente</label><select id="fCliente"><option value="">Todos</option></select></div>
-      <div><label>Auditor</label><select id="fAuditor"><option value="">Todos</option></select></div>
-      <div><label>Resultado</label><select id="fResultado"><option value="">Todos</option><option value="aprob">Aprobado</option><option value="rech">Rechazado</option><option value="override">Override</option></select></div>
-      <div><label>Desde</label><input id="fDesde" type="date"></div>
-      <div><label>Hasta</label><input id="fHasta" type="date"></div>
-    </div>
-    <div class="btns">
-      <button class="btn sec" id="btnLimpiar">Limpiar</button>
-      <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
-      <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
-      <button class="btn toggle" id="btnLiquidados" type="button">Liquidados</button>
-    </div>
-    <div class="hint">Los resultados se actualizan solos según vas eligiendo o escribiendo. Puedes combinar filtros. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
-  </div>
+<div class="page" id="page"><div class="estado" id="estado">Cargando auditoría…</div></div>
 
-  <div class="card">
-    <div class="count" id="count"></div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Color</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+<div id="fotosOverlay">
+  <div class="fobar">
+    <h2 id="fotosOverlayTitulo">Ver fotos</h2>
+    <div class="facts">
+      <button class="fclose" onclick="cerrarFotosOverlay()">✕ Cerrar</button>
+      <button class="fprint" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
     </div>
-    <div class="estado" id="estado">Cargando auditorías…</div>
   </div>
+  <div class="fotabs" id="fotosTabs"></div>
+  <div class="fowrap" id="fotosOverlayBody"></div>
+</div>
+
+<div id="lb" onclick="cerrarLb(event)">
+  <button class="close" onclick="cerrarLb(event,true)">×</button>
+  <div id="lbTitle"></div>
+  <button class="rotbtn" onclick="girarLb(event)">⟳ Girar</button>
+  <div class="lbScroll"><img id="lbImg" src="" alt="foto ampliada"></div>
+  <div class="hint">⟳ Girar para enderezar · rueda o pellizca para zoom · doble clic para acercar · toca fuera para cerrar</div>
 </div>
 
 <script>
 const SHEET_ID='1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
-let DATA=[];
-// índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
-         destino:12,pedido:13,recibido:14,lote:15,licencia:16,resAql:23,override:24,resFinal:27,auditor:31,semana:32,
-         computable:38,reproceso:39,horaEnvio:47,op:50,liquidado:51};
-// Filtros de 3 estados: null = sin filtro, true = mostrar SOLO esas, false = EXCLUIRLAS (mostrar solo las que no)
-let filtroReproceso=null, filtroLicencia=null, filtroLiquidado=null;
-function esVerdadero(v){
-  const s=norm(v);
-  if(!s) return false;
-  return !['0','no','false','n/a','na'].includes(s);
-}
-// Identifica el lote (mismo grupo+estilo+color+po+destino+proceso) para agrupar el historial de un liquidado
-function llaveLote(r){
-  return [norm(r[C.grupo]),norm(r[C.estiloL]),norm(r[C.estiloC]),norm(r[C.color]),norm(r[C.po]),
-    norm(r[C.destino]).substring(0,3),norm(r[C.proceso])].join('|');
-}
+  destino:12,pedido:13,recibido:14,lote:15,licencia:16,loteAql:17,muestra:18,nivel:19,aceptaMax:20,rechazaMin:21,
+  totalDef:22,resAql:23,override:24,ovWho:25,ovWhy:26,resFinal:27,medMuestra:28,medDef:29,medRes:30,auditor:31,
+  semana:32,fotoGen:33,loteKey:34,repetido:35,loteCont:36,anio:37,computable:38,reproceso:39,coment:40,totalDer:41,
+  fotosMed:42,fotosPro:43,op:50,liquidado:51};
+
+const qs=new URLSearchParams(location.search), ID=qs.get('id');
+let FOTOS_MED=[], FOTOS_PRO=[], ES_COSTURA=false;
+let DEFS_DATA=[], DERS_DATA=[], FOTOS_CATEGORIAS=[];
 
 async function gviz(tab){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
@@ -113,152 +182,373 @@ async function gviz(tab){
   return (j.table.rows||[]).map(row=>(row.c||[]).map(c=>c&&c.v!=null?String(c.v):''));
 }
 function norm(s){return String(s||'').trim().toLowerCase();}
-// Convierte fechas de gviz "Date(2026,5,15)" a "2026-06-15". Si ya es texto normal, lo deja.
-function fechaTxt(v){
-  if(v==null||v==='') return '';
-  const s=String(v);
-  const m=s.match(/^Date\((\d+),(\d+),(\d+)/);
-  if(m){
-    const a=m[1], mes=('0'+(parseInt(m[2])+1)).slice(-2), d=('0'+m[3]).slice(-2);
-    return a+'-'+mes+'-'+d;
-  }
-  return s.substring(0,10);
+function fechaTxt(v){ if(v==null||v==='')return''; const s=String(v); const m=s.match(/^Date\((\d+),(\d+),(\d+)/); if(m){return m[1]+'-'+('0'+(parseInt(m[2])+1)).slice(-2)+'-'+('0'+m[3]).slice(-2);} return s.substring(0,10);}
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// Convierte un link de Drive en URL de imagen visible
+function driveImg(url){
+  if(!url) return '';
+  const m=String(url).match(/[-\w]{25,}/);   // id de Drive
+  return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w1600` : url;
 }
-// Extrae solo la hora:minuto de HORA_ENVIO (guardada con hora completa, "Date(a,m,d,h,mi,s)")
-function horaTxt(v){
-  if(v==null||v==='') return '';
-  const s=String(v);
-  const m=s.match(/^Date\(\d+,\d+,\d+,(\d+),(\d+)/);
-  if(!m) return '';
-  return ('0'+m[1]).slice(-2)+':'+('0'+m[2]).slice(-2);
+function driveImgFull(url){
+  if(!url) return '';
+  const m=String(url).match(/[-\w]{25,}/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w3600` : url;
 }
-function esEnc(r){return !r[0]||norm(r[0])==='id_auditoria'||norm(r[0])==='';}
+function fotosDe(celda){
+  if(!celda) return [];
+  return String(celda).split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+}
 
 async function cargar(){
+  if(!ID){ document.getElementById('estado').textContent='Falta el ID de la auditoría.'; return; }
+  let rows, defs, ders;
   try{
-    const rows=await gviz('AUDITORÍAS');
-    DATA=rows.filter(r=>!esEnc(r));
-    // poblar selects de cliente y auditor
-    llenarSelect('fCliente', [...new Set(DATA.map(r=>r[C.cliente]).filter(Boolean))].sort());
-    llenarSelect('fAuditor', [...new Set(DATA.map(r=>r[C.auditor]).filter(Boolean))].sort());
-    buscar();
-  }catch(e){
-    document.getElementById('estado').textContent='No se pudo cargar. Revisa tu conexión.';
+    [rows,defs,ders]=await Promise.all([gviz('AUDITORÍAS'),gviz('DEFECTOS'),gviz('DERIVADOS')]);
+  }catch(e){ document.getElementById('estado').textContent='No se pudo cargar.'; return; }
+
+  const r=rows.find(x=>String(x[C.id]).trim()===ID.trim());
+  if(!r){ document.getElementById('estado').textContent='No se encontró la auditoría '+ID; return; }
+
+  const misDef=defs.filter(d=>String(d[0]).trim()===ID.trim());
+  const misDer=ders.filter(d=>String(d[0]).trim()===ID.trim());
+  render(r,misDef,misDer);
+}
+
+function render(r,defs,ders){
+  document.getElementById('ttl').textContent='Reporte · '+r[C.id];
+  const resF=r[C.resFinal]||'—', rn=norm(resF);
+  let cls=rn.indexOf('override')>=0?'ov':(rn.indexOf('aprob')>=0?'ap':(rn.indexOf('rech')>=0?'re':''));
+
+  const esCostura=/costura/i.test(r[C.proceso]||'');
+  const fMed=fotosDe(r[C.fotosMed]), fPro=fotosDe(r[C.fotosPro]);
+  ES_COSTURA=esCostura;
+  FOTOS_MED=fMed.map(u=>driveImgFull(u));
+  FOTOS_PRO=fPro.map(u=>driveImgFull(u));
+  DEFS_DATA=defs; DERS_DATA=ders;
+  // Mostrar el botón si hay fotos en cualquiera de las 3 categorías (medidas, proceso o defectos/derivados)
+  const hayFotosDef = defs.some(d=>d[6]) || ders.some(d=>d[6]);
+  const hayFotos = FOTOS_MED.length || (esCostura && FOTOS_PRO.length) || hayFotosDef;
+  document.getElementById('btnFotos').style.display = hayFotos ? '' : 'none';
+
+  function fil(k,v){return `<div class="f"><div class="k">${k}</div><div class="v">${esc(v)||'—'}</div></div>`;}
+
+  // Liquidado solo existe para Costura/Acabados (taller) — en Auditoría Final no se muestra, aunque
+  // la columna siempre traiga "NO" guardado (ahí ese dato no significa nada).
+  const procNorm=norm(r[C.proceso]);
+  const aplicaLiquidado = procNorm.indexOf('costura (taller)')>=0 || procNorm.indexOf('acabados (taller)')>=0;
+  const esLiquidado = norm(r[C.liquidado]).indexOf('s')===0;
+  const liquidadoHtml = aplicaLiquidado
+    ? `<div class="code" style="margin-top:6px;font-weight:700;color:${esLiquidado?'#1c7a6e':'#99a'}">${esLiquidado?'✓ Liquidado':'Sin liquidar'}</div>`
+    : '';
+
+  let html=`
+  <div class="head">
+    <div>
+      <div class="brand">LIVES</div>
+      <div class="code">Auditoría Final / Acabados · AC-009-25</div>
+      <div class="code">${esc(r[C.id])}</div>
+    </div>
+    <div class="res">
+      <div class="bigres ${cls}">${esc(resF)}</div>
+      <div class="code" style="margin-top:6px">Semana ${esc(r[C.semana])} · ${esc(fechaTxt(r[C.fecha]))}</div>
+      ${liquidadoHtml}
+    </div>
+  </div>
+
+  <h2>Datos del lote</h2>
+  <div class="grid">
+    ${fil('Cliente',r[C.cliente])}
+    ${fil('Grupo',r[C.grupo])}
+    ${fil('Proceso',r[C.proceso])}
+    ${fil('OP',r[C.op])}
+    ${fil('Estilo LIVES',r[C.estiloL])}
+    ${fil('Estilo cliente',r[C.estiloC])}
+    ${fil('PO',r[C.po])}
+    ${fil('Color',r[C.color])}
+    ${fil('Destino',r[C.destino])}
+    ${fil('Servicio / Taller',r[C.servicio])}
+    ${fil('N° auditoría',r[C.nAud])}
+    ${fil('Interna/Externa',r[C.intext])}
+    ${fil('Auditor',r[C.auditor])}
+  </div>
+
+  <h2>Cantidades y AQL</h2>
+  <div class="grid">
+    ${fil('Cant. pedido',r[C.pedido])}
+    ${fil('Total recibido',r[C.recibido])}
+    ${fil('Lote real',r[C.lote])}
+    ${fil('Licencia',r[C.licencia])}
+    ${fil('Reproceso',r[C.reproceso])}
+    ${fil('Nivel AQL',r[C.nivel])}
+  </div>
+  <div class="aqlbox">
+    <div class="b"><div class="k">Muestra</div><div class="v">${esc(r[C.muestra])||'—'}</div></div>
+    <div class="b"><div class="k">Acepta máx</div><div class="v">${esc(r[C.aceptaMax])||'—'}</div></div>
+    <div class="b"><div class="k">Total defectos</div><div class="v">${esc(r[C.totalDef])||'0'}</div></div>
+    <div class="b"><div class="k">Resultado AQL</div><div class="v" style="font-size:14px">${esc(r[C.resAql])||'—'}</div></div>
+  </div>`;
+
+  if(norm(r[C.override]).indexOf('s')===0){
+    html+=`<div class="ovbox"><b>Pase al rechazo (override):</b> autorizado por ${esc(r[C.ovWho])||'—'} · Motivo: ${esc(r[C.ovWhy])||'—'}</div>`;
+  }
+
+  // Defectos
+  html+=`<h2>Defectos (${defs.length})</h2>`;
+  if(defs.length){
+    html+=`<div class="tablewrap"><table><thead><tr><th>Sección</th><th>Categoría</th><th>Subtipo</th><th>Cant.</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
+    defs.forEach(d=>{
+      const tituloDef = 'Defecto: ' + (d[2]||'') + (d[3]?(' - '+d[3]):'');
+      const foto = d[6] ? `<div class="deffotoWrap"><div class="deflab">${esc(tituloDef)}</div><img src="${driveImg(d[6])}" class="deffoto" onclick="abrirLb('${driveImgFull(d[6])}', '${esc(tituloDef).replace(/'/g,"\\'")}')" alt="foto defecto"></div>` : '—';
+      html+=`<tr><td>${esc(d[1])}</td><td>${esc(d[2])}</td><td>${esc(d[3]||'—')}</td><td>${esc(d[4])}</td><td>${esc(d[5])}</td><td>${foto}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  } else { html+=`<div class="coment">Sin defectos registrados.</div>`; }
+
+  // Derivados
+  html+=`<h2>Derivados (${ders.length})</h2>`;
+  if(ders.length){
+    html+=`<div class="tablewrap"><table><thead><tr><th>Categoría</th><th>Subtipo</th><th>Cant. (lote)</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
+    ders.forEach(d=>{
+      const tituloDer = 'Derivado: ' + (d[2]||'') + (d[3]?(' - '+d[3]):'');
+      const foto = d[6] ? `<div class="deffotoWrap"><div class="deflab">${esc(tituloDer)}</div><img src="${driveImg(d[6])}" class="deffoto" onclick="abrirLb('${driveImgFull(d[6])}', '${esc(tituloDer).replace(/'/g,"\\'")}')" alt="foto derivado"></div>` : '—';
+      html+=`<tr><td>${esc(d[2])}</td><td>${esc(d[3]||'—')}</td><td>${esc(d[4])}</td><td>${esc(d[5])}</td><td>${foto}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  } else { html+=`<div class="coment">Sin derivados registrados.</div>`; }
+
+  // Medidas
+  html+=`<h2>Medidas</h2><div class="grid">
+    ${fil('Muestra medidas',r[C.medMuestra])}
+    ${fil('Def. medidas',r[C.medDef])}
+    ${fil('Resultado',r[C.medRes])}
+  </div>`;
+
+  // Comentario
+  html+=`<h2>Comentario</h2><div class="coment">${esc(r[C.coment])||'—'}</div>`;
+
+  html+=`<div class="foot"><span>LIVES · Calidad Manufactura</span><span>Generado ${new Date().toLocaleDateString('es-PE')}</span></div>`;
+
+  document.getElementById('page').innerHTML=html;
+}
+
+let lbScale=1, lbDeg=0;
+function aplicarZoom(){ const im=document.getElementById('lbImg'); im.style.transform='rotate('+lbDeg+'deg) scale('+lbScale+')'; im.classList.toggle('zoom',lbScale>1); im.setAttribute('data-deg',lbDeg); }
+function abrirLb(src,titulo){ const lb=document.getElementById('lb'); lbScale=1; lbDeg=0; const im=document.getElementById('lbImg'); im.src=src; im.style.transform=''; im.classList.remove('zoom'); im.setAttribute('data-deg','0'); document.getElementById('lbTitle').textContent=titulo||''; lb.classList.add('show'); }
+function girarLb(e){ if(e)e.stopPropagation(); lbDeg=(lbDeg+90)%360; aplicarZoom(); }
+function cerrarLb(e,force){ if(force||e.target.id==='lb'){ document.getElementById('lb').classList.remove('show'); } }
+document.addEventListener('wheel',function(e){
+  const lb=document.getElementById('lb'); if(!lb.classList.contains('show')) return;
+  if(e.target.id==='lbImg'||e.target.closest('.lbScroll')){ e.preventDefault();
+    lbScale += (e.deltaY<0?0.2:-0.2); lbScale=Math.max(1,Math.min(5,lbScale)); aplicarZoom(); }
+},{passive:false});
+document.addEventListener('dblclick',function(e){ if(e.target.id==='lbImg'){ lbScale=lbScale>1?1:2.5; aplicarZoom(); } });
+
+/* ===== OPCIÓN B: ver/imprimir fotos de medidas por separado ===== */
+function fotosDefectosYDerivados(){
+  const todas=[];
+  (DEFS_DATA||[]).forEach(d=>{
+    if(d[6]) todas.push({src:driveImgFull(d[6]), tag:'Defecto: '+(d[2]||'')+(d[3]?(' - '+d[3]):'')});
+  });
+  (DERS_DATA||[]).forEach(d=>{
+    if(d[6]) todas.push({src:driveImgFull(d[6]), tag:'Derivado: '+(d[2]||'')+(d[3]?(' - '+d[3]):'')});
+  });
+  return todas;
+}
+function abrirVerFotos(){
+  FOTOS_CATEGORIAS=[];
+  if(FOTOS_MED.length) FOTOS_CATEGORIAS.push({id:'med', nombre:'Medidas de auditoría', datos:FOTOS_MED.map(s=>({src:s,tag:'Medidas de auditoría'}))});
+  if(ES_COSTURA && FOTOS_PRO.length) FOTOS_CATEGORIAS.push({id:'proc', nombre:'Medidas de proceso', datos:FOTOS_PRO.map(s=>({src:s,tag:'Medidas de proceso'}))});
+  const fd=fotosDefectosYDerivados();
+  if(fd.length) FOTOS_CATEGORIAS.push({id:'def', nombre:'Defectos', datos:fd});
+  if(!FOTOS_CATEGORIAS.length){ alert('Esta auditoría no tiene fotos.'); return; }
+
+  const tabsEl=document.getElementById('fotosTabs');
+  tabsEl.innerHTML = FOTOS_CATEGORIAS.map((c,i)=>`<button class="ftab${i===0?' on':''}" data-cat="${c.id}" onclick="mostrarCategoriaFotos('${c.id}')">${esc(c.nombre)}</button>`).join('');
+  tabsEl.style.display = FOTOS_CATEGORIAS.length>1 ? 'flex' : 'none';
+
+  mostrarCategoriaFotos(FOTOS_CATEGORIAS[0].id);
+  document.getElementById('fotosOverlay').classList.add('show');
+  document.body.classList.add('viendoFotos'); // activa las reglas de impresión propias de esta ventana
+  // @page no se puede limitar con una clase — aplica a toda la hoja siempre. Por eso, mientras esta
+  // ventana está abierta, se reemplaza a 0 margen (así no aparece el encabezado/pie automático de
+  // Chrome ni sobra espacio); al cerrar, se quita y el reporte normal vuelve a sus 10mm de siempre.
+  if(!document.getElementById('fotosPageStyle')){
+    const st=document.createElement('style');
+    st.id='fotosPageStyle';
+    st.textContent='@media print{ @page{ size:portrait; margin:0; } }';
+    document.head.appendChild(st);
   }
 }
-function llenarSelect(id,vals){
-  const s=document.getElementById(id);
-  vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});
-}
-function fechaOK(fstr,desde,hasta){
-  if(!desde&&!hasta) return true;
-  const f=fechaTxt(fstr);
-  if(!f) return false;
-  if(desde&&f<desde) return false;
-  if(hasta&&f>hasta) return false;
-  return true;
-}
-function badge(res){
-  const r=norm(res);
-  if(r.indexOf('override')>=0) return '<span class="tag ov">OVERRIDE</span>';
-  if(r.indexOf('aprob')>=0) return '<span class="tag ap">APROBADO</span>';
-  if(r.indexOf('rech')>=0) return '<span class="tag re">RECHAZADO</span>';
-  return res||'—';
-}
-function buscar(){
-  const proc=val('fProceso'),po=norm(val('fPo')),op=norm(val('fOp')),gr=norm(val('fGrupo')),es=norm(val('fEstilo')),co=norm(val('fColor')),
-        cli=val('fCliente'),aud=val('fAuditor'),resu=norm(val('fResultado')),desde=val('fDesde'),hasta=val('fHasta');
-  let res=DATA.filter(r=>{
-    if(proc&&r[C.proceso]!==proc) return false;
-    if(po&&norm(r[C.po]).indexOf(po)<0) return false;
-    if(op&&norm(r[C.op]).indexOf(op)<0) return false;
-    if(gr&&norm(r[C.grupo]).indexOf(gr)<0) return false;
-    if(es&&norm(r[C.estiloL]).indexOf(es)<0) return false;
-    if(co&&norm(r[C.color]).indexOf(co)<0) return false;
-    if(cli&&r[C.cliente]!==cli) return false;
-    if(aud&&r[C.auditor]!==aud) return false;
-    if(resu&&norm(r[C.resFinal]).indexOf(resu)<0) return false;
-    if(!fechaOK(r[C.fecha],desde,hasta)) return false;
-    if(filtroReproceso===true&&!esVerdadero(r[C.reproceso])) return false;
-    if(filtroReproceso===false&&esVerdadero(r[C.reproceso])) return false;
-    if(filtroLicencia===true&&!esVerdadero(r[C.licencia])) return false;
-    if(filtroLicencia===false&&esVerdadero(r[C.licencia])) return false;
-    if(filtroLiquidado===false&&esVerdadero(r[C.liquidado])) return false;
-    // filtroLiquidado===true (mostrar solo liquidados) se aplica aparte abajo, porque además de las
-    // filas liquidadas, hay que sumar el resto del historial de ese mismo lote (ver más abajo).
-    return true;
+function mostrarCategoriaFotos(id){
+  const cat=FOTOS_CATEGORIAS.find(c=>c.id===id);
+  if(!cat) return;
+  document.querySelectorAll('.ftab').forEach(b=>b.classList.toggle('on', b.dataset.cat===id));
+  document.getElementById('fotosOverlayTitulo').textContent = cat.nombre+' · '+ID;
+
+  let cuerpo='<div class="fotip">Si una foto sale de lado o de cabeza, usa "⟳ Girar" hasta verla derecha. Con la rueda del mouse o pellizcando en el celular puedes acercar. Lo que ves aquí es lo que se imprime.</div>';
+  cat.datos.forEach((f,i)=>{
+    cuerpo+=`<figure class="hoja" data-deg="0">
+      <div class="lab">${esc(f.tag)}${cat.datos.length>1?(' · '+(i+1)+'/'+cat.datos.length):''}
+        <button class="girar" onclick="girarFoto(this)">⟳ Girar</button></div>
+      <div class="imgbox"><img src="${f.src}" alt="foto" data-deg="0" data-escala="1"></div>
+    </figure>`;
   });
-  if(filtroLiquidado===true){
-    // Cualquier fila que comparta el mismo lote (grupo+estilo+color+po+destino+proceso) con una fila
-    // liquidada entra también, aunque esa fila en sí no esté marcada liquidada — así se ve el historial
-    // completo del lote (reprocesos, intentos previos, etc.), no solo la fila final que quedó liquidada.
-    const clavesLiquidadas=new Set(DATA.filter(r=>esVerdadero(r[C.liquidado])).map(llaveLote));
-    res=res.filter(r=>clavesLiquidadas.has(llaveLote(r)));
+  document.getElementById('fotosOverlayBody').innerHTML = cuerpo;
+  activarZoomFotos();
+}
+function cerrarFotosOverlay(){
+  document.getElementById('fotosOverlay').classList.remove('show');
+  document.body.classList.remove('viendoFotos');
+  const st=document.getElementById('fotosPageStyle'); if(st) st.remove();
+}
+// Gira y acerca combinados sobre la foto grande directamente (sin ventana aparte). No basta con
+// "rotate()" en CSS — eso solo gira lo que se VE, pero la caja que envuelve la foto se queda con el
+// tamaño de ANTES de girar, por eso se veía cortada o con barra para deslizar. Aquí se recalcula el
+// tamaño real de la foto (ancho/alto en píxeles) cada vez que gira o hace zoom, para que la caja se
+// acomode de verdad al nuevo tamaño.
+function aplicarTransformFoto(img){
+  const deg=parseInt(img.getAttribute('data-deg'))||0;
+  const escala=parseFloat(img.getAttribute('data-escala'))||1;
+  const rotado = (deg===90||deg===270);
+  const box=img.closest('.imgbox');
+  if(img.naturalWidth && img.naturalHeight){
+    // Espacio disponible en pantalla para la foto YA GIRADA (si está de lado, el ancho disponible
+    // pasa a ser la altura de la ventana, y viceversa — por eso se intercambian aquí).
+    const dispW = rotado ? window.innerHeight*0.78 : Math.min(window.innerWidth*0.92, 1000);
+    const dispH = rotado ? Math.min(window.innerWidth*0.92, 1000) : window.innerHeight*0.78;
+    // Girada: lo que hoy es el ALTO de la foto pasa a ocupar el ANCHO visual (y viceversa) — por eso
+    // aquí también se comparan cruzados, si no, el cálculo queda mal.
+    const s = rotado
+      ? Math.min(dispW/img.naturalHeight, dispH/img.naturalWidth) * escala
+      : Math.min(dispW/img.naturalWidth, dispH/img.naturalHeight) * escala;
+    const w0=img.naturalWidth*s, h0=img.naturalHeight*s; // tamaño ANTES de girar (lo que usa el layout)
+    img.style.width=w0+'px'; img.style.height=h0+'px';
+    // La CAJA crece junto con la foto (incluyendo el zoom) — si con el acercamiento ya no cabe en la
+    // pantalla, la ventana completa se desplaza (scroll de toda la página), en vez de quedar encerrada
+    // en un tamaño fijo. Antes esto chocaba con un límite de ancho/alto puesto en el CSS de la caja —
+    // ya se quitó ese límite, así que ahora sí puede crecer todo lo que haga falta sin aplastarse.
+    if(box){
+      box.style.width=(rotado?h0:w0)+'px'; box.style.height=(rotado?w0:h0)+'px';
+      // "transform" deja un remanente de scroll "fantasma" del tamaño de ANTES de girar, aunque
+      // visualmente ya quede bien acomodado — por eso, sin zoom, se recorta ese sobrante (no hay
+      // nada real que se pierda, ya se calculó para que quepa). Con zoom sí se permite desplazar.
+      box.style.overflow = 'hidden';
+    }
   }
-  // más recientes primero
-  res.sort((a,b)=>fechaTxt(b[C.fecha]).localeCompare(fechaTxt(a[C.fecha])));
-  pintar(res);
+  img.style.transform='rotate('+deg+'deg)';
 }
-function pintar(res){
-  const tb=document.getElementById('tbody'), est=document.getElementById('estado'), cnt=document.getElementById('count');
-  tb.innerHTML='';
-  if(!res.length){ est.style.display='block'; est.textContent='Sin resultados. Ajusta los filtros.'; cnt.textContent=''; return; }
-  est.style.display='none';
-  cnt.textContent=res.length+' auditoría(s) encontrada(s)';
-  res.forEach(r=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${fechaTxt(r[C.fecha])}${horaTxt(r[C.horaEnvio])?('<br><span style="color:#889">'+horaTxt(r[C.horaEnvio])+'</span>'):''}</td>
-      <td>${r[C.cliente]||''}<br><span style="color:#889">${r[C.grupo]||''}</span></td>
-      <td>${r[C.estiloL]||''}<br><span style="color:#889">${r[C.po]||''}</span></td>
-      <td>${r[C.color]||''}</td>
-      <td>${r[C.auditor]||''}</td>
-      <td>${badge(r[C.resFinal])}</td>
-      <td><a class="ver" href="ver.html?id=${encodeURIComponent(r[C.id])}">Ver / PDF</a></td>`;
-    tb.appendChild(tr);
+function girarFoto(btn){
+  const fig=btn.closest('figure');
+  const img=fig.querySelector('img');
+  let d=parseInt(img.getAttribute('data-deg'))||0;
+  d=(d+90)%360;
+  img.setAttribute('data-deg', d);
+  fig.setAttribute('data-deg', d); // el CSS de pantalla e impresión usa el data-deg de la figure
+  aplicarTransformFoto(img);
+}
+function activarZoomFotos(){
+  document.querySelectorAll('#fotosOverlayBody .imgbox img').forEach(img=>{
+    img.style.cursor='zoom-in';
+    // Tamaño inicial correcto apenas carga la foto (si ya estaba en caché, "complete" ya es true)
+    if(img.complete) aplicarTransformFoto(img);
+    else img.addEventListener('load', ()=>aplicarTransformFoto(img));
+    img.addEventListener('dblclick', ()=>{
+      const cur=parseFloat(img.getAttribute('data-escala'))||1;
+      const nuevo = cur>1 ? 1 : 2.5;
+      img.setAttribute('data-escala', nuevo);
+      img.style.cursor = nuevo>1 ? 'zoom-out' : 'zoom-in';
+      aplicarTransformFoto(img);
+    });
+    img.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      let cur=parseFloat(img.getAttribute('data-escala'))||1;
+      cur += (e.deltaY<0?0.2:-0.2); cur=Math.max(1,Math.min(3,cur));
+      img.setAttribute('data-escala', cur);
+      img.style.cursor = cur>1 ? 'zoom-out' : 'zoom-in';
+      aplicarTransformFoto(img);
+    }, {passive:false});
   });
 }
-function val(id){return document.getElementById(id).value.trim();}
+// Antes de imprimir: se quita el tamaño en línea (calculado en píxeles para la pantalla) para que
+// mande el CSS de impresión (calculado en milímetros para la hoja) — si no, el tamaño de pantalla
+// pisaría al de impresión y saldría mal. Después de imprimir, se recalcula para la pantalla otra vez.
+window.addEventListener('beforeprint', ()=>{
+  document.querySelectorAll('#fotosOverlayBody .imgbox').forEach(box=>{
+    const img=box.querySelector('img');
+    if(img) img.setAttribute('data-escala','1');
+    if(img) img.style.width=img.style.height=img.style.transform='';
+    box.style.width=box.style.height='';
+  });
+});
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('#fotosOverlayBody .imgbox img').forEach(img=>aplicarTransformFoto(img));
+});
 
-document.getElementById('btnLimpiar').onclick=()=>{
-  ['fPo','fOp','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
-  filtroReproceso=null; filtroLicencia=null; filtroLiquidado=null;
-  pintarBotonFiltro('btnReprocesos', null, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
-  pintarBotonFiltro('btnLicencias', null, 'Licencias', 'Solo licencias', 'Sin licencias');
-  pintarBotonFiltro('btnLiquidados', null, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
-  buscar();
-};
-// Cicla neutro -> solo esas -> excluirlas -> neutro otra vez, y pinta el botón según el estado.
-function siguienteEstado(actual){ return actual===null ? true : (actual===true ? false : null); }
-function pintarBotonFiltro(id, estado, nombreBase, nombreSolo, nombreExcluir){
-  const btn=document.getElementById(id);
-  btn.classList.remove('active','excluir');
-  if(estado===true){ btn.classList.add('active'); btn.textContent='✓ '+nombreSolo; }
-  else if(estado===false){ btn.classList.add('excluir'); btn.textContent='✕ '+nombreExcluir; }
-  else{ btn.textContent=nombreBase; }
+/* ===== COMPARTIR REPORTE (PDF sin fotos, por WhatsApp/menú nativo) ===== */
+async function compartirReporte(){
+  const btn=document.getElementById('btnShare');
+  const txtOrig=btn.textContent;
+  btn.textContent='Generando…'; btn.disabled=true;
+  try{
+    // Ocultar fotos temporalmente para que el PDF salga solo con datos
+    const estilo=document.createElement('style');
+    estilo.id='hideFotos';
+    estilo.textContent='.fotoblock,#fotosSec,.deffotoWrap,.deffoto{display:none!important}';
+    document.head.appendChild(estilo);
+
+    const page=document.getElementById('page');
+    const canvas=await html2canvas(page,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    // quitar el ocultado
+    const h=document.getElementById('hideFotos'); if(h) h.remove();
+
+    const { jsPDF }=window.jspdf;
+    const pdf=new jsPDF('p','mm','a4');
+    const pw=210, ph=297;
+    const iw=pw, ih=canvas.height*pw/canvas.width;
+    let pos=0, left=ih;
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    // paginar si el reporte es más alto que una hoja
+    if(ih<=ph){
+      pdf.addImage(imgData,'JPEG',0,0,iw,ih);
+    } else {
+      while(left>0){
+        pdf.addImage(imgData,'JPEG',0,pos,iw,ih);
+        left-=ph; pos-=ph;
+        if(left>0) pdf.addPage();
+      }
+    }
+
+    const nombre='Auditoria_'+(ID||'reporte')+'.pdf';
+    const blob=pdf.output('blob');
+    const file=new File([blob],nombre,{type:'application/pdf'});
+
+    // Compartir por menú nativo (WhatsApp, correo, etc.)
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file], title:'Auditoría '+ID, text:'Reporte de auditoría '+ID });
+    } else {
+      // Respaldo: descargar el PDF (luego lo adjuntan manual)
+      pdf.save(nombre);
+      alert('Se descargó el PDF. Ahora puedes adjuntarlo en WhatsApp.');
+    }
+  }catch(err){
+    alert('No se pudo generar el PDF: '+(err.message||err));
+    const h=document.getElementById('hideFotos'); if(h) h.remove();
+  }finally{
+    btn.textContent=txtOrig; btn.disabled=false;
+  }
 }
-document.getElementById('btnReprocesos').onclick=()=>{
-  filtroReproceso=siguienteEstado(filtroReproceso);
-  pintarBotonFiltro('btnReprocesos', filtroReproceso, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
-  buscar();
-};
-document.getElementById('btnLicencias').onclick=()=>{
-  filtroLicencia=siguienteEstado(filtroLicencia);
-  pintarBotonFiltro('btnLicencias', filtroLicencia, 'Licencias', 'Solo licencias', 'Sin licencias');
-  buscar();
-};
-document.getElementById('btnLiquidados').onclick=()=>{
-  filtroLiquidado=siguienteEstado(filtroLiquidado);
-  pintarBotonFiltro('btnLiquidados', filtroLiquidado, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
-  buscar();
-};
-// Filtros en vivo: los selects y fechas filtran apenas cambian; los campos de texto
-// filtran mientras se escribe, con una pausa corta para no recalcular en cada tecla.
-let _buscarTimer=null;
-function buscarDebounced(){ clearTimeout(_buscarTimer); _buscarTimer=setTimeout(buscar,200); }
-['fGrupo','fEstilo','fColor','fPo','fOp'].forEach(id=>document.getElementById(id).addEventListener('input',buscarDebounced));
-['fProceso','fCliente','fAuditor','fResultado','fDesde','fHasta'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
 
+function volverAtras(){
+  // Si venimos de buscar.html (mismo sitio), usar el "atrás" real del navegador (conserva los filtros de búsqueda).
+  // Si se abrió el enlace directo (ej. compartido por WhatsApp), no hay a dónde volver: ir a buscar.html.
+  if(document.referrer && document.referrer.indexOf(location.origin)===0){
+    history.back();
+  } else {
+    location.href='buscar.html';
+  }
+}
 cargar();
 </script>
 </body>
