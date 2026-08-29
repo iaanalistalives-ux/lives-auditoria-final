@@ -17,16 +17,16 @@
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#e9edf2;color:var(--ink)}
-.toolbar{position:sticky;top:0;background:var(--navy);color:#fff;padding:12px 18px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;z-index:10}
-.toolbar h1{font-size:15px;margin:0;font-weight:700}
-.toolbar .acts{display:flex;flex-wrap:wrap;gap:8px;width:100%}
-.tbtn{border:none;border-radius:8px;padding:0 16px;height:38px;line-height:1;font-weight:700;cursor:pointer;font-size:13px;min-width:150px;max-width:190px;flex:0 0 auto;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.toolbar{position:sticky;top:0;background:var(--navy);color:#fff;padding:8px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;z-index:10}
+.toolbar h1{font-size:14px;margin:0;font-weight:700}
+.toolbar .acts{display:flex;flex-wrap:wrap;gap:6px}
+.tbtn{border:none;border-radius:7px;padding:0 12px;height:32px;line-height:1;font-weight:700;cursor:pointer;font-size:12.5px;min-width:0;max-width:170px;flex:0 0 auto;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
 /* En pantallas angostas (celular/tablet en vertical) los botones se acomodan en varias filas,
    más chicos y repartiendo el ancho — nunca se salen de la pantalla ni hay que arrastrar. */
 @media (max-width:700px){
-  .toolbar{padding:12px 14px}
-  .toolbar .acts{gap:6px}
-  .tbtn{min-width:0;max-width:none;flex:1 1 calc(50% - 6px);padding:0 6px;font-size:12px}
+  .toolbar{padding:8px 12px}
+  .toolbar .acts{gap:6px;width:100%}
+  .tbtn{min-width:0;max-width:none;flex:1 1 calc(50% - 6px);padding:0 6px;height:34px;font-size:12px}
 }
 .tbtn.print{background:var(--tan);color:#3b2600}
 .tbtn.medbtn{background:var(--sage);color:#fff}
@@ -45,6 +45,7 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--navy)
 .f .k{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#889}
 .f .v{font-size:14px;font-weight:600}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 th{background:#f0f3f7;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;color:#556;border-bottom:1px solid var(--line)}
 td{padding:7px 9px;border-bottom:1px solid #eef1f4}
 .deffotoWrap{display:flex;flex-direction:column;gap:3px}
@@ -75,27 +76,26 @@ td{padding:7px 9px;border-bottom:1px solid #eef1f4}
 .estado{padding:40px;text-align:center;color:#889}
 .foot{margin-top:24px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:#99a;display:flex;justify-content:space-between}
 /* ===== Ventana emergente de Hojas de medidas / Medidas de proceso (dentro de la misma pestaña, no abre nada aparte) ===== */
-#fotosOverlay{display:none;position:fixed;inset:0;background:#3a3f47;z-index:200;overflow-y:auto;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#fotosOverlay{display:none;position:fixed;inset:0;background:#3a3f47;z-index:200;overflow:auto;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 #fotosOverlay.show{display:block}
-.fobar{position:sticky;top:0;background:#0E3B36;padding:12px 18px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;z-index:5;color:#fff}
-.fobar h2{font-size:15px;margin:0;font-weight:700}
-.fobar .facts{display:flex;flex-wrap:wrap;gap:8px}
-.fobar button{border:none;border-radius:8px;padding:0 16px;height:38px;line-height:1;font-weight:700;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.fobar{position:sticky;top:0;background:#0E3B36;padding:8px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;z-index:5;color:#fff}
+.fobar h2{font-size:14px;margin:0;font-weight:700}
+.fobar .facts{display:flex;flex-wrap:wrap;gap:6px}
+.fobar button{border:none;border-radius:7px;padding:0 12px;height:32px;line-height:1;font-weight:700;cursor:pointer;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
 .fobar .fclose{background:#fff;color:#0E3B36}
 .fobar .fprint{background:#F59E0B;color:#0E3B36}
-.fotabs{display:none;flex-wrap:wrap;gap:8px;padding:12px 18px 0;background:#2f353d}
-.ftab{border:1px solid #55606b;background:transparent;color:#dfe4ea;border-radius:20px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer}
+.fotabs{display:none;flex-wrap:wrap;gap:6px;padding:8px 16px 0;background:#2f353d}
+.ftab{border:1px solid #55606b;background:transparent;color:#dfe4ea;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
 .ftab.on{background:#F59E0B;color:#0E3B36;border-color:#F59E0B}
 .fowrap{padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px;background:#2f353d;min-height:calc(100vh - 60px)}
 .fotip{color:#dfe4ea;font-size:13px;text-align:center;max-width:600px;margin:0 auto 6px}
-.hoja{margin:0;background:#fff;border-radius:10px;padding:14px;max-width:96vw;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hoja{margin:0;background:#fff;border-radius:10px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 .hoja .lab{color:#0E3B36;font-weight:700;font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .hoja .lab .girar{background:#0F7A5A;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
 /* La caja YA NO recorta la foto (overflow:auto en vez de hidden) — así, al girar 90°, la foto se ve
    completa y con su propio scroll si no cabe, en vez de quedar cortada por un marco que no se ajusta. */
-.hoja .imgbox{display:flex;align-items:center;justify-content:center;overflow:auto;max-height:75vh}
-.hoja img{display:block;max-width:100%;height:auto;border-radius:6px;transition:transform .15s;transform-origin:center}
-.hoja[data-deg="90"] img,.hoja[data-deg="270"] img{max-width:none;max-height:70vh}
+.hoja .imgbox{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.hoja img{display:block;border-radius:6px;transition:transform .15s;transform-origin:center;flex-shrink:0}
 @media print{
   /* Mientras la ventana de fotos está abierta, imprimir SOLO eso — el reporte de datos queda oculto */
   body.viendoFotos .toolbar, body.viendoFotos .page{display:none!important}
@@ -297,25 +297,25 @@ function render(r,defs,ders){
   // Defectos
   html+=`<h2>Defectos (${defs.length})</h2>`;
   if(defs.length){
-    html+=`<table><thead><tr><th>Sección</th><th>Categoría</th><th>Subtipo</th><th>Cant.</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
+    html+=`<div class="tablewrap"><table><thead><tr><th>Sección</th><th>Categoría</th><th>Subtipo</th><th>Cant.</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
     defs.forEach(d=>{
       const tituloDef = 'Defecto: ' + (d[2]||'') + (d[3]?(' - '+d[3]):'');
       const foto = d[6] ? `<div class="deffotoWrap"><div class="deflab">${esc(tituloDef)}</div><img src="${driveImg(d[6])}" class="deffoto" onclick="abrirLb('${driveImgFull(d[6])}', '${esc(tituloDef).replace(/'/g,"\\'")}')" alt="foto defecto"></div>` : '—';
       html+=`<tr><td>${esc(d[1])}</td><td>${esc(d[2])}</td><td>${esc(d[3]||'—')}</td><td>${esc(d[4])}</td><td>${esc(d[5])}</td><td>${foto}</td></tr>`;
     });
-    html+=`</tbody></table>`;
+    html+=`</tbody></table></div>`;
   } else { html+=`<div class="coment">Sin defectos registrados.</div>`; }
 
   // Derivados
   html+=`<h2>Derivados (${ders.length})</h2>`;
   if(ders.length){
-    html+=`<table><thead><tr><th>Categoría</th><th>Subtipo</th><th>Cant. (lote)</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
+    html+=`<div class="tablewrap"><table><thead><tr><th>Categoría</th><th>Subtipo</th><th>Cant. (lote)</th><th>Detalle</th><th>Foto</th></tr></thead><tbody>`;
     ders.forEach(d=>{
       const tituloDer = 'Derivado: ' + (d[2]||'') + (d[3]?(' - '+d[3]):'');
       const foto = d[6] ? `<div class="deffotoWrap"><div class="deflab">${esc(tituloDer)}</div><img src="${driveImg(d[6])}" class="deffoto" onclick="abrirLb('${driveImgFull(d[6])}', '${esc(tituloDer).replace(/'/g,"\\'")}')" alt="foto derivado"></div>` : '—';
       html+=`<tr><td>${esc(d[2])}</td><td>${esc(d[3]||'—')}</td><td>${esc(d[4])}</td><td>${esc(d[5])}</td><td>${foto}</td></tr>`;
     });
-    html+=`</tbody></table>`;
+    html+=`</tbody></table></div>`;
   } else { html+=`<div class="coment">Sin derivados registrados.</div>`; }
 
   // Medidas
@@ -416,19 +416,26 @@ function aplicarTransformFoto(img){
   if(img.naturalWidth && img.naturalHeight){
     // Espacio disponible en pantalla para la foto YA GIRADA (si está de lado, el ancho disponible
     // pasa a ser la altura de la ventana, y viceversa — por eso se intercambian aquí).
-    const dispW = rotado ? window.innerHeight*0.60 : Math.min(window.innerWidth*0.9, 640);
-    const dispH = rotado ? Math.min(window.innerWidth*0.9, 640) : window.innerHeight*0.60;
+    const dispW = rotado ? window.innerHeight*0.78 : Math.min(window.innerWidth*0.92, 1000);
+    const dispH = rotado ? Math.min(window.innerWidth*0.92, 1000) : window.innerHeight*0.78;
     // Girada: lo que hoy es el ALTO de la foto pasa a ocupar el ANCHO visual (y viceversa) — por eso
-    // aquí también se comparan cruzados, si no, el cálculo queda mal y la caja se sigue quedando chica.
+    // aquí también se comparan cruzados, si no, el cálculo queda mal.
     const s = rotado
       ? Math.min(dispW/img.naturalHeight, dispH/img.naturalWidth) * escala
       : Math.min(dispW/img.naturalWidth, dispH/img.naturalHeight) * escala;
     const w0=img.naturalWidth*s, h0=img.naturalHeight*s; // tamaño ANTES de girar (lo que usa el layout)
     img.style.width=w0+'px'; img.style.height=h0+'px';
-    // "transform:rotate()" solo cambia lo que se VE, nunca el espacio que reserva el layout — por eso
-    // la CAJA que envuelve la foto también se fija a mano, con el tamaño YA GIRADO (visual). Si no se
-    // hace esto, la foto se ve del tamaño correcto pero la caja se queda chica y pide hacer scroll.
-    if(box){ box.style.width=(rotado?h0:w0)+'px'; box.style.height=(rotado?w0:h0)+'px'; }
+    // La CAJA crece junto con la foto (incluyendo el zoom) — si con el acercamiento ya no cabe en la
+    // pantalla, la ventana completa se desplaza (scroll de toda la página), en vez de quedar encerrada
+    // en un tamaño fijo. Antes esto chocaba con un límite de ancho/alto puesto en el CSS de la caja —
+    // ya se quitó ese límite, así que ahora sí puede crecer todo lo que haga falta sin aplastarse.
+    if(box){
+      box.style.width=(rotado?h0:w0)+'px'; box.style.height=(rotado?w0:h0)+'px';
+      // "transform" deja un remanente de scroll "fantasma" del tamaño de ANTES de girar, aunque
+      // visualmente ya quede bien acomodado — por eso, sin zoom, se recorta ese sobrante (no hay
+      // nada real que se pierda, ya se calculó para que quepa). Con zoom sí se permite desplazar.
+      box.style.overflow = 'hidden';
+    }
   }
   img.style.transform='rotate('+deg+'deg)';
 }
