@@ -55,6 +55,7 @@ tr:hover td{background:#f6f9fb}
     <div class="filtros">
       <div><label>Proceso</label><select id="fProceso"><option value="">Todos</option><option>Costura (taller)</option><option>Acabados (taller)</option><option>Acabados Final (interno)</option></select></div>
       <div><label>Grupo</label><input id="fGrupo" placeholder="EFI-102"></div>
+      <div><label>OP</label><input id="fOp" placeholder="24978"></div>
       <div><label>Estilo LIVES</label><input id="fEstilo" placeholder="24647"></div>
       <div><label>Color</label><input id="fColor" placeholder="White"></div>
       <div><label>PO</label><input id="fPo" placeholder="6002469"></div>
@@ -91,7 +92,7 @@ let DATA=[];
 // índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
          destino:12,pedido:13,recibido:14,lote:15,licencia:16,resAql:23,override:24,resFinal:27,auditor:31,semana:32,
-         computable:38,reproceso:39,liquidado:51};
+         computable:38,reproceso:39,op:50,liquidado:51};
 // Filtros de 3 estados: null = sin filtro, true = mostrar SOLO esas, false = EXCLUIRLAS (mostrar solo las que no)
 let filtroReproceso=null, filtroLicencia=null, filtroLiquidado=null;
 function esVerdadero(v){
@@ -157,11 +158,12 @@ function badge(res){
   return res||'—';
 }
 function buscar(){
-  const proc=val('fProceso'),po=norm(val('fPo')),gr=norm(val('fGrupo')),es=norm(val('fEstilo')),co=norm(val('fColor')),
+  const proc=val('fProceso'),po=norm(val('fPo')),op=norm(val('fOp')),gr=norm(val('fGrupo')),es=norm(val('fEstilo')),co=norm(val('fColor')),
         cli=val('fCliente'),aud=val('fAuditor'),resu=norm(val('fResultado')),desde=val('fDesde'),hasta=val('fHasta');
   let res=DATA.filter(r=>{
     if(proc&&r[C.proceso]!==proc) return false;
     if(po&&norm(r[C.po]).indexOf(po)<0) return false;
+    if(op&&norm(r[C.op]).indexOf(op)<0) return false;
     if(gr&&norm(r[C.grupo]).indexOf(gr)<0) return false;
     if(es&&norm(r[C.estiloL]).indexOf(es)<0) return false;
     if(co&&norm(r[C.color]).indexOf(co)<0) return false;
@@ -210,7 +212,7 @@ function pintar(res){
 function val(id){return document.getElementById(id).value.trim();}
 
 document.getElementById('btnLimpiar').onclick=()=>{
-  ['fPo','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
+  ['fPo','fOp','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
   filtroReproceso=null; filtroLicencia=null; filtroLiquidado=null;
   pintarBotonFiltro('btnReprocesos', null, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
@@ -246,7 +248,7 @@ document.getElementById('btnLiquidados').onclick=()=>{
 // filtran mientras se escribe, con una pausa corta para no recalcular en cada tecla.
 let _buscarTimer=null;
 function buscarDebounced(){ clearTimeout(_buscarTimer); _buscarTimer=setTimeout(buscar,200); }
-['fGrupo','fEstilo','fColor','fPo'].forEach(id=>document.getElementById(id).addEventListener('input',buscarDebounced));
+['fGrupo','fEstilo','fColor','fPo','fOp'].forEach(id=>document.getElementById(id).addEventListener('input',buscarDebounced));
 ['fProceso','fCliente','fAuditor','fResultado','fDesde','fHasta'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
 
 cargar();
