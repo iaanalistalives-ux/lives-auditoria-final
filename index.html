@@ -559,7 +559,12 @@ function agregarFotos(files,cual){
   let pend=lista.length;
   lista.forEach(f=>{
     if(arr.length>=MAX_FOTOS){pend--; if(pend<=0){pintarFotos(cual);validate();} return;}
-    shrink(f,b64=>{ if(arr.length<MAX_FOTOS) arr.push(b64); pend--; if(pend<=0){pintarFotos(cual);validate();} }, null, true);
+    shrink(f,b64=>{
+      if(arr.length<MAX_FOTOS) arr.push(b64);
+      pend--;
+      if(pend<=0){ pintarFotos(cual); validate(); }
+      guardarBorradorDebounced(); // guardar apenas se agrega cada foto, no solo al cambiar de app
+    }, null, true);
   });
 }
 // ¿el proceso actual requiere foto de proceso? (solo Costura taller)
@@ -1270,7 +1275,7 @@ $('camGlobal').onchange=e=>{
   const f=e.target.files[0]; e.target.value='';
   if(!f||!_camTarget) return;
   const {target,btnEl}=_camTarget;
-  shrink(f,b64=>{ target.foto=b64; pintarBotonCam(btnEl,b64); recalc(); }, null, false);
+  shrink(f,b64=>{ target.foto=b64; pintarBotonCam(btnEl,b64); recalc(); guardarBorradorDebounced(); }, null, false);
 };
 
 /* ===== foto: cámara directa, con manejo de errores ===== */
@@ -1290,7 +1295,7 @@ function shrink(file,cb,onerr,escaner){
     const img=new Image();
     img.onerror=()=>avisarError('No se pudo procesar la foto. Intenta tomarla de nuevo.');
     img.onload=()=>{
-      const max=1400,sc=Math.min(1,max/Math.max(img.width,img.height));
+      const max=1200,sc=Math.min(1,max/Math.max(img.width,img.height));
       const cv=document.createElement('canvas');
       cv.width=img.width*sc; cv.height=img.height*sc;
       const ctx=cv.getContext('2d');
@@ -1594,8 +1599,14 @@ async function buscarMisAud(){
     const poTxt = po ? ('PO '+po) : '<span style="color:#c32030;font-weight:700">SIN PO</span>';
     const medBtn = medRes.indexOf('RECH')>=0
       ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#eef7f4;color:#1c7a6e;border:1px solid #bfe3da" onclick="aprobarMedidaRapido('${id}',this)">✅ Aprobar medida</button>` : '';
+    // AX=49 REPROCESA_DE: si alguna otra fila del historial ya apunta a esta auditoría como su origen,
+    // significa que ya se reprocesó — no se debe poder volver a tocar "Reprocesar" sobre la misma.
+    const yaReprocesada = (AUD_CACHE||[]).some(x=>x && String(x[49]||'').trim()===String(id).trim());
     const reproBtn = res.indexOf('RECH')>=0
-      ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#fdeceb;color:#7a2318;border:1px solid #e6a4a0" onclick="iniciarReproceso('${id}')">🔁 Reprocesar</button>` : '';
+      ? (yaReprocesada
+          ? `<span style="font-size:12px;color:#7a5a12;background:#fff4e0;border:1px solid #e9c46a;border-radius:8px;padding:8px 12px;white-space:nowrap">✓ Ya reprocesada</span>`
+          : `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#fdeceb;color:#7a2318;border:1px solid #e6a4a0" onclick="iniciarReproceso('${id}')">🔁 Reprocesar</button>`)
+      : '';
     h+=`<div style="border:1px solid #d8e0ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div style="font-size:13px"><b>${id}</b> ${tag}<br><span style="color:#778">${fecha} · ${proc} · Auditor: <b>${esc(aud)}</b></span></div>
