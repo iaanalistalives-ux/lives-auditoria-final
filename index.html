@@ -1401,10 +1401,12 @@ function calcularFaltantes(){
   if(S.reprocesaDe&&!v('motivoReproceso')) faltan.push('Motivo del reproceso');
   return faltan;
 }
-// Se sigue llamando en cada cambio del formulario (para el autoguardado del borrador),
-// pero YA NO deshabilita el botón ni muestra ningún aviso mientras se llena.
+// Se sigue llamando en cada cambio del formulario (para validaciones visuales normales),
+// pero YA NO dispara un guardado del borrador en cada tecla — eso repetía innecesariamente el
+// guardado completo (con todas las fotos) mientras alguien escribe, por ejemplo, un comentario
+// largo. El guardado real ahora depende de guardarBorradorPeriodico() (cada 15s) y de que la
+// pantalla pase a segundo plano (que ya cubre, de forma confiable, cada vez que se abre la cámara).
 function validate(){
-  guardarBorradorDebounced();
 }
 $('grupo').addEventListener('input',maskGrupo);
 $('pedido').addEventListener('input',soloDigitos);
@@ -1950,6 +1952,9 @@ function restaurarBorrador(){
 
 // Guardar de inmediato al salir/ocultar la app (clave para "cambiar de app y volver")
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) guardarBorradorAhora(); });
+// Colchón extra para sesiones largas de escritura (ej. un comentario largo) sin depender de que
+// cambie de app — guarda cada 15s, solo si hay algo distinto que lo justifique.
+setInterval(()=>{ if(!document.hidden) guardarBorradorAhora(); }, 15000);
 window.addEventListener('pagehide', guardarBorradorAhora);
 
 async function cargarOPS(){
