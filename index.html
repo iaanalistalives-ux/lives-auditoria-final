@@ -1289,40 +1289,70 @@ function shrink(file,cb,onerr,escaner){
   const cbSeguro=(...args)=>{ resuelto=true; cb(...args); };
   setTimeout(()=>{ if(!resuelto) avisarError('La foto está tardando demasiado. Intenta de nuevo.'); },15000);
 
-  const r=new FileReader();
-  r.onerror=()=>avisarError('No se pudo leer la foto. Intenta de nuevo.');
-  r.onload=()=>{
-    const img=new Image();
-    img.onerror=()=>avisarError('No se pudo procesar la foto. Intenta tomarla de nuevo.');
-    img.onload=()=>{
-      const max=1200,sc=Math.min(1,max/Math.max(img.width,img.height));
-      const cv=document.createElement('canvas');
-      cv.width=img.width*sc; cv.height=img.height*sc;
-      const ctx=cv.getContext('2d');
-      ctx.drawImage(img,0,0,cv.width,cv.height);
-      // filtro tipo escáner: gris + contraste + brillo (SOLO si escaner=true, ej. hojas de medidas)
-      if(escaner){
-        try{
-          const d=ctx.getImageData(0,0,cv.width,cv.height), px=d.data;
-          const contraste=1.35, brillo=12;
-          for(let i=0;i<px.length;i+=4){
-            let g=0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];
-            g=(g-128)*contraste+128+brillo;
-            g=g<0?0:g>255?255:g;
-            px[i]=px[i+1]=px[i+2]=g;
-          }
-          ctx.putImageData(d,0,0);
-        }catch(e){/* si falla el filtro, queda la foto normal */}
-      }
+  const max=1200;
+
+  function aplicarFiltroYEnviar(cv,ctx){
+    // filtro tipo escáner: gris + contraste + brillo (SOLO si escaner=true, ej. hojas de medidas)
+    if(escaner){
       try{
-        cbSeguro(cv.toDataURL('image/jpeg', escaner?0.75:0.85));
-      }catch(e){
-        avisarError('No se pudo terminar de procesar la foto. Intenta de nuevo.');
-      }
+        const d=ctx.getImageData(0,0,cv.width,cv.height), px=d.data;
+        const contraste=1.35, brillo=12;
+        for(let i=0;i<px.length;i+=4){
+          let g=0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];
+          g=(g-128)*contraste+128+brillo;
+          g=g<0?0:g>255?255:g;
+          px[i]=px[i+1]=px[i+2]=g;
+        }
+        ctx.putImageData(d,0,0);
+      }catch(e){/* si falla el filtro, queda la foto normal */}
+    }
+    try{
+      cbSeguro(cv.toDataURL('image/jpeg', escaner?0.75:0.85));
+    }catch(e){
+      avisarError('No se pudo terminar de procesar la foto. Intenta de nuevo.');
+    }
+  }
+
+  function decodificarConImageClasica(){
+    const r=new FileReader();
+    r.onerror=()=>avisarError('No se pudo leer la foto. Intenta de nuevo.');
+    r.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>avisarError('No se pudo procesar la foto. Intenta tomarla de nuevo.');
+      img.onload=()=>{
+        const sc=Math.min(1,max/Math.max(img.width,img.height));
+        const cv=document.createElement('canvas');
+        cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+        const ctx=cv.getContext('2d');
+        ctx.drawImage(img,0,0,cv.width,cv.height);
+        aplicarFiltroYEnviar(cv,ctx);
+      };
+      img.src=r.result;
     };
-    img.src=r.result;
-  };
-  r.readAsDataURL(file);
+    r.readAsDataURL(file);
+  }
+
+  // createImageBitmap con "resize": el navegador decodifica la foto YA achicada por dentro, sin pasar
+  // por el paso intermedio de tener la foto completa sin comprimir en memoria (una foto de cámara de
+  // muchos megapixeles puede pesar 40-50MB sin comprimir, aunque el archivo final sea de 200KB) — eso
+  // es justo lo que causaba "memoria insuficiente" en celulares con poca RAM al tomar cada foto.
+  if(window.createImageBitmap){
+    createImageBitmap(file, {resizeWidth:max, resizeQuality:'medium'}).then(bmp=>{
+      try{
+        const sc=Math.min(1, max/Math.max(bmp.width,bmp.height));
+        const cv=document.createElement('canvas');
+        cv.width=Math.round(bmp.width*sc); cv.height=Math.round(bmp.height*sc);
+        const ctx=cv.getContext('2d');
+        ctx.drawImage(bmp,0,0,cv.width,cv.height);
+        if(bmp.close) bmp.close(); // libera la memoria del bitmap apenas se usó, no esperar al recolector de basura
+        aplicarFiltroYEnviar(cv,ctx);
+      }catch(e){ decodificarConImageClasica(); }
+    }).catch(()=>{
+      decodificarConImageClasica(); // si el navegador no soporta el "resize" al decodificar, se usa el método anterior
+    });
+  } else {
+    decodificarConImageClasica();
+  }
 }
 
 /* ===== override ===== */
