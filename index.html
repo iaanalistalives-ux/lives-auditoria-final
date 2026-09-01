@@ -563,7 +563,9 @@ function agregarFotos(files,cual){
       if(arr.length<MAX_FOTOS) arr.push(b64);
       pend--;
       if(pend<=0){ pintarFotos(cual); validate(); }
-      guardarBorradorDebounced(); // guardar apenas se agrega cada foto, no solo al cambiar de app
+      // El guardado completo (con fotos) ya pasa solo, apenas la pantalla pasa a segundo plano (ver
+      // visibilitychange más abajo) — y abrir la cámara hace justo eso. Guardar aquí también sería
+      // repetir el mismo trabajo pesado dos veces por cada foto, sin ganar protección real.
     }, null, true);
   });
 }
@@ -1275,7 +1277,7 @@ $('camGlobal').onchange=e=>{
   const f=e.target.files[0]; e.target.value='';
   if(!f||!_camTarget) return;
   const {target,btnEl}=_camTarget;
-  shrink(f,b64=>{ target.foto=b64; pintarBotonCam(btnEl,b64); recalc(); guardarBorradorDebounced(); }, null, false);
+  shrink(f,b64=>{ target.foto=b64; pintarBotonCam(btnEl,b64); recalc(); }, null, false);
 };
 
 /* ===== foto: cámara directa, con manejo de errores ===== */
@@ -1289,7 +1291,7 @@ function shrink(file,cb,onerr,escaner){
   const cbSeguro=(...args)=>{ resuelto=true; cb(...args); };
   setTimeout(()=>{ if(!resuelto) avisarError('La foto está tardando demasiado. Intenta de nuevo.'); },15000);
 
-  const max=1200;
+  const max=900;
 
   function aplicarFiltroYEnviar(cv,ctx){
     // filtro tipo escáner: gris + contraste + brillo (SOLO si escaner=true, ej. hojas de medidas)
