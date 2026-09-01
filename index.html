@@ -1720,9 +1720,12 @@ async function cargarParaEditar(id){
   S.nAud = r[2] || '';
   const outOrd=$('ordinal'); if(outOrd) outOrd.value = S.nAud || '—';
   const ordH=$('ordHint'); if(ordH) ordH.textContent='N° original de esta auditoría (no cambia al corregir).';
-  S.int_ext = (norm(proc).indexOf('interno')>=0) ? 'INTERNA' : (proc?'EXTERNA':'');
+  S.int_ext = (norm(proc).indexOf('INTERNO')>=0) ? 'INTERNA' : (proc?'EXTERNA':'');
   // mostrar/ocultar bloque de licencia según el proceso (solo aplica a Auditoría Final interno)
-  const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('interno')>=0)?'flex':'none';
+  const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('INTERNO')>=0)?'flex':'none';
+  // El campo Taller es obligatorio para Costura/Acabados (EXTERNA) — mismo bug que en Reprocesar:
+  // se llenaban sus opciones pero nunca se mostraba el campo en sí.
+  const tallerWrapEd=$('tallerWrap'); if(tallerWrapEd) tallerWrapEd.style.display=(proc&&S.int_ext==='EXTERNA')?'block':'none';
   // Derivados solo aplica a Costura (taller)
   const esCosturaEd = proc==='Costura (taller)';
   const derCardEd=$('derivadosCard'); if(derCardEd) derCardEd.style.display = esCosturaEd ? 'block' : 'none';
@@ -1748,6 +1751,7 @@ async function cargarParaEditar(id){
   // Recalcular y refrescar
   if(typeof aplicarCliente==='function') aplicarCliente();
   if(typeof fillTaller==='function' && S.proceso) fillTaller(S.proceso);
+  if($('taller')) $('taller').value=r[5]||''; // restaurar el taller ya guardado, no dejarlo vacío para elegir de nuevo
   if(typeof actualizarCardProceso==='function') actualizarCardProceso();
   recalc(); refrescarCascada(); calcAvance();
   toast('Auditoría '+id+' cargada para corregir','ok');
@@ -1768,8 +1772,11 @@ async function iniciarReproceso(id){
   $('auditor').value='';
   $('fecha').valueAsDate=new Date(); // fecha real de hoy, no la de la auditoría rechazada
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
-  S.int_ext=(norm(proc).indexOf('interno')>=0)?'INTERNA':(proc?'EXTERNA':'');
-  const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('interno')>=0)?'flex':'none';
+  S.int_ext=(norm(proc).indexOf('INTERNO')>=0)?'INTERNA':(proc?'EXTERNA':'');
+  const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('INTERNO')>=0)?'flex':'none';
+  // El campo Taller es obligatorio para Costura/Acabados (EXTERNA) — antes solo se llenaban sus
+  // opciones pero nunca se mostraba, así que la validación lo pedía sin que nadie pudiera verlo.
+  const tallerWrapRp=$('tallerWrap'); if(tallerWrapRp) tallerWrapRp.style.display=(proc&&S.int_ext==='EXTERNA')?'block':'none';
   const esCosturaRp=proc==='Costura (taller)';
   const derCardRp=$('derivadosCard'); if(derCardRp) derCardRp.style.display=esCosturaRp?'block':'none';
   generarChecklistDefectos(); generarChecklistDerivados(); // vacíos: se registra normal si encuentra algo
