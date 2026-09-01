@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<!-- El celular guardaba el formulario en caché y seguía abriendo la versión vieja aunque el
+     archivo ya estuviera actualizado en el servidor. En un celular no hay Ctrl+Shift+R, así que
+     hay que pedir explícitamente que no se guarde copia. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Auditoría de Calidad · LIVES</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -343,6 +349,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 </div>
 
 </div>
+<!-- Sello de versión y origen de los datos. Sirve para saber, mirando el celular de la auditora,
+     QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
+     celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
+     con la versión vieja en caché". -->
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-01c · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -414,22 +425,48 @@ function parseCSV(txt){
   if(campo!=='' || fila.length){ fila.push(campo); filas.push(fila); }
   return filas;
 }
-async function gviz(tab){
-  // `_cb` + cache:'no-store': sin esto, al recargar la pantalla justo después de guardar una
-  // auditoría el navegador devolvía la copia CACHEADA del historial (sin la fila recién guardada).
-  // Consecuencia real medida en el Sheet: el N° de auditoría volvía a decir "1ra" en el mismo lote,
-  // y por eso la 2da parcial exigía foto de hojas de medidas como si fuera la primera.
+async function gvizCSV(tab){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
   const r=await fetch(url,{cache:'no-store'});
-  if(!r.ok) throw new Error('No se pudo leer la hoja '+tab+' (HTTP '+r.status+')');
+  if(!r.ok) throw new Error('HTTP '+r.status);
   const t=await r.text();
-  // Si el Sheet responde una página de error/login en vez del CSV, hay que fallar de verdad
-  // para que entre el respaldo local — no quedarse con basura parseada.
-  if(/^\s*</.test(t)) throw new Error('Respuesta inesperada al leer la hoja '+tab);
+  // Si el Sheet responde una página de error/login en vez del CSV, hay que fallar de verdad.
+  if(/^\s*</.test(t)) throw new Error('respuesta no es CSV');
   const filas=parseCSV(t);
-  if(!filas.length) throw new Error('Hoja '+tab+' vacía');
+  if(!filas.length) throw new Error('hoja vacía');
   // La primera línea es SIEMPRE el encabezado de la hoja: se descarta.
   return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));
+}
+// Lectura antigua (JSON). Se conserva SOLO como respaldo: pierde el texto de las columnas
+// mixtas (ver arriba), pero es preferible a quedarse sin datos si el CSV falla.
+async function gvizJSON(tab){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
+  const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
+  const j=JSON.parse(t.substring(t.indexOf('{'),t.lastIndexOf('}')+1));
+  return (j.table.rows||[]).map(row=>(row.c||[]).map(c=>{
+    if(!c) return '';
+    if(c.v!=null) return String(c.v);
+    if(c.f!=null) return String(c.f);   // rescata algo cuando el tipo de columna no calza
+    return '';
+  }));
+}
+// Origen real de los datos que se están usando ahora mismo. Se muestra en el sello del pie.
+let ORIGEN_DATOS='';
+function marcarOrigen(txt){
+  ORIGEN_DATOS=txt;
+  const el=document.getElementById('selloOrigen');
+  if(el) el.textContent=txt;
+}
+async function gviz(tab){
+  try{
+    const filas=await gvizCSV(tab);
+    if(tab==='AUDITORÍAS') marcarOrigen('datos: csv');
+    return filas;
+  }catch(e){
+    const filas=await gvizJSON(tab);
+    if(tab==='AUDITORÍAS') marcarOrigen('datos: json (csv falló: '+(e.message||e)+')');
+    return filas;
+  }
 }
 
 /* ===== AUDITORÍAS en vivo (para ordinal, pedido y panel) ===== */
@@ -438,18 +475,25 @@ async function gviz(tab){
 // frescos con éxito, se guarda una copia en el celular. Si en un recargo posterior falla la
 // descarga (sin señal), se usa esa última copia buena en vez de quedarse con todo vacío.
 // Nunca reemplaza una carga exitosa — solo entra quieta a tapar el hueco cuando algo falla.
+// OJO con la versión de la clave (`_v2_`): el respaldo guardado por versiones anteriores del
+// formulario se leyó con el lector JSON, así que trae 83 auditorías SIN PO y 11 sin estilo
+// cliente. Si se reutilizara, el error volvería a aparecer aunque la lectura ya esté arreglada.
+// Al cambiar la clave, esas copias viejas quedan huérfanas y nunca más se usan.
 function cacheGuardar(clave, datos){
-  try{ localStorage.setItem('lives_cache_'+clave, JSON.stringify({t:Date.now(), d:datos})); }
+  try{ localStorage.setItem('lives_cache_v2_'+clave, JSON.stringify({t:Date.now(), d:datos})); }
   catch(e){ /* si el celular no tiene espacio, no pasa nada grave: sigue funcionando como hoy */ }
 }
 function cacheLeer(clave){
-  try{ const raw=localStorage.getItem('lives_cache_'+clave); if(!raw) return null; const o=JSON.parse(raw); return (o&&o.d!==undefined)?o.d:null; }
+  try{ const raw=localStorage.getItem('lives_cache_v2_'+clave); if(!raw) return null; const o=JSON.parse(raw); return (o&&o.d!==undefined)?o.d:null; }
   catch(e){ return null; }
 }
 
 async function cargarAud(){
   try{ AUD_CACHE=await gviz('AUDITORÍAS'); cacheGuardar('aud', AUD_CACHE); }
-  catch(e){ const c=cacheLeer('aud'); AUD_CACHE=(c&&c.length)?c:[]; }
+  catch(e){
+    const c=cacheLeer('aud'); AUD_CACHE=(c&&c.length)?c:[];
+    marcarOrigen(AUD_CACHE.length ? 'datos: respaldo del celular (sin señal)' : 'datos: no se pudo leer el historial');
+  }
   return AUD_CACHE;
 }
 
