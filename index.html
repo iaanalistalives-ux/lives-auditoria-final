@@ -386,15 +386,50 @@ function normSec(s){
 
 /* ===== listas dinámicas (Sheet) ===== */
 let TALLERES=[], AUDITORAS=[], CLIENTES=[];
+/* ===== Lector del Sheet =====
+   Se lee en formato CSV, no JSON, a propósito.
+   Motivo (verificado sobre el Sheet real): gviz en formato JSON le asigna UN SOLO tipo a cada
+   columna, decidido por la mayoría de sus celdas. La columna PO tiene 206 celdas numéricas y 83
+   de texto, así que queda tipada como "número" — y toda celda de texto ("505342 USA",
+   "LIVES-S-117-2", "PO-2438") vuelve VACÍA. No es un problema de formato: el dato se pierde en
+   la descarga y no hay forma de recuperarlo en JSON. Lo mismo pasa al revés en ESTILO_CLIENTE,
+   que es mayoría texto y tiene 11 celdas numéricas.
+   Consecuencia real: 83 auditorías se leían "SIN PO", y como el PO forma parte de la llave del
+   lote, además rompía el N° de auditoría, el bloqueo del pedido y el panel de previas.
+   El formato CSV devuelve todo como texto, tal como se ve en la hoja, sin tipado. */
+function parseCSV(txt){
+  const filas=[]; let campo='', fila=[], enComillas=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(enComillas){
+      if(ch==='"'){ if(txt[i+1]==='"'){ campo+='"'; i++; } else enComillas=false; }
+      else campo+=ch;
+    }else{
+      if(ch==='"') enComillas=true;
+      else if(ch===','){ fila.push(campo); campo=''; }
+      else if(ch==='\n'){ fila.push(campo); campo=''; filas.push(fila); fila=[]; }
+      else if(ch!=='\r') campo+=ch;
+    }
+  }
+  if(campo!=='' || fila.length){ fila.push(campo); filas.push(fila); }
+  return filas;
+}
 async function gviz(tab){
   // `_cb` + cache:'no-store': sin esto, al recargar la pantalla justo después de guardar una
   // auditoría el navegador devolvía la copia CACHEADA del historial (sin la fila recién guardada).
   // Consecuencia real medida en el Sheet: el N° de auditoría volvía a decir "1ra" en el mismo lote,
   // y por eso la 2da parcial exigía foto de hojas de medidas como si fuera la primera.
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
-  const j=JSON.parse(t.substring(t.indexOf('{'),t.lastIndexOf('}')+1));
-  return (j.table.rows||[]).map(row=>(row.c||[]).map(c=>c&&c.v!=null?String(c.v):''));
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
+  const r=await fetch(url,{cache:'no-store'});
+  if(!r.ok) throw new Error('No se pudo leer la hoja '+tab+' (HTTP '+r.status+')');
+  const t=await r.text();
+  // Si el Sheet responde una página de error/login en vez del CSV, hay que fallar de verdad
+  // para que entre el respaldo local — no quedarse con basura parseada.
+  if(/^\s*</.test(t)) throw new Error('Respuesta inesperada al leer la hoja '+tab);
+  const filas=parseCSV(t);
+  if(!filas.length) throw new Error('Hoja '+tab+' vacía');
+  // La primera línea es SIEMPRE el encabezado de la hoja: se descarta.
+  return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));
 }
 
 /* ===== AUDITORÍAS en vivo (para ordinal, pedido y panel) ===== */
