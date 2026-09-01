@@ -387,8 +387,12 @@ function normSec(s){
 /* ===== listas dinámicas (Sheet) ===== */
 let TALLERES=[], AUDITORAS=[], CLIENTES=[];
 async function gviz(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
-  const r=await fetch(url); const t=await r.text();
+  // `_cb` + cache:'no-store': sin esto, al recargar la pantalla justo después de guardar una
+  // auditoría el navegador devolvía la copia CACHEADA del historial (sin la fila recién guardada).
+  // Consecuencia real medida en el Sheet: el N° de auditoría volvía a decir "1ra" en el mismo lote,
+  // y por eso la 2da parcial exigía foto de hojas de medidas como si fuera la primera.
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
+  const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
   const j=JSON.parse(t.substring(t.indexOf('{'),t.lastIndexOf('}')+1));
   return (j.table.rows||[]).map(row=>(row.c||[]).map(c=>c&&c.v!=null?String(c.v):''));
 }
@@ -413,6 +417,33 @@ async function cargarAud(){
   catch(e){ const c=cacheLeer('aud'); AUD_CACHE=(c&&c.length)?c:[]; }
   return AUD_CACHE;
 }
+
+/* ===== ECO LOCAL de auditorías recién guardadas =====
+   Aunque la lectura del historial ya va sin caché, el Sheet puede tardar unos segundos en
+   reflejar una fila recién escrita. En ese hueco la auditora ya está llenando la siguiente
+   parcial del mismo lote, y el sistema volvía a contarla como "1ra".
+   Solución: al guardar con éxito se anota aquí, en el celular, la huella del lote auditado
+   (12 horas de vida). El conteo de auditorías previas suma esas huellas mientras la fila
+   real todavía no aparece en el historial. Cuando ya aparece (mismo ID), la huella se ignora. */
+const ECO_KEY='lives_eco_aud', ECO_TTL=12*60*60*1000;
+function ecoLeer(){
+  try{
+    const a=JSON.parse(localStorage.getItem(ECO_KEY)||'[]'); const t=Date.now();
+    return Array.isArray(a)?a.filter(x=>x&&(t-(x.ts||0))<ECO_TTL):[];
+  }catch(e){ return []; }
+}
+function ecoGuardar(item){
+  try{ const a=ecoLeer(); a.push(item); localStorage.setItem(ECO_KEY,JSON.stringify(a)); }catch(e){}
+}
+// Huellas que todavía NO se ven en el historial descargado (por ID). Las guardadas sin señal
+// no tienen ID: se limpian cuando la cola de pendientes se vacía con éxito.
+function ecosVigentes(){
+  const ids=new Set((AUD_CACHE||[]).map(r=>String((r&&r[0])||'').trim()).filter(Boolean));
+  return ecoLeer().filter(e=>!e.id || !ids.has(String(e.id).trim()));
+}
+function ecoLimpiarSinId(){
+  try{ localStorage.setItem(ECO_KEY, JSON.stringify(ecoLeer().filter(e=>!!e.id))); }catch(e){}
+}
 function norm(v){ return String(v==null?'':v).trim().toUpperCase(); }
 // Llave de lote = grupo+estilo_lives+estilo_cliente+color+po+destino (col H,I,J,L,K,M = idx 7,8,9,11,10,12)
 // Incluye PO y Destino de nuevo: un mismo estilo/color despachado a destinos distintos
@@ -428,6 +459,30 @@ function llaveActual(){
 function llaveFila(r){
   // r = fila de AUDITORÍAS (array). idx: H=7 grupo, I=8 estLives, J=9 estCli, K=10 po, L=11 color, M=12 destino
   return [norm(r[7]),norm(r[8]),norm(r[9]),norm(r[11]),norm(r[10]),destinoCorto(r[12])].join('|');
+}
+/* ===== Llave LAXA de lote: solo grupo + estilo LIVES + color =====
+   NO reemplaza a la llave de 6 campos (esa sigue mandando en el N° de auditoría, el pedido
+   bloqueado y el panel de previas). Se usa únicamente para responder una pregunta más simple:
+   "¿este lote ya fue auditado antes en este mismo proceso?", que es lo que decide si hay que
+   pedir la foto de hojas de medidas.
+   Motivo: la llave de 6 campos incluye PO, estilo cliente y destino, y en el histórico real
+   esos tres se digitan con variaciones ("LIVES-S-117-2" vs "LIVES -S-117-2", "PO9HW506" vs
+   "P09HW506", "USA" vs "CANADA" en el mismo lote). Cualquiera de esas diferencias reiniciaba
+   el conteo y volvía a exigir la foto en una 2da o 3ra parcial. */
+function llaveLaxa(g,e,c){ return [norm(g),norm(e),norm(c)].join('|'); }
+function llaveLaxaActual(){ return llaveLaxa($('grupo').value,$('estiloL').value,$('color').value); }
+function llaveLaxaFila(r){ return llaveLaxa(r[7],r[8],r[11]); }
+// ¿Ya existe al menos una auditoría previa de este lote en este mismo proceso?
+function loteYaAuditadoAntes(){
+  if(!$('grupo').value || !$('estiloL').value || !$('color').value || !S.proceso) return false;
+  const k=llaveLaxaActual(), proc=norm(S.proceso);
+  const enHistorial=(AUD_CACHE||[]).some(r=>{
+    if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA'||norm(r[0])==='') return false;
+    if(S.editId && String(r[0]).trim()===String(S.editId).trim()) return false; // no contarse a sí misma
+    return llaveLaxaFila(r)===k && norm(r[3])===proc;
+  });
+  if(enHistorial) return true;
+  return ecosVigentes().some(e=>e.keyLaxa===k && e.proc===proc);
 }
 function poEsOpcional(){ return S.proceso==='Costura (taller)'; }
 function loteCompleto(){
@@ -455,6 +510,8 @@ async function calcOrdinal(){
     if(norm(r[39]).indexOf('S')===0) return; // AN=39 REPROCESO: no cuenta como un parcial nuevo, es la corrección de uno ya contado
     if(llaveFila(r)===key && norm(r[3])===proc) previas++;
   });
+  // Suma las auditorías guardadas hace segundos que el Sheet todavía no devuelve (ver ecoLeer)
+  ecosVigentes().forEach(e=>{ if(!e.reproceso && e.key===key && e.proc===proc) previas++; });
   const n=previas+1; S.nAud=ordinalTexto(n);
   out.value=S.nAud;
   h.className='hint'; h.textContent=previas? (previas+' auditoría(s) previa(s) de este tipo en el lote') : 'Primera auditoría de este tipo en el lote';
@@ -1379,8 +1436,17 @@ function tieneContenidoReal(id,minimo){
 function calcularFaltantes(){
   const lote=parseInt(v('recibido'))||0;
   const editando = !!S.editId;
-  const esPrimera = (S.nAud==='1ra');
-  const fotoMedOK = editando || !esPrimera || S.fotosMed.length>0;
+  /* FOTO DE HOJAS DE MEDIDAS — obligatoria SOLO en la primera auditoría del lote.
+     No se pide cuando:
+       · es una corrección de una auditoría ya guardada (la foto original ya está),
+       · es un reproceso (es la corrección de un lote ya auditado, no un parcial nuevo),
+       · el N° de auditoría ya dice 2da/3ra/4ta…,
+       · o el lote ya tiene alguna auditoría previa en este proceso (llave laxa: grupo+estilo+color).
+     Esta última condición es la red de seguridad: aunque el N° salga mal por una diferencia de
+     tipeo en PO/estilo cliente/destino, si el lote ya fue auditado antes no se vuelve a pedir foto. */
+  const esReproceso = !!S.reprocesaDe;
+  const ordinalDicePrimera = (S.nAud==='' || S.nAud==='1ra');
+  const fotoMedOK = editando || esReproceso || !ordinalDicePrimera || loteYaAuditadoAntes() || S.fotosMed.length>0;
 
   const faltan=[];
   if(!v2('grupo')) faltan.push('Grupo');
@@ -1471,11 +1537,27 @@ async function enviarPendientes(){
   }
   btn.disabled=false; btn.textContent='Enviar ahora';
   await refrescarPend();
-  if(failN===0) toast('Enviadas '+okN+' auditoría(s) ✓','ok');
+  if(failN===0){ toast('Enviadas '+okN+' auditoría(s) ✓','ok'); ecoLimpiarSinId(); }
   else toast('Enviadas '+okN+', fallaron '+failN+' (reintenta con señal)','err');
   cargarAud();
 }
 $('pendBtn').onclick=enviarPendientes;
+
+// Anota la huella del lote recién guardado (ver ecoLeer). Solo para auditorías NUEVAS:
+// las correcciones no crean un parcial nuevo, y los reprocesos no cuentan como parcial.
+function anotarEco(idAsignado){
+  if(S.editId) return;
+  try{
+    ecoGuardar({
+      id: idAsignado||'',
+      key: llaveActual(),
+      keyLaxa: llaveLaxaActual(),
+      proc: norm(S.proceso),
+      reproceso: !!S.reprocesaDe,
+      ts: Date.now()
+    });
+  }catch(e){}
+}
 
 function armarPayload(){
   const nom=$('cliente').value; const cod=(v('grupo').substring(0,3)||'AUD').toUpperCase();
@@ -1526,18 +1608,19 @@ $('save').onclick=async()=>{
   }
   // Si no hay conexión, guardar directo en cola sin intentar
   if(navigator.onLine===false){
-    try{ await colaAdd(payload); await refrescarPend(); borrarBorrador();
+    try{ await colaAdd(payload); anotarEco(''); await refrescarPend(); borrarBorrador();
       confirmarGuardado('cola');
     }catch(e){ toast('No se pudo guardar localmente: '+e.message,'err'); btn.disabled=false;btn.textContent='Guardar'; }
     return;
   }
   try{
     const data=await enviarUno(payload);
+    anotarEco(data.id);
     borrarBorrador();
     confirmarGuardado('enviado', data.id, data.resultado);
   }catch(err){
     // falló el envío (señal intermitente) -> guardar en cola
-    try{ await colaAdd(payload); await refrescarPend(); borrarBorrador();
+    try{ await colaAdd(payload); anotarEco(''); await refrescarPend(); borrarBorrador();
       confirmarGuardado('cola');
     }catch(e){ toast('No se pudo guardar: '+e.message,'err'); btn.disabled=false;btn.textContent='Guardar'; }
   }
