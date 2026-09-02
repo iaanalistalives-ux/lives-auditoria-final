@@ -116,7 +116,11 @@
   .panel{background:#fff;border:1px solid var(--warm);border-radius:8px;padding:16px 18px;margin-bottom:18px;}
   .panel .pt{font-size:15px;font-weight:700;color:#333;}
   .panel .ph{font-size:11.5px;color:var(--stone);margin-top:2px;margin-bottom:10px;}
-  .cwrap{position:relative;width:100%;height:280px;}
+  .cwrap{position:relative;width:100%;height:clamp(220px,26vh,320px);}
+  .cwrap.tall{height:clamp(260px,34vh,400px);}
+  /* Sin esto Chart.js le fija al canvas su propia altura y en celular los gráficos
+     quedaban en ~125px. El alto lo manda .cwrap, no el canvas. */
+  .cwrap canvas{position:absolute;inset:0;}
   .foot{font-size:11px;color:var(--stone);margin-top:8px;line-height:1.5;text-align:center;padding:10px 0 0;}
   #dash{display:none;}
 
@@ -155,6 +159,18 @@
   .fc-foot{background:var(--warm-light);padding:10px 24px;font-size:10px;color:var(--stone);display:flex;justify-content:space-between;}
   .ficha-topbar{max-width:720px;margin:0 auto 10px;display:flex;align-items:center;gap:10px;justify-content:center;color:#fff;font-size:13px;font-weight:600;}
   .ficha-topbar select{font-family:inherit;font-size:13px;font-weight:700;color:var(--sage);border:none;border-radius:6px;padding:6px 12px;background:#fff;cursor:pointer;}
+  /* ===== Celular y tablet =====
+     Sin esto, el clamp() con vh deja los gráficos en unos 125px de alto en celular vertical
+     (aplastados e ilegibles) y la tabla de talleres desborda la página en lugar de tener su
+     propio scroll dentro de la tarjeta. */
+  @media(max-width:600px){
+    .cwrap,.cwrap.tall{height:260px;}
+    #uniTbl{min-width:560px;}
+    #paretoSeg .clibtn{flex:1 1 100%;text-align:center;min-height:44px;}
+    #paretoLista div[onclick]>div:nth-child(2){width:110px;}
+    #paretoLista div[onclick]>div:last-child{width:96px;font-size:11px;}
+    .panel{overflow-x:hidden;}
+  }
   @media print{
     @page{size:A4 portrait;margin:11mm;}
     body.print-ficha .header,body.print-ficha .wrap{display:none!important;}
@@ -313,6 +329,49 @@
         </div>
       </div>
 
+      <!-- PARETO DE MOTIVOS — bloque 1 en prioridad del asesor.
+           Dos universos SEPARADOS, nunca sumados: los defectos salen de la muestra AQL y los
+           derivados del lote revisado al 100%. Mezclarlos daría un porcentaje sin significado. -->
+      <div class="panel" id="panelPareto">
+        <div class="pt">📊 ¿Dónde está concentrado el problema?</div>
+        <div class="ph" id="paretoSub"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="paretoSeg">
+          <button type="button" class="clibtn active" data-uni="der" onclick="setUniverso('der')">Derivados · lote 100% (Costura)</button>
+          <button type="button" class="clibtn" data-uni="def" onclick="setUniverso('def')">Defectos · muestra AQL (Acabados y Final)</button>
+        </div>
+        <div class="note" id="paretoWarn" style="display:none;font-size:11px;"></div>
+        <div id="paretoIns" style="background:#fff;border-left:4px solid var(--tan);border-radius:0 12px 12px 0;box-shadow:0 1px 3px rgba(14,59,54,.06);padding:12px 16px;margin-bottom:14px;font-size:13.5px;"></div>
+        <div id="paretoBox">
+          <div class="cwrap tall"><canvas id="chPareto"></canvas></div>
+          <div class="ph" style="margin-top:10px">Toca una barra para ver en qué talleres, estilos y telas aparece ese motivo.</div>
+          <div id="paretoLista"></div>
+        </div>
+      </div>
+
+      <!-- UNIVERSO POR TALLER — bloque 2 en prioridad. Responde literalmente:
+           cuántas prendas se revisaron en cada taller y cuántas de esas salieron con falla. -->
+      <div class="panel" id="panelUniverso">
+        <div class="pt">🏭 Universo por taller — prendas revisadas y prendas con falla</div>
+        <div class="ph" id="uniSub"></div>
+        <div class="note" id="uniWarn" style="display:none;font-size:11px;"></div>
+        <div style="overflow-x:auto">
+          <table id="uniTbl" style="width:100%;border-collapse:collapse;font-size:12.5px;">
+            <thead><tr style="background:var(--warm-light);text-align:left;">
+              <th style="padding:8px 10px;">#</th>
+              <th style="padding:8px 10px;">Taller</th>
+              <th style="padding:8px 10px;text-align:right;">Prendas revisadas</th>
+              <th style="padding:8px 10px;text-align:right;">Con falla</th>
+              <th style="padding:8px 10px;text-align:right;">% con falla</th>
+              <th style="padding:8px 10px;">Peso en el total</th>
+              <th style="padding:8px 10px;text-align:center;">Estado</th>
+            </tr></thead>
+            <tbody id="uniBody"></tbody>
+          </table>
+        </div>
+        <div class="cwrap" style="margin-top:16px"><canvas id="chUniTend"></canvas></div>
+        <div class="ph" style="margin-top:6px">Tendencia semanal del % con falla. Solo se dibujan los talleres con volumen suficiente para que la línea signifique algo.</div>
+      </div>
+
       <div class="row2" id="rowDefDer">
         <div class="panel">
           <div class="pt">🔍 Defectos por origen</div>
@@ -371,7 +430,9 @@ const COL = {
   ESTILO_LIVES:8, ESTILO_CLIENTE:9, PO:10, COLOR:11, DESTINO:12, CANT_PEDIDO:13,
   TOTAL_RECIBIDO:14, LICENCIA:16, MUESTRA:18, TOTAL_DEF:22, RESULTADO_FINAL:27,
   AUDITOR:31, SEMANA:32, REPETIDO:35, LOTE_CONTABLE:36, ANIO:37, COMPUTABLE:38,
-  REPROCESO:39, TOTAL_DER:41, MUESTRA_CONTABLE:44
+  REPROCESO:39, TOTAL_DER:41, MUESTRA_CONTABLE:44,
+  // agregadas para el drill-down de motivos (taller / estilo / tela)
+  COD_TELA:45, DESC_TELA:46, OP:50
 };
 
 const SAGE='#0F7A5A', ROSE='#DC2626', WARM='#DCE5E2', WARML='#F1F6F4', SLATE='#4E6B78', TAN='#F59E0B', TAUPE='#B45309';
@@ -402,7 +463,12 @@ let CURMODE='week', CURVAL=null;
 let STATE_wrows=[]; // filas del período activo — usado por los onclick de las listas HTML (Defectos/Derivados)
 let CURRENT_FICHA=null; // recuerda qué ficha está abierta, para poder recalcularla si cambia el período dentro de la ficha
 
-function curTok(){ return CURMODE==='month' ? ('m:'+CURVAL) : ('w:'+CURVAL); }
+function curTok(){
+  // En modo "año" no hay semana ni mes: el token correcto es 'acum'. Antes devolvía 'w:null'
+  // y cualquier ficha abierta estando en modo año salía en blanco, con el título "Semana null".
+  if(CURMODE==='year' || CURVAL===null || CURVAL===undefined) return 'acum';
+  return CURMODE==='month' ? ('m:'+CURVAL) : ('w:'+CURVAL);
+}
 function periodRows(period){
   if(!period || period==='acum') return ROWS;
   if(period.indexOf('w:')===0) return ROWS.filter(r=>r.semana===+period.slice(2));
@@ -427,52 +493,93 @@ function cambiarPeriodoFicha(period){
   else if(CURRENT_FICHA.type==='cliente') abrirFichaCliente(CURRENT_FICHA.cliente, period);
   else if(CURRENT_FICHA.type==='categoria') abrirFichaCategoria(CURRENT_FICHA.tipo, CURRENT_FICHA.origen, CURRENT_FICHA.categoria, period);
 }
+// Defaults de Chart.js según el estándar visual LIVES (una sola vez para todo el archivo)
+if(window.Chart){
+  Chart.defaults.font.family="Calibri, Arial, sans-serif";
+  Chart.defaults.font.size=12;
+  Chart.defaults.color="#5F726C";
+  Chart.defaults.borderColor="#F1F6F4";
+  Chart.defaults.maintainAspectRatio=false;
+  Chart.defaults.plugins.tooltip.backgroundColor='rgba(14,59,54,.95)';
+  Chart.defaults.plugins.tooltip.padding=10;
+  Chart.defaults.plugins.tooltip.cornerRadius=6;
+  if(window.matchMedia('(max-width:600px)').matches){
+    Chart.defaults.font.size=11;
+    Chart.defaults.plugins.legend.labels.boxWidth=10;
+  }
+}
 let CHARTS=[];
 
 function reg(c){CHARTS.push(c);return c;}
-function clearCharts(){CHARTS.forEach(c=>{try{c.destroy();}catch(e){}});CHARTS=[];}
+function clearCharts(){CHARTS.forEach(c=>{try{c.destroy();}catch(e){}});CHARTS=[];CH_PARETO=null;CH_UNITEND=null;}
 function nf(n){return Number(n||0).toLocaleString('es-PE');}
 function pct(a,b){return b?+(a/b*100).toFixed(1):0;}
 
-/* ===================== Carga en vivo (gviz) ===================== */
+/* ===================== Lectura del Sheet (CSV, no JSON) =====================
+   Se lee en CSV a propósito. En formato JSON, gviz le asigna UN SOLO tipo a cada columna,
+   decidido por la mayoría de sus celdas, y toda celda que no calce con ese tipo vuelve VACÍA.
+   Verificado sobre este mismo Sheet: la columna PO tiene 206 celdas numéricas y 83 de texto,
+   así que los 83 PO con letras ("LIVES-S-117-2", "505342 USA") se perdían; y en ESTILO_CLIENTE
+   pasa al revés. El CSV devuelve todo como texto, tal como se ve en la hoja, sin tipado. */
+function parseCSV(txt){
+  const filas=[]; let campo='', fila=[], enComillas=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(enComillas){
+      if(ch==='"'){ if(txt[i+1]==='"'){ campo+='"'; i++; } else enComillas=false; }
+      else campo+=ch;
+    }else{
+      if(ch==='"') enComillas=true;
+      else if(ch===','){ fila.push(campo); campo=''; }
+      else if(ch==='\n'){ fila.push(campo); campo=''; filas.push(fila); fila=[]; }
+      else if(ch!=='\r') campo+=ch;
+    }
+  }
+  if(campo!=='' || fila.length){ fila.push(campo); filas.push(fila); }
+  return filas;
+}
+async function leerHoja(nombre){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(nombre)}&_cb=${Date.now()}`;
+  const res = await fetch(url,{cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const txt = await res.text();
+  if(/^\s*</.test(txt)) throw new Error('El Sheet respondió una página en vez del CSV (¿permisos?)');
+  const filas = parseCSV(txt);
+  if(!filas.length) throw new Error('La hoja "'+nombre+'" volvió vacía');
+  return filas.slice(1);   // la primera línea es el encabezado
+}
+
+/* ===================== Carga en vivo ===================== */
 async function cargarDatos(){
   try{
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text = await res.text();
-    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);\s*$/);
-    if(!m) throw new Error('Formato de respuesta inesperado del Sheet');
-    const json = JSON.parse(m[1]);
-    const rows = json.table.rows || [];
+    const rows = await leerHoja(SHEET_NAME);
 
-    const val = (c, idx) => (c[idx] && c[idx].v !== null && c[idx].v !== undefined) ? c[idx].v : null;
-    const strv = (c, idx) => { const v = val(c, idx); return v === null ? '' : String(v).trim(); };
-    const numv = (c, idx) => { const v = val(c, idx); const n = Number(v); return isNaN(n) ? 0 : n; };
+    const strv = (c, idx) => String((c[idx]==null?'':c[idx])).trim();
+    const numv = (c, idx) => { const n = Number(String(c[idx]==null?'':c[idx]).trim()); return isNaN(n) ? 0 : n; };
 
+    // La fecha llega como texto "YYYY-MM-DD". Se parte con regex y se arma en hora local:
+    // new Date("YYYY-MM-DD") se interpreta como medianoche UTC y en Lima (UTC-5) devuelve el
+    // día anterior, lo que corre de mes las auditorías del día 1.
     function parseFecha(v){
-      if(v === null || v === undefined) return null;
-      if(v instanceof Date) return v;
-      if(typeof v === 'string'){
-        // formato gviz típico: "Date(2026,5,13)"
-        const gm = v.match(/^Date\((\d+),(\d+),(\d+)/);
-        if(gm) return new Date(+gm[1], +gm[2], +gm[3]);
-        const d = new Date(v);
-        if(!isNaN(d)) return d;
-      }
-      return null;
+      if(v === null || v === undefined || v === '') return null;
+      const gm = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(gm) return new Date(+gm[1], +gm[2]-1, +gm[3]);
+      const gv = String(v).match(/^Date\((\d+),(\d+),(\d+)/);   // por si alguna vez vuelve en formato gviz
+      if(gv) return new Date(+gv[1], +gv[2], +gv[3]);
+      const d = new Date(v);
+      return isNaN(d) ? null : d;
     }
 
     let all = [];
-    rows.forEach(r=>{
-      const c = r.c || [];
+    rows.forEach(c=>{
+      if(!c || !c.length || !String(c[0]||'').trim()) return;
       const computable = numv(c, COL.COMPUTABLE);
       // NOTA: ya NO filtramos por COMPUTABLE aquí. Regla de negocio (confirmada por Christian):
       // el conteo de AUDITORÍAS debe incluir todas las filas (licencias, repetidas, etc. son trabajo real).
       // COMPUTABLE sí importa para LOTE (y MUESTRA si se llega a usar): verificado con datos reales que
       // LOTE_CONTABLE NO siempre viene en 0 cuando COMPUTABLE=0 (ej. filas de licencia sí traen lote>0),
       // así que el filtro por computable se aplica explícitamente al sumar el lote — ver kpiFor().
-      const fecha = parseFecha(val(c, COL.FECHA));
+      const fecha = parseFecha(strv(c, COL.FECHA));
       const anio = numv(c, COL.ANIO) || (fecha ? fecha.getFullYear() : null);
       const semana = numv(c, COL.SEMANA);
       const mes = fecha ? fecha.getMonth() : null;
@@ -487,7 +594,17 @@ async function cargarDatos(){
       // Normalizamos "SI"/"SÍ" (el Sheet trae ambas formas, con y sin tilde) a un solo valor comparable.
       const reproceso = strv(c, COL.REPROCESO).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       if(!anio || !semana) return;
-      all.push({id:idAuditoria, fecha, anio, semana, mes, intext, resultado, servicio, loteContable, muestraContable, nAuditoria, cliente, computable, reproceso});
+      // Campos extra para el drill-down: sin ellos no se puede responder "¿en qué taller,
+      // en qué estilo y en qué tela aparece este defecto?", que es lo que pide el asesor.
+      const proceso = strv(c, COL.PROCESO);
+      const estilo  = strv(c, COL.ESTILO_LIVES);
+      const grupo   = strv(c, COL.GRUPO);
+      const color   = strv(c, COL.COLOR);
+      const tela    = strv(c, COL.DESC_TELA) || strv(c, COL.COD_TELA);
+      const totalDef = numv(c, COL.TOTAL_DEF);
+      const totalDer = numv(c, COL.TOTAL_DER);
+      all.push({id:idAuditoria, fecha, anio, semana, mes, intext, resultado, servicio, loteContable, muestraContable, nAuditoria, cliente, computable, reproceso,
+                proceso, estilo, grupo, color, tela, totalDef, totalDer});
     });
 
     // filas cuyo resultado no es APROBADO/RECHAZADO (transparencia, no se descartan del total)
@@ -533,27 +650,16 @@ async function cargarDatos(){
 
 async function cargarHojaTipoDefecto(sheetName, warnElId, labelError){
   try{
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text = await res.text();
-    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);\s*$/);
-    if(!m) throw new Error('Formato de respuesta inesperado');
-    const json = JSON.parse(m[1]);
-    const rows = json.table.rows || [];
-    const val = (c, idx) => (c[idx] && c[idx].v !== null && c[idx].v !== undefined) ? c[idx].v : null;
-    const strv = (c, idx) => { const v = val(c, idx); return v === null ? '' : String(v).trim(); };
-    const numv = (c, idx) => { const v = val(c, idx); const n = Number(v); return isNaN(n) ? 0 : n; };
-    const out = rows.map(r=>{
-      const c = r.c || [];
-      return {
-        idAuditoria: strv(c, DCOL.ID_AUDITORIA),
-        seccion: strv(c, DCOL.SECCION),
-        categoria: strv(c, DCOL.CATEGORIA),
-        subtipo: strv(c, DCOL.SUBTIPO),
-        cantidad: numv(c, DCOL.CANTIDAD) || 1
-      };
-    }).filter(r=>r.idAuditoria && r.categoria);
+    const rows = await leerHoja(sheetName);
+    const strv = (c, idx) => String((c[idx]==null?'':c[idx])).trim();
+    const numv = (c, idx) => { const n = Number(String(c[idx]==null?'':c[idx]).trim()); return isNaN(n) ? 0 : n; };
+    const out = rows.map(c=>({
+      idAuditoria: strv(c, DCOL.ID_AUDITORIA),
+      seccion: strv(c, DCOL.SECCION),
+      categoria: strv(c, DCOL.CATEGORIA),
+      subtipo: strv(c, DCOL.SUBTIPO),
+      cantidad: numv(c, DCOL.CANTIDAD) || 1
+    })).filter(r=>r.idAuditoria && r.categoria);
     return {rows: out, ok: true};
   }catch(e){
     console.error(labelError+' no se pudo cargar:', e);
@@ -784,6 +890,8 @@ function render(mode, value){
   renderComparativo(wKeys);
   renderProceso(wrows);
   renderRanking();
+  renderPareto(wrows);      // debe ir dentro de render(): sus gráficos se registran en reg()
+  renderUniverso(wrows);    // para que clearCharts() los destruya al cambiar de período
   renderDefectos(wrows);
   renderDerivados(wrows);
   renderClientes(wrows);
@@ -906,6 +1014,282 @@ function hbarListHTML(list, color, onClickAttr){
       `<div class="hbar-track"><div class="hbar-fill" style="width:${w}%;background:${color}"></div></div>`+
       `<div class="hbar-val">${x.v}</div></div>`;
   }).join('');
+}
+
+/* ============================================================================
+   PARETO DE MOTIVOS + UNIVERSO POR TALLER
+   ----------------------------------------------------------------------------
+   Regla que gobierna todo este bloque: hay DOS universos y no se mezclan nunca.
+
+   · DERIVADOS  -> denominador = LOTE_CONTABLE de Costura (taller). Ahí se revisa el
+     100% de las prendas, así que "de todas las que revisaron, cuántas salieron con
+     falla" es un dato real.
+   · DEFECTOS   -> denominador = MUESTRA_CONTABLE. En Acabados y Final se inspecciona
+     una muestra AQL, no el lote entero. El porcentaje es de la muestra; proyectarlo al
+     lote completo sería inventar un número, así que no se hace.
+============================================================================ */
+let UNIVERSO='der';   // 'der' = lote 100% (Costura) · 'def' = muestra AQL
+
+function setUniverso(u){
+  UNIVERSO=u;
+  document.querySelectorAll('#paretoSeg .clibtn').forEach(b=>b.classList.toggle('active', b.getAttribute('data-uni')===u));
+  renderPareto(STATE_wrows);
+}
+// Filas que pertenecen al universo elegido, ya filtradas por COMPUTABLE y sin reprocesos
+// (un reproceso vuelve a mirar prendas ya contadas: sumarlas duplicaría el universo).
+function filasUniverso(wrows, uni){
+  return wrows.filter(r=>{
+    if(r.computable!==1) return false;
+    if(r.reproceso==='SI') return false;
+    return uni==='der' ? /costura/i.test(r.proceso) : !/costura/i.test(r.proceso);
+  });
+}
+function denomUniverso(rows, uni){
+  return rows.reduce((s,r)=>s+(uni==='der'? r.loteContable : r.muestraContable),0);
+}
+function filasDetalle(uni){ return uni==='der' ? DER_ROWS : DEF_ROWS; }
+
+let CH_PARETO=null, CH_UNITEND=null;
+function renderPareto(wrows){
+  const uni=UNIVERSO;
+  // setUniverso() vuelve a dibujar sin pasar por render(), así que clearCharts() no corre:
+  // hay que destruir este gráfico a mano o Chart.js rechaza reusar el canvas.
+  if(CH_PARETO){ try{CH_PARETO.destroy();}catch(e){} CH_PARETO=null; }
+  const box=document.getElementById('paretoBox');
+  const warn=document.getElementById('paretoWarn');
+  const base=filasUniverso(wrows, uni);
+  const ids=new Set(base.map(r=>r.id));
+  const denom=denomUniverso(base, uni);
+  const det=filasDetalle(uni).filter(d=>ids.has(d.idAuditoria));
+
+  document.getElementById('paretoSub').innerHTML = uni==='der'
+    ? 'Prendas con falla encontradas al revisar el <b>lote completo</b> en Costura (taller). El % se calcula sobre las prendas revisadas, no sobre una muestra.'
+    : 'Defectos encontrados en la <b>muestra inspeccionada</b> (AQL) de Acabados y Auditoría Final. El % es de la muestra: no dice cuántas prendas del lote entero están falladas.';
+
+  if(!det.length || !denom){
+    box.style.display='none'; warn.style.display='block';
+    warn.innerHTML = '<b>Sin registros en este período</b> para '+(uni==='der'?'derivados de Costura (taller)':'defectos de la muestra')+'.';
+    return;
+  }
+  box.style.display=''; warn.style.display='none';
+
+  const acc={};
+  det.forEach(d=>{ acc[d.categoria]=(acc[d.categoria]||0)+d.cantidad; });
+  const lista=Object.keys(acc).map(k=>({k, v:acc[k]})).sort((a,b)=>b.v-a.v);
+  const total=lista.reduce((s,x)=>s+x.v,0);
+  let run=0; const acum=lista.map(x=>{ run+=x.v; return +(run/total*100).toFixed(1); });
+  const top=lista.slice(0,10), acumTop=acum.slice(0,10);
+  const colores=[TAUPE, SLATE, '#10B981', ROSE, TAN];
+
+  CH_PARETO = reg(new Chart(document.getElementById('chPareto'), {
+    data:{
+      labels: top.map(x=>x.k.length>26 ? x.k.slice(0,25)+'…' : x.k),
+      datasets:[
+        {type:'bar', label:'Prendas', data: top.map(x=>x.v), yAxisID:'y',
+         backgroundColor: top.map((_,i)=>colores[i%colores.length]), borderRadius:4, order:2},
+        {type:'line', label:'% acumulado', data: acumTop, yAxisID:'y2',
+         borderColor: SAGE, borderWidth:2.5, tension:.25, pointRadius:4,
+         pointBackgroundColor: SAGE, pointBorderColor:'#fff', order:1}
+      ]
+    },
+    options:{
+      onClick:(e,els)=>{ if(els.length) abrirFichaMotivo(top[els[0].index].k, uni, curTok()); },
+      plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:12}},
+        tooltip:{callbacks:{label:(c)=> c.datasetIndex===0
+          ? nf(c.parsed.y)+' prendas ('+pct(c.parsed.y,total)+'% de los motivos)'
+          : 'Acumulado: '+c.parsed.y+'%' }} },
+      scales:{
+        y:{beginAtZero:true, title:{display:true, text:'Prendas'}},
+        y2:{position:'right', beginAtZero:true, max:100, grid:{drawOnChartArea:false},
+            ticks:{callback:v=>v+'%'}},
+        x:{ticks:{maxRotation:38, minRotation:0, autoSkip:false, font:{size:10.5}}}
+      }
+    }
+  }));
+
+  // Lista clickeable debajo: en celular la barra es difícil de tocar con precisión.
+  const maxV=lista[0].v;
+  document.getElementById('paretoLista').innerHTML = top.map((x,i)=>{
+    const tasa=pct(x.v, denom);
+    return '<div onclick="abrirFichaMotivo('+JSON.stringify(x.k).replace(/"/g,'&quot;')+',\''+uni+'\')" '+
+      'style="display:flex;align-items:center;gap:10px;margin:7px 0;cursor:pointer;">'+
+      '<div style="width:22px;height:22px;border-radius:50%;background:var(--warm-light);color:var(--stone);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">'+(i+1)+'</div>'+
+      '<div style="width:180px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x.k+'</div>'+
+      '<div style="flex:1;background:var(--warm-light);border-radius:4px;height:14px;overflow:hidden"><div style="width:'+Math.max(5,Math.round(x.v/maxV*100))+'%;height:100%;background:'+colores[i%colores.length]+';border-radius:4px"></div></div>'+
+      '<div style="width:120px;text-align:right;font-size:12px;font-weight:700;color:var(--stone)">'+nf(x.v)+' · '+tasa+'%</div></div>';
+  }).join('');
+
+  // Insight: concentración real, calculada — nunca escrita a mano.
+  const n80 = acum.findIndex(a=>a>=80)+1;
+  const insEl=document.getElementById('paretoIns');
+  if(insEl){
+    insEl.innerHTML = '<b>'+n80+'</b> de '+lista.length+' motivos explican el <b>80%</b> de las '+
+      nf(total)+' prendas afectadas. El principal es <b>'+lista[0].k+'</b> con '+nf(lista[0].v)+
+      ' ('+pct(lista[0].v,total)+'% de los motivos, '+pct(lista[0].v,denom)+'% de las '+nf(denom)+
+      (uni==='der'?' prendas revisadas':' prendas de muestra')+').';
+  }
+}
+
+/* Ficha de un motivo: dónde aparece. Esto es lo que el asesor pidió como "qué conlleva
+   dentro de sí": el mismo motivo desglosado por taller, por estilo y por tela. */
+function abrirFichaMotivo(categoria, uni, period){
+  period = period || curTok();
+  uni = uni || UNIVERSO;
+  CURRENT_FICHA = {type:'motivo', categoria, uni};
+  const plabel=periodLabel(period);
+  const base=filasUniverso(periodRows(period), uni);
+  const porId={}; base.forEach(r=>{ porId[r.id]=r; });
+  const det=filasDetalle(uni).filter(d=>porId[d.idAuditoria] && d.categoria===categoria);
+  const total=det.reduce((s,d)=>s+d.cantidad,0);
+  const audAfect=new Set(det.map(d=>d.idAuditoria)).size;
+  const denom=denomUniverso(base, uni);
+  const color = uni==='der' ? TAUPE : ROSE;
+
+  // Agrupa el motivo por una dimensión de la auditoría, con su denominador propio,
+  // para que el % de cada fila sea comparable y no un simple reparto del total.
+  function agrupar(campo, etiquetaVacia){
+    const num={}, den={};
+    base.forEach(r=>{
+      const k=(r[campo]||'').trim() || etiquetaVacia;
+      den[k]=(den[k]||0)+(uni==='der'? r.loteContable : r.muestraContable);
+    });
+    det.forEach(d=>{
+      const r=porId[d.idAuditoria];
+      const k=(r[campo]||'').trim() || etiquetaVacia;
+      num[k]=(num[k]||0)+d.cantidad;
+    });
+    return Object.keys(num).map(k=>({k, v:num[k], d:den[k]||0, p: den[k]? +(num[k]/den[k]*100).toFixed(2) : 0}))
+      .sort((a,b)=>b.v-a.v);
+  }
+  function barras(lista, unidad){
+    if(!lista.length) return '<span style="font-size:11px;color:var(--stone)">Sin registros.</span>';
+    const mx=lista[0].v;
+    return lista.slice(0,10).map(x=>
+      '<div style="display:flex;align-items:center;gap:10px;margin:7px 0;">'+
+      '<div style="width:150px;font-size:11.5px;color:#333;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+x.k+'</div>'+
+      '<div style="flex:1;background:var(--warm-light);border-radius:4px;height:15px;overflow:hidden;"><div style="width:'+Math.max(6,Math.round(x.v/mx*100))+'%;height:100%;background:'+color+';border-radius:4px;"></div></div>'+
+      '<div style="width:132px;text-align:right;font-size:11.5px;font-weight:700;color:var(--stone);">'+nf(x.v)+' de '+nf(x.d)+' · '+x.p+'%</div></div>').join('');
+  }
+
+  const porTaller = agrupar('servicio','(sin taller)');
+  const porEstilo = agrupar('estilo','(sin estilo)');
+  const porTela   = agrupar('tela','(sin tela registrada)');
+  const bySub={}; det.forEach(d=>{ const k=d.subtipo||'(sin subtipo)'; bySub[k]=(bySub[k]||0)+d.cantidad; });
+  const subList=Object.keys(bySub).map(k=>({k,v:bySub[k],d:denom,p:pct(bySub[k],denom)})).sort((a,b)=>b.v-a.v);
+
+  // Cobertura de tela: hoy solo las auditorías nuevas la traen. Se dice el dato en vez de
+  // mostrar un desglose que parece completo y no lo es.
+  const conTela = base.filter(r=>(r.tela||'').trim()).length;
+  const covTela = base.length ? Math.round(conTela/base.length*100) : 0;
+
+  const universoTxt = uni==='der'
+    ? 'lote revisado al 100% en Costura (taller)'
+    : 'muestra inspeccionada (AQL) en Acabados y Auditoría Final';
+  const hoy=new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  document.getElementById('fichaCard').innerHTML =
+    '<div class="fc-hd" style="background:'+color+'"><div><div class="co">LIVES — Área de Calidad · AC-009-25</div>'+
+    '<div class="tn">'+categoria+'</div><div class="tsub">'+(uni==='der'?'Derivado':'Defecto')+' · '+universoTxt+' · '+plabel+'</div></div>'+
+    '<div class="tpct">'+pct(total,denom)+'<small>% del universo</small></div></div>'+
+    '<div class="fc-body">'+
+      '<div class="fc-kpis">'+
+        '<div class="k"><div class="v">'+nf(total)+'</div><div class="l">Prendas con este motivo</div></div>'+
+        '<div class="k"><div class="v">'+nf(denom)+'</div><div class="l">'+(uni==='der'?'Prendas revisadas':'Prendas de muestra')+'</div></div>'+
+        '<div class="k"><div class="v">'+pct(total,denom)+'%</div><div class="l">Tasa sobre el universo</div></div>'+
+        '<div class="k"><div class="v">'+audAfect+'</div><div class="l">Auditorías afectadas</div></div>'+
+      '</div>'+
+      '<div class="fc-sec">Por taller</div>'+barras(porTaller)+
+      '<div class="fc-sec">Por estilo</div>'+barras(porEstilo)+
+      '<div class="fc-sec">Por tela</div>'+
+      (covTela<70 ? '<div class="fc-note warn">Solo el '+covTela+'% de las auditorías de este período tiene la tela registrada. El desglose de abajo cubre esa parte, no el total: la tela se empezó a guardar hace poco, así que las auditorías anteriores no la traen.</div>' : '')+
+      barras(porTela)+
+      '<div class="fc-sec">Por subtipo</div>'+barras(subList)+
+      '<div class="fc-note">Cada línea muestra las prendas con este motivo sobre el total revisado de ese taller, estilo o tela — por eso los porcentajes no suman 100%: son tasas independientes, no un reparto.</div>'+
+    '</div>'+
+    '<div class="fc-foot"><span>Confidencial — Uso Interno · Sistema de Calidad LIVES</span><span>AC-009-25 en vivo · Generado el '+hoy+'</span></div>';
+  document.getElementById('fichaPeriodSel').innerHTML = periodOptionsHTML(period);
+  document.getElementById('fichaOverlay').classList.add('show');
+  document.getElementById('fichaOverlay').scrollTop = 0;
+}
+
+/* ---- Universo por taller: prendas revisadas vs prendas con falla ---- */
+function renderUniverso(wrows){
+  if(CH_UNITEND){ try{CH_UNITEND.destroy();}catch(e){} CH_UNITEND=null; }
+  const warn=document.getElementById('uniWarn'), body=document.getElementById('uniBody');
+  const base=filasUniverso(wrows,'der');   // solo Costura: es el único proceso con revisión al 100%
+  document.getElementById('uniSub').innerHTML =
+    'Solo <b>Costura (taller)</b>, que es donde se revisa el 100% del lote. En Acabados y Auditoría Final se inspecciona una muestra, así que ahí no se puede decir cuántas prendas del lote entero tienen falla.';
+  if(!base.length){
+    body.innerHTML=''; warn.style.display='block';
+    warn.innerHTML='<b>Sin auditorías de Costura (taller)</b> en este período.';
+    document.getElementById('chUniTend').style.display='none';
+    return;
+  }
+  warn.style.display='none'; document.getElementById('chUniTend').style.display='';
+  const porId={}; base.forEach(r=>{ porId[r.id]=r; });
+  const lote={}, falla={};
+  base.forEach(r=>{ const t=r.servicio||'(sin taller)'; lote[t]=(lote[t]||0)+r.loteContable; });
+  DER_ROWS.forEach(d=>{ const r=porId[d.idAuditoria]; if(!r) return; const t=r.servicio||'(sin taller)'; falla[t]=(falla[t]||0)+d.cantidad; });
+
+  const totL=Object.values(lote).reduce((a,b)=>a+b,0);
+  const totF=Object.values(falla).reduce((a,b)=>a+b,0);
+  const media = totL ? totF/totL*100 : 0;
+  // Semáforo relativo a la media del período: no hay meta declarada por Calidad, así que no se
+  // inventa una. Se compara cada taller contra el promedio real de todos.
+  const lista=Object.keys(lote).filter(t=>lote[t]>0).map(t=>({
+    t, lote:lote[t], falla:falla[t]||0, p:+( (falla[t]||0)/lote[t]*100 ).toFixed(2),
+    peso:+((falla[t]||0)/(totF||1)*100).toFixed(1)
+  })).sort((a,b)=>b.falla-a.falla);
+
+  body.innerHTML = lista.map((x,i)=>{
+    const est = x.p<=media ? ['ok','En la media o mejor'] : (x.p<=media*1.5 ? ['warn','Sobre la media'] : ['bad','Muy sobre la media']);
+    const col = est[0]==='ok'? SAGE : (est[0]==='warn'? TAN : ROSE);
+    return '<tr style="cursor:pointer" onclick="abrirFichaTaller('+JSON.stringify(x.t).replace(/"/g,'&quot;')+', curTok())">'+
+      '<td style="padding:8px 10px;color:var(--stone)">'+(i+1)+'</td>'+
+      '<td style="padding:8px 10px;font-weight:700">'+x.t+'</td>'+
+      '<td style="padding:8px 10px;text-align:right">'+nf(x.lote)+'</td>'+
+      '<td style="padding:8px 10px;text-align:right">'+nf(x.falla)+'</td>'+
+      '<td style="padding:8px 10px;text-align:right;font-weight:700;color:'+col+'">'+x.p+'%</td>'+
+      '<td style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:var(--warm-light);border-radius:4px;height:9px;overflow:hidden;min-width:60px"><div style="width:'+x.peso+'%;height:100%;background:'+col+';border-radius:4px"></div></div><span style="font-size:11px;color:var(--stone);width:38px;text-align:right">'+x.peso+'%</span></div></td>'+
+      '<td style="padding:8px 10px;text-align:center"><span class="pill '+est[0]+'">'+est[1]+'</span></td></tr>';
+  }).join('') +
+    '<tr style="background:var(--warm-light);font-weight:700"><td colspan="2" style="padding:8px 10px">TOTAL</td>'+
+    '<td style="padding:8px 10px;text-align:right">'+nf(totL)+'</td>'+
+    '<td style="padding:8px 10px;text-align:right">'+nf(totF)+'</td>'+
+    '<td style="padding:8px 10px;text-align:right">'+(+media.toFixed(2))+'%</td><td colspan="2"></td></tr>';
+
+  // Tendencia semanal por taller. Solo talleres con volumen suficiente: con lotes chicos
+  // el porcentaje salta de 0 a 20 por dos prendas y la línea engaña más de lo que informa.
+  const MIN_LOTE_SEM = 200;
+  const semanas=[...new Set(base.map(r=>r.semana))].sort((a,b)=>a-b);
+  const topT=lista.slice(0,5).map(x=>x.t);
+  const colores=[TAUPE, SLATE, '#10B981', ROSE, TAN];
+  const ds=topT.map((t,i)=>{
+    const puntos=semanas.map(sem=>{
+      const rs=base.filter(r=>r.semana===sem && (r.servicio||'(sin taller)')===t);
+      const L=rs.reduce((s,r)=>s+r.loteContable,0);
+      if(L<MIN_LOTE_SEM) return null;
+      const ids=new Set(rs.map(r=>r.id));
+      const F=DER_ROWS.filter(d=>ids.has(d.idAuditoria)).reduce((s,d)=>s+d.cantidad,0);
+      return +(F/L*100).toFixed(2);
+    });
+    return {label:t, data:puntos, borderColor:colores[i%colores.length], backgroundColor:colores[i%colores.length],
+            borderWidth:2.5, tension:.3, pointRadius:4, pointBorderColor:'#fff', spanGaps:true};
+  }).filter(d=>d.data.some(v=>v!==null));
+
+  if(!ds.length){
+    document.getElementById('chUniTend').style.display='none';
+  }else{
+    CH_UNITEND = reg(new Chart(document.getElementById('chUniTend'), {
+      type:'line',
+      data:{labels:semanas.map(w=>'S'+w), datasets:ds},
+      options:{
+        plugins:{legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:12}},
+          tooltip:{callbacks:{label:c=> c.dataset.label+': '+c.parsed.y+'% con falla'}}},
+        scales:{y:{beginAtZero:true, ticks:{callback:v=>v+'%'}, title:{display:true,text:'% con falla'}}}
+      }
+    }));
+  }
 }
 
 function renderDefectos(wrows){
