@@ -148,6 +148,14 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       ✏️ <b>Estás corrigiendo la auditoría <span id="editId"></span>.</b> Cambia lo que necesites abajo y guarda.
       <button class="addbtn" id="btnCancelEdit" style="margin-top:8px;background:#fff;color:#c32030;border:1px solid #e63946">Cancelar corrección</button>
     </div>
+    <!-- Aviso cuando NO se pudieron leer los defectos ya guardados de la auditoría que se corrige.
+         Mientras esto esté visible, el botón Guardar queda trabado: guardar con el checklist vacío
+         reemplazaría el detalle real por nada. -->
+    <div id="avisoDetalle" style="display:none;margin-top:10px;padding:11px 13px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px;font-size:13px;color:#7a2318">
+      ⚠️ <b>No se pudieron leer los defectos ya registrados en esta auditoría.</b><br>
+      <span style="font-size:12.5px;color:#8d4b40">No guardes así: se perderían los defectos que ya estaban. Busca señal y vuelve a intentar, o cancela la corrección.</span>
+      <button class="addbtn" id="btnReintentarDetalle" style="margin-top:9px;width:100%;background:#fff;color:#7a2318;border:1px solid #e6a4a0;font-weight:700" onclick="reintentarDetalle()">Volver a intentar</button>
+    </div>
     <div id="modoReproceso" style="display:none;margin-top:10px;padding:10px 12px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px;font-size:13px;color:#7a2318">
       🔁 <b>Estás reprocesando la auditoría rechazada <span id="reprocesaDeId"></span>.</b> Esto crea una auditoría nueva — la rechazada original no se toca. Pon el total recibido y, si encuentras algún defecto, regístralo abajo normal.
       <button class="addbtn" id="btnCancelRepro" style="margin-top:8px;background:#fff;color:#c32030;border:1px solid #e63946">Cancelar reproceso</button>
@@ -183,6 +191,13 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <div style="font-size:12px;font-weight:700;color:#7a5a12;margin-bottom:8px">Esta OP tiene varias opciones — toca la que corresponde:</div>
       <div id="opSelectorList" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
+    <!-- Aviso de lotes rechazados esperando reproceso. Va aquí, pegado a la OP, porque es donde
+         la auditora realmente está mirando: nadie entra a "Ver auditorías" a buscar su reproceso. -->
+    <div id="opRechazos" style="display:none;margin:-6px 0 10px;padding:11px 13px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px">
+      <div style="font-size:12.5px;font-weight:700;color:#7a2318;margin-bottom:3px" id="opRechazosTitulo"></div>
+      <div style="font-size:11.5px;color:#8d4b40;margin-bottom:9px">Si vienes a reprocesar uno de estos, tócalo. Si vienes a auditar otra cosa de esta OP, ignora este aviso y sigue normal.</div>
+      <div id="opRechazosList" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
     <div class="grid">
       <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="EFI-102">
         <div class="hint" id="grupoHint">Escribe las 3 letras y el número: el "-" sale solo (ej. EFI102 → EFI-102).</div>
@@ -211,6 +226,14 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <div style="background:#d4ece6;border-radius:20px;height:14px;margin-top:8px;overflow:hidden">
           <div id="avanceBar" style="height:100%;width:0%;background:#2a9d8f;border-radius:20px;transition:width .3s"></div>
         </div>
+      </div>
+      <!-- CANDADO DEL PARCIAL. Se traba el guardado cuando lo que se está por registrar no cuadra
+           con lo ya auditado del mismo pedido: o es idéntico a algo ya guardado hoy (duplicado),
+           o la suma pasa del pedido total. No prohíbe: obliga a confirmarlo a propósito. -->
+      <div class="full" id="candadoParcial" style="display:none;border-radius:12px;padding:13px 15px;margin-top:4px">
+        <div id="candadoTitulo" style="font-size:13.5px;font-weight:800;margin-bottom:5px"></div>
+        <div id="candadoTexto" style="font-size:12.5px;line-height:1.6;margin-bottom:10px"></div>
+        <button type="button" class="addbtn" id="btnConfirmarParcial" style="width:100%;padding:11px 12px;font-weight:700"></button>
       </div>
       <div class="full"><label>Auditor *</label><input id="auditor" list="auditoras" autocomplete="off" placeholder="Escribe y selecciona tu nombre">
         <datalist id="auditoras"></datalist></div>
@@ -353,7 +376,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-01c · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-02c · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -593,7 +616,13 @@ async function calcOrdinal(){
   ecosVigentes().forEach(e=>{ if(!e.reproceso && e.key===key && e.proc===proc) previas++; });
   const n=previas+1; S.nAud=ordinalTexto(n);
   out.value=S.nAud;
-  h.className='hint'; h.textContent=previas? (previas+' auditoría(s) previa(s) de este tipo en el lote') : 'Primera auditoría de este tipo en el lote';
+  // El número solo no dice nada: hay que decir en palabras QUÉ significa, porque 1ra/2da/3ra son
+  // lotes distintos del mismo pedido y ahí es donde se confunden.
+  h.className='hint';
+  h.innerHTML = previas
+    ? ('<b>Es un LOTE NUEVO de este mismo pedido.</b> Ya hubo '+previas+' auditoría(s) antes. '
+       +'Escribe abajo solo las prendas que te llegaron <u>ahora</u>, no el pedido completo.')
+    : 'Primera auditoría de este lote en este proceso.';
   aplicarPedido();
   mostrarPanelPrevias();
   calcAvance();
@@ -659,6 +688,7 @@ function calcAvance(){
       otros[p].resultados[res]=(otros[p].resultados[res]||0)+1;
     }
   });
+  refrescarCandadoParcial();
   const otrosKeys=Object.keys(otros);
   if(otrosKeys.length){
     txt += `<hr style="border:none;border-top:1px solid #e3e9ef;margin:8px 0">`;
@@ -773,6 +803,7 @@ function refrescarCascada(){
   setDatalist('dlEstC', opcionesCombinadas('estiloC',{grupo:g,estiloL:e,po:p,color:c}));
   // Destino según todo lo anterior
   setDatalist('dlDest', opcionesCombinadas('destino',{grupo:g,estiloL:e,po:p,color:c,estiloC:ec}));
+  refrescarAvisoRechazos();
 }
 // Cuando una PO existe y es única, autocompletar lo que falte hacia abajo
 function autocompletarPorPO(){
@@ -791,7 +822,152 @@ function autocompletarPorPO(){
   aplicarCliente();
 }
 
-/* ===== Panel "quién auditó antes" ===== */
+/* ===== RECHAZOS QUE ESPERAN REPROCESO =====
+   Antes, el único camino para reprocesar era entrar a "Ver auditorías" y buscar la auditoría
+   rechazada. Nadie hacía eso: la auditora escribe la OP y empieza a auditar. Por eso el aviso
+   vive pegado al campo OP, que es donde sí está mirando.
+
+   Un rechazo se considera ATENDIDO (y por lo tanto no se avisa) cuando:
+     a) existe una auditoría que lo declara su origen (REPROCESA_DE = ese ID), o
+     b) existe una auditoría posterior del mismo lote marcada REPROCESO=SÍ. Esto cubre los 53
+        reprocesos hechos con el toggle manual viejo, que nunca guardaron el vínculo. Sin esta
+        segunda regla el aviso saldría en lotes ya resueltos hace semanas. */
+function fechaDe(r){ return fechaTxtForm(r&&r[1]); }
+function rechazoPendiente(r, todas){
+  if(!/RECH/.test(norm(r[27]))) return false;
+  const id=String(r[0]).trim();
+  if(todas.some(x=>String(x[49]||'').trim()===id)) return false;
+  const k=llaveLaxaFila(r), f=fechaDe(r);
+  return !todas.some(x=>String(x[0]).trim()!==id
+                     && norm(x[39]).indexOf('S')===0
+                     && llaveLaxaFila(x)===k
+                     && fechaDe(x)>=f);
+}
+// Rechazos pendientes de una OP. Se busca por dos vías porque la columna OP solo se guarda desde
+// hace poco: por OP guardada, y por el lote (grupo+estilo+color) que esa OP resuelve en la base
+// de OPs — así también aparecen los rechazos anteriores a que existiera el campo OP.
+function rechazosPendientesDeOP(op){
+  const opN=norm(op); if(!opN) return [];
+  const todas=filasValidas();
+  const claves=new Set(OPS_DB.filter(m=>norm(m.op)===opN).map(m=>llaveLaxa(m.grupo,m.estilo,m.color)));
+  return todas.filter(r=>(norm(r[50])===opN || claves.has(llaveLaxaFila(r))) && rechazoPendiente(r,todas));
+}
+// Rechazos pendientes del lote que ya está escrito en el formulario (sirve cuando llenan a mano,
+// sin pasar por la OP).
+function rechazosPendientesDeLote(){
+  if(!$('grupo').value || !$('estiloL').value || !$('color').value) return [];
+  const todas=filasValidas(), k=llaveLaxaActual();
+  return todas.filter(r=>llaveLaxaFila(r)===k && rechazoPendiente(r,todas));
+}
+function refrescarAvisoRechazos(){
+  const caja=$('opRechazos'); if(!caja) return;
+  // Dentro de un reproceso o de una corrección el aviso sobra: ya se está trabajando sobre eso.
+  const listaEl=$('opRechazosList');
+  if(S.reprocesaDe || S.editId){ caja.style.display='none'; if(listaEl) listaEl.dataset.firma=''; return; }
+  // Si ya se sabe qué lote es (grupo+estilo+color), se muestran SOLO los rechazos de ese lote.
+  // Si todavía no se eligió la variante, se muestran los de toda la OP, para que se vea de una
+  // que el pedido trae algo pendiente. Así nunca se ofrece reprocesar el color equivocado.
+  const delLote=rechazosPendientesDeLote();
+  const base = delLote.length ? delLote : rechazosPendientesDeOP($('opInput')?$('opInput').value:'');
+  const vistos=new Set(); const lista=[];
+  base.forEach(r=>{ const id=String(r[0]).trim(); if(!vistos.has(id)){ vistos.add(id); lista.push(r); } });
+  if(!lista.length){ caja.style.display='none'; if(listaEl) listaEl.dataset.firma=''; return; }
+  lista.sort((a,b)=>String(fechaDe(b)).localeCompare(String(fechaDe(a))));
+  const cont=$('opRechazosList');
+  // Esta función se dispara con cada tecla del formulario. Si volviera a dibujar los botones cada
+  // vez, el dedo de la auditora tocaría un botón que ya fue reemplazado y no pasaría nada — el
+  // mismo problema que ya se había arreglado en el selector de OP. Si la lista es idéntica, no se
+  // toca el DOM.
+  const firma=lista.map(r=>String(r[0]).trim()).join(',');
+  if(cont.dataset.firma===firma && caja.style.display==='block') return;
+  $('opRechazosTitulo').textContent = lista.length===1
+    ? '⚠️ Este lote quedó RECHAZADO y todavía no se reprocesa'
+    : '⚠️ Hay '+lista.length+' auditorías rechazadas de este pedido sin reprocesar';
+  cont.innerHTML=''; cont.dataset.firma=firma;
+  lista.forEach(r=>{
+    const b=document.createElement('button'); b.type='button';
+    b.style.cssText='text-align:left;padding:10px 12px;border-radius:8px;border:1px solid #e6a4a0;background:#fff;font-size:13px;color:#7a2318;cursor:pointer;line-height:1.45';
+    const det=[r[11]||'', r[3]||'', fechaDe(r), r[31]||''].filter(Boolean).join(' · ');
+    b.innerHTML='🔁 <b>Reprocesar '+esc(String(r[0]))+'</b><br><span style="color:#8d4b40;font-size:11.5px">'+esc(det)+'</span>';
+    b.onclick=()=>{ $('opRechazos').style.display='none'; iniciarReproceso(String(r[0]).trim()); };
+    cont.appendChild(b);
+  });
+  caja.style.display='block';
+}
+/* ===== CANDADO DEL PARCIAL =====
+   La 1ra, 2da y 3ra auditoría son LOTES DISTINTOS del mismo pedido, no la misma prenda vista
+   varias veces. En el histórico eso se perdió: hay 12 casos de la misma auditora guardando el
+   mismo lote, el mismo día, con la misma cantidad, dos y tres veces; y 52 lotes donde la suma de
+   lo auditado pasa del pedido total (uno llegó al 399%).
+   Este candado no prohíbe nada: cuando lo que se va a guardar no cuadra, traba el botón Guardar
+   hasta que la auditora confirme a propósito que sabe lo que está registrando. */
+function firmaParcial(){
+  return [llaveActual(), norm(S.proceso), v('fecha'), String(parseInt(v('recibido'))||0)].join('#');
+}
+function detectarConflictoParcial(){
+  if(S.editId || S.reprocesaDe) return null;            // corregir y reprocesar no crean parciales
+  if(!loteCompleto() || !S.proceso) return null;
+  const rec=parseInt(v('recibido'))||0;
+  if(!rec) return null;
+  const key=llaveActual(), proc=norm(S.proceso), hoy=v('fecha');
+  const previas=filasValidas().filter(r=>llaveFila(r)===key && norm(r[3])===proc && norm(r[39]).indexOf('S')!==0);
+  // (a) DUPLICADO: mismo lote, mismo día, misma cantidad recibida
+  const dup=previas.find(r=>fechaDe(r)===hoy && (parseInt(r[14])||0)===rec);
+  if(dup) return {tipo:'duplicado', id:String(dup[0]).trim(), aud:dup[31]||'', rec:rec};
+  // (b) EXCESO: lo ya auditado más este lote pasa del pedido
+  const ya=sumaLotesPrevios(previas);
+  let pedRef=0;
+  previas.forEach(r=>{ const p=Number(r[13])||0; if(p>pedRef) pedRef=p; });
+  const pedido = pedRef || (parseInt(v('pedido'))||0);
+  if(pedido && (ya+rec) > pedido) return {tipo:'exceso', ya:ya, rec:rec, pedido:pedido, total:ya+rec};
+  return null;
+}
+/* Cuántas prendas de este pedido se auditaron REALMENTE hasta ahora.
+   No se usa LOTE_CONTABLE aquí a propósito: el backend marca como "REPETIDO" (y pone LOTE_CONTABLE
+   en 0) TODA auditoría posterior del mismo grupo/estilo/color, sin distinguir un duplicado de un
+   parcial nuevo. Hoy hay 104 filas así, y 45 de ellas son parciales reales con cantidad distinta:
+   lotes que sí se auditaron pero cuentan como cero. Por eso el avance nunca sube aunque se audite
+   más, y de ahí sale buena parte de la confusión.
+   Mientras eso no se corrija en el backend, aquí se suma el total recibido de cada parcial y se
+   descarta solo lo que es duplicado de verdad: misma fecha y misma cantidad exacta. */
+function sumaLotesPrevios(previas){
+  const vistos=new Set(); let suma=0;
+  previas.forEach(r=>{
+    if(norm(r[39]).indexOf('S')===0) return;   // un reproceso no trae prendas nuevas al pedido
+    const rec=parseInt(r[14])||0; if(!rec) return;
+    const huella=fechaDe(r)+'#'+rec;
+    if(vistos.has(huella)) return;
+    vistos.add(huella); suma+=rec;
+  });
+  return suma;
+}
+function parcialConfirmado(){ return S.parcialOK && S.parcialOK===firmaParcial(); }
+function refrescarCandadoParcial(){
+  const caja=$('candadoParcial'); if(!caja) return;
+  const c=detectarConflictoParcial();
+  if(!c){ caja.style.display='none'; return; }
+  const ok=parcialConfirmado();
+  const tit=$('candadoTitulo'), txt=$('candadoTexto'), btn=$('btnConfirmarParcial');
+  if(c.tipo==='duplicado'){
+    caja.style.background='#fdeceb'; caja.style.border='1px solid #e6a4a0';
+    tit.style.color='#7a2318'; txt.style.color='#8d4b40';
+    tit.textContent='🔒 Esto parece la misma auditoría de nuevo';
+    txt.innerHTML='Hoy ya se guardó <b>'+esc(c.id)+'</b> con este mismo lote y las mismas <b>'+c.rec+' prendas</b>'
+      +(c.aud?(' (por '+esc(String(c.aud))+')'):'')+'.<br><br>Si es <b>otro parcial distinto</b>, el total recibido tiene que ser el de <u>este</u> lote, no el mismo de antes. Si te equivocaste, corrige el número arriba.';
+    btn.textContent = ok ? '✓ Confirmado: es otro lote distinto' : 'Sí, es otro lote distinto — desbloquear';
+  }else{
+    caja.style.background='#fff4e0'; caja.style.border='1px solid #e9c46a';
+    tit.style.color='#7a5a12'; txt.style.color='#7a5a12';
+    tit.textContent='🔒 Con este lote se pasa del pedido';
+    txt.innerHTML='El pedido es de <b>'+c.pedido+' prendas</b>. Ya se auditaron <b>'+c.ya+'</b> y con tu lote de <b>'+c.rec+'</b> sumarían <b>'+c.total+'</b>.<br><br>Revisa que el total recibido sea solo <b>lo que llegó ahora</b>, no el pedido completo.';
+    btn.textContent = ok ? '✓ Confirmado: el pedido creció' : 'Está bien, confirmo el número — desbloquear';
+  }
+  btn.style.background = ok ? '#eef7f4' : '#fff';
+  btn.style.color = ok ? '#1c7a6e' : (c.tipo==='duplicado' ? '#7a2318' : '#7a5a12');
+  btn.style.border = '1px solid '+(ok ? '#bfe3da' : (c.tipo==='duplicado' ? '#e6a4a0' : '#e9c46a'));
+  caja.style.display='block';
+}
+
 function mostrarPanelPrevias(){
   const panel=$('panelPrev'), body=$('panelPrevBody');
   if(!loteCompleto()){ panel.style.display='none'; return; }
@@ -799,12 +975,29 @@ function mostrarPanelPrevias(){
   const previas=filasValidas().filter(r=>llaveFila(r)===key);
   if(!previas.length){ panel.style.display='none'; return; }
   // Cada fila: AF=31 auditor, D=3 proceso, B=1 fecha, AB=27 resultado_final, K=10 PO, M=12 destino
+  // Se muestra la CANTIDAD de cada parcial: sin eso no hay forma de ver que la 1ra, 2da y 3ra
+  // fueron lotes distintos, ni de notar que alguien repitió la misma cifra.
+  const acum=sumaLotesPrevios(previas);
+  const vistosPanel=new Set();
   const items=previas.map(r=>{
-    const aud=r[31]||'—', proc=r[3]||'—', fec=(r[1]||'').substring(0,10), res=r[27]||'—';
+    const aud=r[31]||'—', proc=r[3]||'—', fec=fechaDe(r)||'—', res=r[27]||'—';
     const po=r[10]||'—', dest=r[12]||'—';
-    return `<div>• <b>${aud}</b> · ${proc} · ${fec} · <span style="font-weight:600">${res}</span><br><span style="color:#778;font-size:12px;padding-left:12px">PO ${po} · Destino ${dest}</span></div>`;
+    const nro=r[2]||'—';
+    const esRepro=norm(r[39]).indexOf('S')===0;
+    const rec=parseInt(r[14])||0;
+    // marca visible del duplicado: mismo día y misma cantidad que otra fila ya listada
+    let dup=false;
+    if(!esRepro && rec){ const hu=fec+'#'+rec; if(vistosPanel.has(hu)) dup=true; else vistosPanel.add(hu); }
+    const etq=esRepro
+      ? '<span style="background:#fdeceb;color:#7a2318;border-radius:6px;padding:1px 6px;font-size:11.5px;font-weight:700">Reproceso</span>'
+      : '<span style="background:#e6eef8;color:#1d3557;border-radius:6px;padding:1px 6px;font-size:11.5px;font-weight:700">'+esc(String(nro))+'</span>';
+    const marca=dup?' <span style="background:#fff4e0;color:#7a5a12;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">repetida — no suma</span>':'';
+    return `<div style="padding:5px 0;border-bottom:1px solid #dfe7f1${dup?';opacity:.62':''}">${etq} <b>${esc(String(rec))} prendas</b> · ${esc(fec)}${marca}<br><span style="color:#778;font-size:12px">${esc(String(aud))} · ${esc(String(proc))} · <b>${esc(String(res))}</b> · PO ${esc(String(po))} · ${esc(String(dest))}</span></div>`;
   }).join('');
-  body.innerHTML=items;
+  const ped=previas.reduce((m,r)=>Math.max(m,Number(r[13])||0),0) || (parseInt(v('pedido'))||0);
+  const resumen = '<div style="padding:7px 0 4px;font-size:13px"><b>Suma de los lotes ya auditados: '+acum+' prendas</b>'
+    + (ped ? (' de '+ped+' del pedido') : '') + '</div>';
+  body.innerHTML=items+resumen;
   panel.style.display='block';
 }
 
@@ -938,7 +1131,7 @@ function fillTaller(proc){
 }
 
 /* ===== ESTADO ===== */
-const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null,pedidoDeOP:false,liquidado:false};
+const S={nAud:'',proceso:'',int_ext:'',nivel:'1.5',defs:[],ders:[],override:false,licencia:false,reproceso:false,fotosMed:[],fotosPro:[],codTela:'',descTela:'',reprocesaDe:null,pedidoDeOP:false,liquidado:false,opResuelta:'',parcialOK:'',detalleCargado:true};
 let AUD_CACHE=null;       // filas de la hoja AUDITORÍAS (para ordinal/pedido/panel)
 let ordTimer=null;
 let defId=0;
@@ -1007,7 +1200,7 @@ function fijarReproWrap(mostrar){
 }
 function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
 function liberarCamposOP(){
-  CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; S.pedidoDeOP=false;
+  CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; S.pedidoDeOP=false; S.opResuelta='';
   const gh=$('grupoHint'); if(gh) gh.style.display='';
 }
 function autocompletarDesdeOP(m){
@@ -1015,6 +1208,7 @@ function autocompletarDesdeOP(m){
   lockField('color',m.color); lockField('destino',m.destino); lockField('pedido',m.pedido);
   S.codTela=m.codTela||''; S.descTela=m.descTela||'';
   S.pedidoDeOP=true; // el pedido vino de la base de OPs — que aplicarPedido() no lo desbloquee por su cuenta
+  S.opResuelta=($('opInput').value||'').trim(); // esta OP ya quedó resuelta a una variante concreta
   const gh=$('grupoHint'); if(gh) gh.style.display='none'; // esa instrucción es para cuando se tipea a mano
   aplicarCliente(); refrescarCascada(); validate();
   pedirOrdinal(); // los campos se llenaron por código (lockField), no por tecleo, así que hay que
@@ -1028,8 +1222,14 @@ function buscarOP(){
   if(!op){
     ocultarSelectorOP(); liberarCamposOP();
     if(h){ h.className='hint'; h.textContent='Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.'; }
-    validate(); return;
+    refrescarAvisoRechazos(); validate(); return;
   }
+  // Ya se eligió una variante de esta OP: no volver a abrir el selector.
+  // Antes sí lo reabría, porque este mismo buscador corre en el `blur` del campo OP — o sea,
+  // justo cuando la auditora aparta el dedo del campo para tocar otro botón. El selector
+  // reaparecía, empujaba todo hacia abajo, y el toque terminaba cayendo en otro lugar.
+  // Para cambiar de variante hay que borrar la OP y volver a escribirla, como siempre.
+  if(S.opResuelta===op){ refrescarAvisoRechazos(); validate(); return; }
   const matches=OPS_DB.filter(r=>r.op===op);
   if(matches.length>1){
     // Si ya está mostrando exactamente estas opciones, no tocar nada (evita que un
@@ -1041,7 +1241,7 @@ function buscarOP(){
   if(matches.length===0){
     liberarCamposOP();
     if(h){ h.className='hint warn'; h.textContent='OP no encontrada en la base (puede ser anterior a 2025). Completa los datos abajo a mano.'; }
-    validate();
+    refrescarAvisoRechazos(); validate();
   } else if(matches.length===1){
     autocompletarDesdeOP(matches[0]);
   } else {
@@ -1051,16 +1251,35 @@ function buscarOP(){
     matches.forEach(m=>{
       const b=document.createElement('button'); b.type='button';
       b.style.cssText='text-align:left;padding:9px 12px;border-radius:8px;border:1px solid #e9c46a;background:#fff;font-size:13px;cursor:pointer';
-      b.textContent=[m.color,m.destino?('Destino '+m.destino):'',m.po?('PO '+m.po):'',(m.pedido!=null&&m.pedido!=='')?(m.pedido+' prendas'):''].filter(Boolean).join(' · ');
+      const desc=[m.color,m.destino?('Destino '+m.destino):'',m.po?('PO '+m.po):'',(m.pedido!=null&&m.pedido!=='')?(m.pedido+' prendas'):''].filter(Boolean).join(' · ');
+      // Marca la variante que tiene un rechazo esperando reproceso, para que se vea ANTES de elegir.
+      const todasFV=filasValidas();
+      const kv=llaveLaxa(m.grupo,m.estilo,m.color);
+      const pend=todasFV.filter(r=>llaveLaxaFila(r)===kv && rechazoPendiente(r,todasFV)).length;
+      if(pend){
+        b.style.borderColor='#e6a4a0'; b.style.background='#fdeceb'; b.style.color='#7a2318';
+        b.innerHTML=esc(desc)+'<br><span style="font-size:11.5px;font-weight:700">⚠️ '+pend+' rechazo(s) sin reprocesar</span>';
+      }else{
+        b.textContent=desc;
+      }
       b.onclick=()=>{ ocultarSelectorOP(); autocompletarDesdeOP(m); };
       list.appendChild(b);
     });
     sel.style.display='block';
   }
+  refrescarAvisoRechazos();
 }
 let opTimer=null;
 $('opInput').addEventListener('input',()=>{ clearTimeout(opTimer); opTimer=setTimeout(buscarOP,350); });
 $('opInput').addEventListener('blur',buscarOP);
+
+// Confirmar el parcial: guarda la firma EXACTA (lote+proceso+fecha+cantidad). Si la auditora
+// cambia el total recibido después de confirmar, la firma deja de coincidir y el candado vuelve a
+// trabar — no se puede desbloquear una vez y meter cualquier otro número.
+$('btnConfirmarParcial').onclick=()=>{
+  S.parcialOK = parcialConfirmado() ? '' : firmaParcial();
+  refrescarCandadoParcial(); validate();
+};
 
 /* ===== reproceso (solo visible/editable dentro del flujo dedicado "Reprocesar") ===== */
 $('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;recalc();};
@@ -1106,6 +1325,7 @@ function recalc(){
   const totD=S.ders.reduce((s,b)=>s+totalBloque(b),0); const td=$('totDer'); if(td)td.textContent=totD;
   refrescarBadgesCategorias();
   refrescarResumen();
+  refrescarCandadoParcial();
   const v=$('verdict'),vt=$('vText'),ov=$('ovCard'); v.className='verdict';
   if(!lote){vt.textContent='—';ov.classList.remove('show');}
   else if(lic){v.classList.add('ap');vt.textContent='APROBADO (LICENCIA)';ov.classList.remove('show');resetOv();}
@@ -1544,6 +1764,17 @@ function calcularFaltantes(){
   if(S.proceso&&S.int_ext==='EXTERNA'&&!v('taller')) faltan.push('Taller');
   if(S.override&&(!v('ovWho')||!v('ovWhy'))) faltan.push('Datos del override');
   if(S.reprocesaDe&&!v('motivoReproceso')) faltan.push('Motivo del reproceso');
+  // Corrección con los defectos sin leer: no se puede guardar, porque al corregir el formulario
+  // reemplaza el detalle y guardarlo vacío borraría lo ya registrado.
+  if(S.editId && S.detalleCargado===false) faltan.push('Recuperar los defectos ya guardados (toca "Volver a intentar")');
+  // Candado del parcial: si lo que se va a guardar choca con lo ya auditado del pedido, no se
+  // guarda hasta que la auditora toque el botón de confirmación (ver refrescarCandadoParcial).
+  const conflicto=detectarConflictoParcial();
+  if(conflicto && !parcialConfirmado()){
+    faltan.push(conflicto.tipo==='duplicado'
+      ? 'Confirmar que este lote es distinto al ya auditado hoy'
+      : 'Confirmar el total recibido (se pasa del pedido)');
+  }
   return faltan;
 }
 // Se sigue llamando en cada cambio del formulario (para validaciones visuales normales),
@@ -1649,6 +1880,9 @@ function armarPayload(){
     lote_real:recibido,licencia:S.licencia?'SÍ':'NO',nivel_aql:parseFloat(S.nivel),
     cod_tela:S.codTela||'',desc_tela:S.descTela||'',
     motivo_reproceso:v('motivoReproceso')||'',reprocesa_de:S.reprocesaDe||'',op:v('opInput')||'',liquidado:S.liquidado?'SÍ':'NO',
+    // La auditora confirmó a propósito que este lote es distinto (candado del parcial). El backend
+    // lo respeta y no lo marca como REPETIDO, aunque coincida fecha y cantidad con otro.
+    parcial_confirmado: parcialConfirmado(),
     override:S.override?'SÍ':'NO',override_autoriza:v('ovWho'),override_motivo:v('ovWhy'),
     muestra_medidas:parseInt(v('medMuestra'))||'',def_medidas:parseInt(v('medDef'))||'',resultado_medidas:v('medRes'),
     auditor:v('auditor'),
@@ -1847,10 +2081,26 @@ async function cargarDetalleParaEditar(id){
     aplicarDetalleDesdeSheet(S.ders, derRows.filter(r=>String(r[0]).trim()===idTxt));
     repintarChecklistDefectos();
     pintarChecklistConSecciones($('derChecklist'), [['Derivados',S.ders]]);
+    S.detalleCargado=true;
+    const av=$('avisoDetalle'); if(av) av.style.display='none';
     recalc();
   }catch(e){
-    toast('No se pudieron recargar los defectos/derivados ya guardados — revísalos con cuidado antes de guardar','err');
+    // Antes esto solo mostraba un toast de 3 segundos y dejaba guardar igual. Como al corregir el
+    // formulario reemplaza el detalle, guardar con el checklist vacío borraba los defectos ya
+    // registrados. Ahora se traba el guardado hasta poder leerlos.
+    S.detalleCargado=false;
+    const av=$('avisoDetalle'); if(av) av.style.display='block';
+    toast('No se pudieron leer los defectos ya guardados — no guardes hasta recuperarlos','err');
   }
+}
+// Reintento manual de la lectura de defectos/derivados al corregir
+async function reintentarDetalle(){
+  if(!S.editId) return;
+  const btn=$('btnReintentarDetalle'); if(btn){ btn.disabled=true; btn.textContent='Intentando…'; }
+  await cargarDetalleParaEditar(S.editId);
+  if(btn){ btn.disabled=false; btn.textContent='Volver a intentar'; }
+  if(S.detalleCargado) toast('Defectos recuperados ✓','ok');
+  validate();
 }
 
 async function aprobarMedidaRapido(id, btnEl){
@@ -1893,6 +2143,7 @@ async function cargarParaEditar(id){
   const derCardEd=$('derivadosCard'); if(derCardEd) derCardEd.style.display = esCosturaEd ? 'block' : 'none';
   generarChecklistDefectos();
   generarChecklistDerivados();
+  S.detalleCargado=true;   // se pone en false solo si la lectura falla
   await cargarDetalleParaEditar(id);
   // medidas
   $('medMuestra').value=r[28]||''; $('medDef').value=r[29]||''; $('medRes').value=r[30]||'';
