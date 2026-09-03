@@ -583,7 +583,14 @@ async function cargarDatos(){
       const anio = numv(c, COL.ANIO) || (fecha ? fecha.getFullYear() : null);
       const semana = numv(c, COL.SEMANA);
       const mes = fecha ? fecha.getMonth() : null;
-      const intext = strv(c, COL.INT_EXT).toUpperCase(); // INTERNA / EXTERNA
+      // CRÍTICO: desde el Paso 14 la hoja guarda INTERNO/EXTERNO (masculino), que es el
+      // formato del Sheet maestro y del dashboard de gerencia. Las 298 filas anteriores
+      // tienen INTERNA/EXTERNA. Todo el resto de este archivo compara contra 'INTERNA', así
+      // que se normaliza aquí: si no, con el formato nuevo ninguna fila entraría en los
+      // paneles y el tablero completo se quedaría en cero sin avisar.
+      const intCrudo = strv(c, COL.INT_EXT).toUpperCase();
+      const intext = intCrudo.indexOf('INTERN')===0 ? 'INTERNA'
+                   : (intCrudo.indexOf('EXTERN')===0 ? 'EXTERNA' : intCrudo);
       const resultado = strv(c, COL.RESULTADO_FINAL).toUpperCase();
       const servicio = strv(c, COL.SERVICIO);
       const loteContable = numv(c, COL.LOTE_CONTABLE);
@@ -592,7 +599,12 @@ async function cargarDatos(){
       const idAuditoria = strv(c, 0);
       const cliente = strv(c, COL.CLIENTE);
       // Normalizamos "SI"/"SÍ" (el Sheet trae ambas formas, con y sin tilde) a un solo valor comparable.
-      const reproceso = strv(c, COL.REPROCESO).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      // Tolera los dos formatos que conviven en la hoja: las filas anteriores al Paso 14
+      // guardan 'SÍ'/'NO' y las nuevas guardan 1/0 (que es lo que entiende el Sheet maestro,
+      // porque lee estas columnas como número). Se normaliza a 'SI'/'NO' para el resto del
+      // código, así no hay que tocar ningún cálculo ni migrar el histórico.
+      const reproCrudo = strv(c, COL.REPROCESO).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const reproceso = (reproCrudo && reproCrudo!=='0' && reproCrudo!=='NO' && reproCrudo!=='FALSE') ? 'SI' : 'NO';
       if(!anio || !semana) return;
       // Campos extra para el drill-down: sin ellos no se puede responder "¿en qué taller,
       // en qué estilo y en qué tela aparece este defecto?", que es lo que pide el asesor.

@@ -382,7 +382,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-02d · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-02e · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -553,6 +553,21 @@ function ecoLimpiarSinId(){
   try{ localStorage.setItem(ECO_KEY, JSON.stringify(ecoLeer().filter(e=>!!e.id))); }catch(e){}
 }
 function norm(v){ return String(v==null?'':v).trim().toUpperCase(); }
+/* Lee una columna de SÍ/NO tolerando los dos formatos que conviven en la hoja.
+   Desde el Paso 14 el formulario guarda 1/0 (es lo que entiende el Sheet maestro, que lee
+   estas columnas como número: 'SÍ' le llegaba como 0 y por eso los reprocesos no se
+   reconocían). Las 298 filas anteriores siguen con 'SÍ'/'NO', así que se aceptan ambos y
+   no hay que migrar nada. */
+function esSi(v){
+  const t=norm(v);
+  if(!t) return false;
+  return t!=='0' && t!=='NO' && t!=='FALSE' && t!=='N';
+}
+/* Número del parcial: '2da' o 2 dan lo mismo. */
+function numParcial(v){
+  const n=parseInt(String(v==null?'':v).replace(/[^0-9]/g,''),10);
+  return (isFinite(n)&&n>0)?n:0;
+}
 // Llave de lote = grupo+estilo_lives+estilo_cliente+color+po+destino (col H,I,J,L,K,M = idx 7,8,9,11,10,12)
 // Incluye PO y Destino de nuevo: un mismo estilo/color despachado a destinos distintos
 // (ej. Ecom vs Canadá) o con PO distinto son lotes DIFERENTES, aunque compartan estilo/color.
@@ -615,7 +630,7 @@ async function calcOrdinal(){
   let previas=0;
   (AUD_CACHE||[]).forEach(r=>{
     if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return;
-    if(norm(r[39]).indexOf('S')===0) return; // AN=39 REPROCESO: no cuenta como un parcial nuevo, es la corrección de uno ya contado
+    if(esSi(r[39])) return; // AN=39 REPROCESO: no cuenta como un parcial nuevo, es la corrección de uno ya contado
     if(llaveFila(r)===key && norm(r[3])===proc) previas++;
   });
   // Suma las auditorías guardadas hace segundos que el Sheet todavía no devuelve (ver ecoLeer)
@@ -644,7 +659,7 @@ function calcAvance(){
   let lotePrevio=0, pedidoRef=0;
   (AUD_CACHE||[]).forEach(r=>{
     if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return;
-    if(norm(r[39]).indexOf('S')===0) return; // AN=39 REPROCESO: no vuelve a sumar la misma prenda ya contada en la auditoría rechazada
+    if(esSi(r[39])) return; // AN=39 REPROCESO: no vuelve a sumar la misma prenda ya contada en la auditoría rechazada
     if(llaveFila(r)===key && norm(r[3])===proc){
       // computable: AM = idx 38 (1 = auditoría real). Solo sumamos reales.
       const comp = (r[38]===''||r[38]==null) ? 1 : (Number(r[38])||0);
@@ -685,7 +700,7 @@ function calcAvance(){
   const otros={};
   (AUD_CACHE||[]).forEach(r=>{
     if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return;
-    if(norm(r[39]).indexOf('S')===0) return; // reprocesos no cuentan aquí tampoco
+    if(esSi(r[39])) return; // reprocesos no cuentan aquí tampoco
     if(llaveFila(r)===key && norm(r[3])!==proc){
       const p=r[3]||'—';
       if(!otros[p]) otros[p]={n:0, resultados:{}};
@@ -845,7 +860,7 @@ function rechazoPendiente(r, todas){
   if(todas.some(x=>String(x[49]||'').trim()===id)) return false;
   const k=llaveLaxaFila(r), f=fechaDe(r);
   return !todas.some(x=>String(x[0]).trim()!==id
-                     && norm(x[39]).indexOf('S')===0
+                     && esSi(x[39])
                      && llaveLaxaFila(x)===k
                      && fechaDe(x)>=f);
 }
@@ -927,7 +942,7 @@ function detectarConflictoParcial(){
   const rec=parseInt(v('recibido'))||0;
   if(!rec) return null;
   const key=llaveActual(), proc=norm(S.proceso), hoy=v('fecha');
-  const previas=filasValidas().filter(r=>llaveFila(r)===key && norm(r[3])===proc && norm(r[39]).indexOf('S')!==0);
+  const previas=filasValidas().filter(r=>llaveFila(r)===key && norm(r[3])===proc && !esSi(r[39]));
   // (a) DUPLICADO: mismo lote, mismo día, misma cantidad recibida
   const dup=previas.find(r=>fechaDe(r)===hoy && (parseInt(r[14])||0)===rec);
   if(dup) return {tipo:'duplicado', id:String(dup[0]).trim(), aud:dup[31]||'', rec:rec};
@@ -950,7 +965,7 @@ function detectarConflictoParcial(){
 function sumaLotesPrevios(previas){
   const vistos=new Set(); let suma=0;
   previas.forEach(r=>{
-    if(norm(r[39]).indexOf('S')===0) return;   // un reproceso no trae prendas nuevas al pedido
+    if(esSi(r[39])) return;   // un reproceso no trae prendas nuevas al pedido
     const rec=parseInt(r[14])||0; if(!rec) return;
     const huella=fechaDe(r)+'#'+rec;
     if(vistos.has(huella)) return;
@@ -1000,7 +1015,7 @@ function mostrarPanelPrevias(){
     const aud=r[31]||'—', proc=r[3]||'—', fec=fechaDe(r)||'—', res=r[27]||'—';
     const po=r[10]||'—', dest=r[12]||'—';
     const nro=r[2]||'—';
-    const esRepro=norm(r[39]).indexOf('S')===0;
+    const esRepro=esSi(r[39]);
     const rec=parseInt(r[14])||0;
     // marca visible del duplicado: mismo día y misma cantidad que otra fila ya listada
     let dup=false;
@@ -1762,7 +1777,8 @@ function calcularFaltantes(){
      Esta última condición es la red de seguridad: aunque el N° salga mal por una diferencia de
      tipeo en PO/estilo cliente/destino, si el lote ya fue auditado antes no se vuelve a pedir foto. */
   const esReproceso = !!S.reprocesaDe;
-  const ordinalDicePrimera = (S.nAud==='' || S.nAud==='1ra');
+  // Tolera los dos formatos: el histórico guarda '1ra' y desde el Paso 14 se guarda '1'.
+  const ordinalDicePrimera = (S.nAud==='' || numParcial(S.nAud)===1) && S.nAud!=='Reproceso';
   const fotoMedOK = editando || esReproceso || !ordinalDicePrimera || loteYaAuditadoAntes() || S.fotosMed.length>0;
 
   const faltan=[];
@@ -2147,7 +2163,9 @@ async function cargarParaEditar(id){
   // proceso
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
   // N° de auditoría: conservar el mismo de la auditoría original (col C = idx 2)
-  S.nAud = r[2] || '';
+  // r[2] puede venir como '2da' (histórico) o como 2 (Paso 14). Se muestra siempre en
+  // el formato que la auditora reconoce, sin importar cómo esté guardado.
+  S.nAud = esSi(r[39]) ? 'Reproceso' : (numParcial(r[2]) ? ordinalTexto(numParcial(r[2])) : (r[2] || ''));
   const outOrd=$('ordinal'); if(outOrd) outOrd.value = S.nAud || '—';
   const ordH=$('ordHint'); if(ordH) ordH.textContent='N° original de esta auditoría (no cambia al corregir).';
   S.int_ext = (norm(proc).indexOf('INTERNO')>=0) ? 'INTERNA' : (proc?'EXTERNA':'');
@@ -2169,8 +2187,8 @@ async function cargarParaEditar(id){
   $('comentario').value=r[40]||'';
   // licencia / reproceso — Reproceso ya no se muestra al corregir (solo existe en el flujo dedicado
   // "Reprocesar"); si esta auditoría ya lo traía marcado de antes, el valor se conserva igual al guardar.
-  S.licencia=(norm(r[16]).indexOf('S')===0); if($('licSwitch')) $('licSwitch').checked=S.licencia;
-  S.reproceso=(norm(r[39]).indexOf('S')===0); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
+  S.licencia=(esSi(r[16])); if($('licSwitch')) $('licSwitch').checked=S.licencia;
+  S.reproceso=(esSi(r[39])); if($('reproSwitch')) $('reproSwitch').checked=S.reproceso;
   fijarReproWrap(false);
   // marcar modo edición (y limpiar cualquier resto de un modo reproceso que hubiera quedado a medias)
   S.editId=id; S.reprocesaDe=null;
