@@ -131,7 +131,34 @@ function parseCSV(txt){
   if(campo!=='' || fila.length){ fila.push(campo); filas.push(fila); }
   return filas;
 }
-async function gviz(tab){
+/* URL del backend del formulario. Se usa para leer las hojas por Apps Script en vez de
+   por gviz — ver el comentario de leerHoja(). */
+const APP_URL='https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l4BmcQWmVl2BG5LmEr1drr8qy1dUbmngb6Qrq7DsYU/exec';
+
+/* Lectura por Apps Script con getDisplayValues().
+   POR QUÉ: gviz le asigna UN tipo a cada columna y devuelve vacías las celdas que no calzan.
+   La columna PO tiene mayoría de números, así que los PO con letras o espacios
+   ("505221 USA", "LIVES-S-117-2") llegaban vacíos y el reporte los mostraba como "—".
+   getDisplayValues() entrega el texto exacto que se ve en la celda, sin tipado ni
+   conversiones: es la única lectura que no puede perder un dato.
+   Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
+function leerHojaScript(tab){
+  return new Promise(function(resolve,reject){
+    const fn='cbHoja'+Math.random().toString(36).slice(2);
+    const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 20000);
+    function limpiar(){ clearTimeout(t); try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
+    window[fn]=function(res){
+      limpiar();
+      if(res && res.ok && res.rows) resolve(res.rows.map(f=>f.map(c=>String(c==null?'':c))));
+      else reject(new Error((res&&res.error)||'respuesta inválida'));
+    };
+    const sc=document.createElement('script');
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+'&callback='+fn+'&_='+Date.now();
+    sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
+    document.body.appendChild(sc);
+  });
+}
+async function gvizCSV(tab){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
   const r=await fetch(url,{cache:'no-store'});
   if(!r.ok) throw new Error('No se pudo leer la hoja '+tab+' (HTTP '+r.status+')');
@@ -140,6 +167,13 @@ async function gviz(tab){
   const filas=parseCSV(t);
   if(!filas.length) throw new Error('La hoja '+tab+' volvió vacía');
   return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));   // slice(1) descarta el encabezado
+}
+
+/* Enrutador: primero Apps Script (no puede perder datos), y si falla se cae a gviz CSV
+   para no dejar la pantalla en blanco. */
+async function gviz(tab){
+  try{ return await leerHojaScript(tab); }
+  catch(e){ console.warn('lectura por Apps Script falló, usando gviz CSV:', e); return await gvizCSV(tab); }
 }
 function norm(s){return String(s||'').trim().toLowerCase();}
 // Convierte fechas de gviz "Date(2026,5,15)" a "2026-06-15". Si ya es texto normal, lo deja.
