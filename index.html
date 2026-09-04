@@ -28,7 +28,8 @@
   --bg:#F1F6F4; --ink:#0E3B36; --muted:#5F726C; --line:#DCE5E2;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);font-family:'Barlow',system-ui,sans-serif;color:var(--ink);padding-bottom:96px}
+body{margin:0;background:var(--bg);font-family:'Barlow',system-ui,sans-serif;color:var(--ink);
+     padding-bottom:0}
 header{background:var(--petrol);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:20;
        border-bottom:3px solid var(--emer);box-shadow:0 2px 10px rgba(14,59,54,.18)}
 header .hbrand{display:flex;align-items:center;gap:14px}
@@ -109,7 +110,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);ba
 .switch input:checked+.slider:before{transform:translateX(22px)}
 .ov{display:none}.ov.show{display:block}
 .ov-card{display:none}.ov-card.show{display:block}
-.bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);z-index:30}
+/* Barra de veredicto y guardar: SIEMPRE visible abajo.
+   position:fixed se ancla al viewport, y dentro del portal el formulario va en un iframe:
+   ahí el "viewport" es el del iframe, que es más alto que la ventana, así que la barra
+   quedaba al fondo del iframe — fuera de la vista, y en el celular tapada por la barra de
+   navegación del sistema.
+   position:sticky se ancla al contenedor con scroll, que es lo que se ve. Funciona igual
+   abierta directa y embebida en el portal.
+   El padding con env(safe-area-inset-bottom) evita que los botones del teléfono la tapen. */
+.bar{position:sticky;bottom:0;left:0;right:0;background:#fff;
+     border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(14,59,54,.10);z-index:30;
+     padding-bottom:env(safe-area-inset-bottom,0px);margin-top:18px}
 .bar .inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 14px}
 .verdict{flex:1;display:flex;flex-direction:column;justify-content:center}
 .verdict .vk{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:1px}
@@ -388,7 +399,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 </div>
 
-<div class="bar"><div class="inner">
+<div class="bar" id="barraFinal"><div class="inner">
   <div class="verdict" id="verdict"><div class="vk">Veredicto</div><div class="vv" id="vText">—</div></div>
   <button class="save" id="save">Guardar</button>
 </div>
@@ -398,7 +409,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-04a · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-04b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -2501,6 +2512,50 @@ Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   recalc();
 });
 refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount(); if(n>0) enviarPendientes(); } });
+</script>
+<script>
+/* ============================================================================
+   BARRA DE VEREDICTO SIEMPRE VISIBLE, TAMBIÉN DENTRO DEL PORTAL
+   ----------------------------------------------------------------------------
+   El portal embebe este formulario en un iframe de altura fija (unos 2400px), así que el
+   scroll lo hace la página de afuera y el iframe nunca scrollea. Con eso, una barra fija o
+   pegajosa se ancla al fondo del IFRAME —no de la pantalla— y queda fuera de la vista: la
+   auditora tenía que bajar hasta el final para ver el botón de guardar.
+   Aquí se detecta ese caso y se le da al documento la altura de la ventana real, con su
+   propio scroll. La barra vuelve a quedar abajo, siempre a la vista.
+   Si el formulario se abre directo (sin iframe), no se toca nada.
+   ========================================================================== */
+(function(){
+  function estoyEmbebido(){ try{ return window.self !== window.top; }catch(e){ return true; } }
+  if(!estoyEmbebido()) return;
+
+  function alturaVisible(){
+    try{ if(window.parent && window.parent.innerHeight) return window.parent.innerHeight; }
+    catch(e){ /* otro dominio: no se puede leer, se usa la propia */ }
+    return window.innerHeight;
+  }
+  function ajustar(){
+    var h = alturaVisible();
+    if(!h || h < 320) return;
+    /* Solo se ajusta si el iframe es MÁS ALTO que lo que se ve. Si el portal ya le dio una
+       altura correcta, no se toca nada: cambiarla ahí rompería su scroll. */
+    if(h >= window.innerHeight - 4){
+      document.documentElement.style.height='';
+      document.body.style.height='';
+      document.body.style.overflowY='';
+      return;
+    }
+    document.documentElement.style.height = h + 'px';
+    document.body.style.height = h + 'px';
+    document.body.style.overflowY = 'auto';
+    document.body.style.webkitOverflowScrolling = 'touch';
+  }
+  ajustar();
+  window.addEventListener('resize', ajustar);
+  // el portal puede cambiar la altura del iframe después de cargar
+  setTimeout(ajustar, 400);
+  setTimeout(ajustar, 1500);
+})();
 </script>
 </body>
 </html>
