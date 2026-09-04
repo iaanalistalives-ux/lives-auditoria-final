@@ -382,7 +382,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-02e · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-04a · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -486,15 +486,49 @@ function marcarOrigen(txt){
   const el=document.getElementById('selloOrigen');
   if(el) el.textContent=txt;
 }
+/* Lectura por Apps Script con getDisplayValues().
+   POR QUÉ: gviz le asigna UN tipo a cada columna según la mayoría de sus celdas y devuelve
+   VACÍAS las que no calzan. La columna PO tiene mayoría de números, así que los PO con
+   letras o espacios ("505221 USA", "LIVES-S-117-2") llegaban vacíos: medido, 107 de 316.
+   Por eso el panel de auditorías previas mostraba "SIN PO" en lotes que sí tienen PO, y las
+   auditoras creían que no lo habían escrito.
+   El CSV no lo resuelve: tipa igual que el JSON. getDisplayValues() entrega el texto exacto
+   de la celda, sin tipado ni conversiones — es la única lectura que no puede perder un dato.
+   Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
+function leerHojaScript(tab){
+  return new Promise(function(resolve,reject){
+    const fn='cbHoja'+Math.random().toString(36).slice(2);
+    const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 45000);
+    function limpiar(){ clearTimeout(t); try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
+    window[fn]=function(res){
+      limpiar();
+      if(res && res.ok && res.rows) resolve(res.rows.map(f=>f.map(c=>String(c==null?'':c))));
+      else reject(new Error((res&&res.error)||'respuesta inválida'));
+    };
+    const sc=document.createElement('script');
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+'&callback='+fn+'&_='+Date.now();
+    sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
+    document.body.appendChild(sc);
+  });
+}
+
 async function gviz(tab){
+  /* Orden: Apps Script primero (no pierde datos), y si falla se cae a gviz para no dejar la
+     pantalla en blanco. El sello del pie dice cuál se usó, para saberlo sin abrir la consola. */
   try{
-    const filas=await gvizCSV(tab);
-    if(tab==='AUDITORÍAS') marcarOrigen('datos: csv');
+    const filas=await leerHojaScript(tab);
+    if(tab==='AUDITORÍAS') marcarOrigen('datos: directo');
     return filas;
-  }catch(e){
-    const filas=await gvizJSON(tab);
-    if(tab==='AUDITORÍAS') marcarOrigen('datos: json (csv falló: '+(e.message||e)+')');
-    return filas;
+  }catch(e1){
+    try{
+      const filas=await gvizCSV(tab);
+      if(tab==='AUDITORÍAS') marcarOrigen('datos: csv (sin PO completos)');
+      return filas;
+    }catch(e2){
+      const filas=await gvizJSON(tab);
+      if(tab==='AUDITORÍAS') marcarOrigen('datos: json (sin PO completos)');
+      return filas;
+    }
   }
 }
 
