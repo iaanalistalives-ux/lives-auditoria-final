@@ -389,11 +389,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <textarea id="comentario" rows="3" placeholder="Observaciones generales de la auditoría (opcional)"></textarea>
   </div>
 
-  <!-- LIQUIDADO (solo Costura/Acabados taller) -->
+  <!-- LIQUIDADO (los tres procesos) -->
   <div class="card" id="liquidadoCard" style="display:none">
     <div class="toggle" id="liquidadoWrap">
       <div><div style="font-weight:600;font-size:14px">¿Liquidado?</div>
-        <div class="hint" style="margin-top:2px">Marca esto cuando ya no vas a auditar más este lote — quedó cerrado.</div></div>
+        <div class="hint" style="margin-top:2px">Marca esto cuando esta sea la <b>última auditoría de esta OP en este proceso</b> — ya no se vuelve a auditar aquí.</div></div>
       <label class="switch"><input type="checkbox" id="liquidadoSwitch"><span class="slider"></span></label>
     </div>
   </div>
@@ -1252,11 +1252,17 @@ $('proceso').onchange=()=>{
   // Derivados SOLO aplica a Costura (taller). En Acabados y Auditoría Final no se muestra ni se guarda.
   const derCard=$('derivadosCard');
   if(derCard) derCard.style.display = esCostura ? 'block' : 'none';
-  // Liquidado: activo en Costura y Acabados (taller). En Auditoría Final no existe esa marca.
-  const esAcabadosTaller = S.proceso==='Acabados (taller)';
+  /* Liquidado: aplica a LOS TRES procesos. Calidad lo definió como "esta fue la última
+     auditoría de esta OP en este proceso", y eso ocurre igual en un taller externo que en la
+     auditoría interna de Acabados. Antes el control solo se mostraba en Costura y Acabados
+     (taller), así que en la interna nunca se pudo marcar: las 15 marcadas del histórico son
+     todas de taller por eso, no porque la regla las excluyera. */
   const liqCard=$('liquidadoCard');
-  if(liqCard) liqCard.style.display = (esCostura||esAcabadosTaller) ? 'block' : 'none';
-  if(!(esCostura||esAcabadosTaller) && S.liquidado){ S.liquidado=false; if($('liquidadoSwitch')) $('liquidadoSwitch').checked=false; }
+  if(liqCard) liqCard.style.display = S.proceso ? 'block' : 'none';
+  /* Si se vuelve a dejar el proceso sin elegir, el control se oculta: se limpia la marca para
+     que no quede un "sí" invisible esperando a guardarse. Con un proceso elegido NO se limpia,
+     porque ahora la marca aplica a los tres y el control está a la vista. */
+  if(!S.proceso && S.liquidado){ S.liquidado=false; if($('liquidadoSwitch')) $('liquidadoSwitch').checked=false; }
   if(!esCostura){ limpiarDerivados(); }
   fillTaller(S.proceso);
   actualizarCardProceso();
