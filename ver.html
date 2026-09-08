@@ -206,7 +206,7 @@ function parseCSV(txt){
 }
 /* URL del backend del formulario. Se usa para leer las hojas por Apps Script en vez de
    por gviz — ver el comentario de leerHoja(). */
-const APP_URL='https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l4BmcQWmVl2BG5LmEr1drr8qy1dUbmngb6Qrq7DsYU/exec';
+const APP_URL='https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
 
 /* Lectura por Apps Script con getDisplayValues().
    POR QUÉ: gviz le asigna UN tipo a cada columna y devuelve vacías las celdas que no calzan.
@@ -215,7 +215,7 @@ const APP_URL='https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l
    getDisplayValues() entrega el texto exacto que se ve en la celda, sin tipado ni
    conversiones: es la única lectura que no puede perder un dato.
    Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
-function leerHojaScript(tab){
+function leerHojaScript(tab,id){
   return new Promise(function(resolve,reject){
     const fn='cbHoja'+Math.random().toString(36).slice(2);
     const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 45000);
@@ -226,7 +226,7 @@ function leerHojaScript(tab){
       else reject(new Error((res&&res.error)||'respuesta inválida'));
     };
     const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+'&callback='+fn+'&_='+Date.now();
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
     sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
     document.body.appendChild(sc);
   });
@@ -245,16 +245,25 @@ async function gvizCSV(tab){
 /* Enrutador: primero Apps Script (no puede perder datos), y si falla se cae a gviz CSV
    para no dejar la pantalla en blanco. */
 let LECTURA_DEGRADADA=false;
-async function gviz(tab){
-  try{ return await leerHojaScript(tab); }
-  catch(e){
-    // El respaldo por gviz pierde los PO con letras o espacios (107 de 316 en el histórico).
-    // Si hay que usarlo, se avisa en pantalla en vez de mostrar campos vacíos como si el
-    // dato no existiera.
-    console.warn('lectura por Apps Script falló, usando gviz CSV:', e);
-    if(tab==='AUDITORÍAS') LECTURA_DEGRADADA=true;
-    return await gvizCSV(tab);
-  }
+async function gviz(tab,id){
+  /* Ya no hay respaldo por gviz: leía el Sheet del piloto, que quedó CONGELADO como
+     copia cuando las auditorías pasaron al maestro. Devolvería datos viejos sin
+     avisar. Mejor fallar a la vista que mostrar lo desactualizado como si fuera lo
+     actual. */
+  return await leerHojaScript(tab,id);
+}
+
+/* El detalle viene con dos formatos según de dónde salga:
+     7 columnas (hojas viejas del piloto): ID | SECCION | CATEGORIA | SUBTIPO | CANT | NOTA | FOTO
+     8 columnas (tabla del maestro):       ID | COD | SECCION | CATEGORIA | SUBTIPO | CANT | NOTA | FOTO
+   Todo lo que pinta esta pantalla usa las posiciones del formato de 7, así que aquí se
+   quita el COD y el resto del archivo no cambia. Sin esto no da ningún error: la tabla
+   sale con las columnas corridas y la foto no aparece, porque el enlace cae en otra
+   posición. */
+function normalizarDetalle(filas){
+  return (filas||[]).map(function(f){
+    return (f && f.length>=8) ? [f[0], f[2], f[3], f[4], f[5], f[6], f[7]] : f;
+  });
 }
 function norm(s){return String(s||'').trim().toLowerCase();}
 function fechaTxt(v){ if(v==null||v==='')return''; const s=String(v); const m=s.match(/^Date\((\d+),(\d+),(\d+)/); if(m){return m[1]+'-'+('0'+(parseInt(m[2])+1)).slice(-2)+'-'+('0'+m[3]).slice(-2);} return s.substring(0,10);}
@@ -287,8 +296,11 @@ async function cargar(){
        lo sufría porque pide menos hojas a la vez.
        Una detrás de otra tarda un poco más pero llega completo, que es lo que importa. */
     rows = await gviz('AUDITORÍAS');
-    defs = await gviz('DEFECTOS');
-    ders = await gviz('DERIVADOS');
+    /* Se pide SOLO el detalle de esta auditoría: el servidor filtra por id. La tabla
+       de detalle del maestro pasa de 16.000 filas y traerlas enteras a un celular con
+       datos móviles se cae por tiempo de espera. */
+    defs = normalizarDetalle(await gviz('DEFECTOS', ID));
+    ders = normalizarDetalle(await gviz('DERIVADOS', ID));
   }catch(e){ document.getElementById('estado').textContent='No se pudo cargar.'; return; }
 
   const r=rows.find(x=>String(x[C.id]).trim()===ID.trim());
