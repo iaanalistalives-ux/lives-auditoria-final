@@ -2151,7 +2151,15 @@ async function buscarMisAud(){
 // sobre los bloques ya generados (S.defs o S.ders), emparejando por sección+categoría(+subtipo).
 function aplicarDetalleDesdeSheet(bloques, filas){
   filas.forEach(f=>{
-    const seccion=f[1], categoria=f[2], subtipo=f[3], cant=parseInt(f[4])||0, detalle=f[5]||'', foto=f[6]||'';
+    /* El detalle tiene dos formatos según de dónde venga:
+         7 columnas (hojas viejas del piloto):  ID | SECCION | CATEGORIA | SUBTIPO | CANT | DETALLE | FOTO
+         8 columnas (formato del maestro):      ID | COD | SECCION | CATEGORIA | SUBTIPO | CANT | NOTA | FOTO
+       Se detecta por el ancho de la fila. Leerlo con la posición equivocada no da
+       ningún error: simplemente ningún bloque del checklist coincide y todo queda
+       en cero, que es justo el caso en que guardar borra los defectos guardados. */
+    const k = (f.length >= 8) ? 1 : 0;
+    const seccion=f[1+k], categoria=f[2+k], subtipo=f[3+k], cant=parseInt(f[4+k])||0,
+          detalle=f[5+k]||'', foto=f[6+k]||'';
     const b=bloques.find(x=>x.categoria===categoria && x.seccion===seccion);
     if(!b) return;
     if(detalle) b.detalle=detalle;
