@@ -426,7 +426,9 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 
 <script>
 /* ===== CONFIG: reemplaza ambos al desplegar ===== */
-const APP_URL  = 'https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l4BmcQWmVl2BG5LmEr1drr8qy1dUbmngb6Qrq7DsYU/exec';
+/* Backend ÚNICO: el del Sheet maestro. El piloto ya no tiene script propio.
+   Las auditorías, el detalle y los catálogos salen todos de ahí. */
+const APP_URL  = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
 const SHEET_ID = '1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
 
 /* ===== AQL ===== */
@@ -522,7 +524,7 @@ function marcarOrigen(txt){
    El CSV no lo resuelve: tipa igual que el JSON. getDisplayValues() entrega el texto exacto
    de la celda, sin tipado ni conversiones — es la única lectura que no puede perder un dato.
    Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
-function leerHojaScript(tab){
+function leerHojaScript(tab,id){
   return new Promise(function(resolve,reject){
     const fn='cbHoja'+Math.random().toString(36).slice(2);
     const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 45000);
@@ -533,30 +535,20 @@ function leerHojaScript(tab){
       else reject(new Error((res&&res.error)||'respuesta inválida'));
     };
     const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+'&callback='+fn+'&_='+Date.now();
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
     sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
     document.body.appendChild(sc);
   });
 }
 
-async function gviz(tab){
-  /* Orden: Apps Script primero (no pierde datos), y si falla se cae a gviz para no dejar la
-     pantalla en blanco. El sello del pie dice cuál se usó, para saberlo sin abrir la consola. */
-  try{
-    const filas=await leerHojaScript(tab);
-    if(tab==='AUDITORÍAS') marcarOrigen('datos: directo');
-    return filas;
-  }catch(e1){
-    try{
-      const filas=await gvizCSV(tab);
-      if(tab==='AUDITORÍAS') marcarOrigen('datos: csv (sin PO completos)');
-      return filas;
-    }catch(e2){
-      const filas=await gvizJSON(tab);
-      if(tab==='AUDITORÍAS') marcarOrigen('datos: json (sin PO completos)');
-      return filas;
-    }
-  }
+async function gviz(tab,id){
+  /* Antes, si la lectura por Apps Script fallaba, se caía a leer el Sheet del piloto
+     por gviz. Ese respaldo ya no sirve y sería peligroso: ese Sheet quedó congelado
+     como copia y devolvería datos viejos sin avisar. Es mejor fallar visiblemente
+     que mostrar una auditoría desactualizada como si fuera la actual. */
+  const filas=await leerHojaScript(tab,id);
+  if(tab==='AUDITORÍAS') marcarOrigen('datos: maestro');
+  return filas;
 }
 
 /* ===== AUDITORÍAS en vivo (para ordinal, pedido y panel) ===== */
@@ -2176,7 +2168,8 @@ function aplicarDetalleDesdeSheet(bloques, filas){
 // con el riesgo de guardar por encima y borrarlos sin querer.
 async function cargarDetalleParaEditar(id){
   try{
-    const [defRows,derRows]=await Promise.all([gviz('DEFECTOS'),gviz('DERIVADOS')]);
+    /* Se pide SOLO el detalle de esta auditoría: el servidor filtra por id. */
+    const [defRows,derRows]=await Promise.all([gviz('DEFECTOS',id),gviz('DERIVADOS',id)]);
     const idTxt=String(id).trim();
     aplicarDetalleDesdeSheet(S.defs, defRows.filter(r=>String(r[0]).trim()===idTxt));
     aplicarDetalleDesdeSheet(S.ders, derRows.filter(r=>String(r[0]).trim()===idTxt));
