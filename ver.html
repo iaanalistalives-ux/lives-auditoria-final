@@ -173,7 +173,7 @@ const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,est
   destino:12,pedido:13,recibido:14,lote:15,licencia:16,loteAql:17,muestra:18,nivel:19,aceptaMax:20,rechazaMin:21,
   totalDef:22,resAql:23,override:24,ovWho:25,ovWhy:26,resFinal:27,medMuestra:28,medDef:29,medRes:30,auditor:31,
   semana:32,fotoGen:33,loteKey:34,repetido:35,loteCont:36,anio:37,computable:38,reproceso:39,coment:40,totalDer:41,
-  fotosMed:42,fotosPro:43,op:50,liquidado:51};
+  fotosMed:42,fotosPro:43,op:50,liquidado:51,captura:53};
 
 const qs=new URLSearchParams(location.search), ID=qs.get('id');
 let FOTOS_MED=[], FOTOS_PRO=[], ES_COSTURA=false;
@@ -318,6 +318,20 @@ async function cargar(){
 
 function render(r,defs,ders){
   document.getElementById('ttl').textContent='Reporte · '+r[C.id];
+  /* Aviso de origen: una ficha transcrita de papel no tiene fotos, medidas ni los
+     números del AQL, y sin decirlo parece que faltaran datos por un error. */
+  if(String(r[C.captura]||'').trim().toUpperCase()==='DIGITADO'){
+    const t=document.getElementById('ttl');
+    if(t && !document.getElementById('tagCaptura')){
+      const s=document.createElement('span');
+      s.id='tagCaptura';
+      s.textContent='Digitado en Planta';
+      s.style.cssText='display:inline-block;margin-left:10px;padding:2px 10px;border-radius:10px;'+
+                      'background:#EEF2F1;color:#4A5A57;font-size:12px;vertical-align:middle';
+      s.title='Transcrita de la hoja física. No tiene fotos ni medidas: no se capturaron.';
+      t.appendChild(s);
+    }
+  }
   const resF=r[C.resFinal]||'—', rn=norm(resF);
   let cls=rn.indexOf('override')>=0?'ov':(rn.indexOf('aprob')>=0?'ap':(rn.indexOf('rech')>=0?'re':''));
 
