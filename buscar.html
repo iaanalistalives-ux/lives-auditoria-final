@@ -112,7 +112,7 @@ let DATA=[];
 // índices de columnas en AUDITORÍAS
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
          destino:12,pedido:13,recibido:14,lote:15,licencia:16,resAql:23,override:24,resFinal:27,auditor:31,semana:32,
-         computable:38,reproceso:39,op:50,liquidado:51};
+         computable:38,reproceso:39,op:50,liquidado:51,captura:53};
 // Filtros de 3 estados: null = sin filtro, true = mostrar SOLO esas, false = EXCLUIRLAS (mostrar solo las que no)
 let filtroReproceso=null, filtroLicencia=null, filtroLiquidado=null;
 function esVerdadero(v){
@@ -237,6 +237,14 @@ function fechaOK(fstr,desde,hasta){
   if(hasta&&f>hasta) return false;
   return true;
 }
+/* Marca las auditorías transcritas de papel. Sin esto se mezclan con las
+   capturadas en vivo y no hay forma de saber por qué una no tiene fotos. */
+function etiquetaCaptura(r){
+  const cap=String(r[C.captura]||'').trim().toUpperCase();
+  if(cap!=='DIGITADO') return '';
+  return '<br><span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;'+
+         'background:#EEF2F1;color:#4A5A57;font-size:11px;white-space:nowrap">Digitado en Planta</span>';
+}
 function badge(res){
   const r=norm(res);
   if(r.indexOf('override')>=0) return '<span class="tag ov">OVERRIDE</span>';
@@ -290,7 +298,7 @@ function pintar(res){
       <td>${fechaTxt(r[C.fecha])}</td>
       <td>${r[C.cliente]||''}<br><span style="color:#889">${r[C.grupo]||''}</span></td>
       <td>${r[C.estiloL]||''}<br><span style="color:#889">${r[C.po]||''}</span></td>
-      <td>${r[C.auditor]||''}</td>
+      <td>${r[C.auditor]||''}${etiquetaCaptura(r)}</td>
       <td>${badge(r[C.resFinal])}</td>
       <td><a class="ver" href="ver.html?id=${encodeURIComponent(r[C.id])}">Ver / PDF</a></td>`;
     tb.appendChild(tr);
