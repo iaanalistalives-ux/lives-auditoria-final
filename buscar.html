@@ -153,7 +153,7 @@ function parseCSV(txt){
 }
 /* URL del backend del formulario. Se usa para leer las hojas por Apps Script en vez de
    por gviz — ver el comentario de leerHoja(). */
-const APP_URL='https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l4BmcQWmVl2BG5LmEr1drr8qy1dUbmngb6Qrq7DsYU/exec';
+const APP_URL='https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
 
 /* Lectura por Apps Script con getDisplayValues().
    POR QUÉ: gviz le asigna UN tipo a cada columna y devuelve vacías las celdas que no calzan.
@@ -162,7 +162,7 @@ const APP_URL='https://script.google.com/macros/s/AKfycbxgdKn4o0-ubhW31dHl5fAi7l
    getDisplayValues() entrega el texto exacto que se ve en la celda, sin tipado ni
    conversiones: es la única lectura que no puede perder un dato.
    Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
-function leerHojaScript(tab){
+function leerHojaScript(tab,id){
   return new Promise(function(resolve,reject){
     const fn='cbHoja'+Math.random().toString(36).slice(2);
     const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 20000);
@@ -173,7 +173,7 @@ function leerHojaScript(tab){
       else reject(new Error((res&&res.error)||'respuesta inválida'));
     };
     const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+'&callback='+fn+'&_='+Date.now();
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
     sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
     document.body.appendChild(sc);
   });
@@ -191,9 +191,13 @@ async function gvizCSV(tab){
 
 /* Enrutador: primero Apps Script (no puede perder datos), y si falla se cae a gviz CSV
    para no dejar la pantalla en blanco. */
-async function gviz(tab){
-  try{ return await leerHojaScript(tab); }
-  catch(e){ console.warn('lectura por Apps Script falló, usando gviz CSV:', e); return await gvizCSV(tab); }
+async function gviz(tab,id){
+  /* Ya no hay respaldo por gviz. Ese respaldo leía el Sheet del piloto, que quedó
+     CONGELADO como copia cuando las auditorías pasaron al Sheet maestro: devolvería
+     datos viejos sin avisar y la auditora vería su auditoría de hoy como si no
+     existiera, o una corrección como si no se hubiera guardado. Es mejor fallar a
+     la vista que mostrar algo desactualizado como si fuera lo actual. */
+  return await leerHojaScript(tab,id);
 }
 function norm(s){return String(s||'').trim().toLowerCase();}
 // Convierte fechas de gviz "Date(2026,5,15)" a "2026-06-15". Si ya es texto normal, lo deja.
