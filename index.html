@@ -1926,9 +1926,36 @@ async function refrescarPend(){
   if(n>0){bar.style.display='flex';$('pendTxt').textContent='📥 '+n+' pendiente(s) · se enviarán solas al volver la señal';}
   else{bar.style.display='none';}
 }
+/* Guarda el último error real del servidor, para poder mostrarlo tal cual.
+   Antes cualquier fallo se contaba como "sin señal": el servidor podía estar
+   rechazando la auditoría por un campo y el mensaje hablaba de la conexión, así
+   que el problema se buscaba en el celular y en el wifi durante un día entero. */
+var ULTIMO_ERROR = '';
+
 async function enviarUno(payload){
-  const res=await fetch(APP_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
-  const data=await res.json(); if(!data.ok) throw new Error(data.error||'Error'); return data;
+  let res;
+  try{
+    res = await fetch(APP_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
+  }catch(e){
+    ULTIMO_ERROR = 'Sin conexión con el servidor';
+    throw new Error(ULTIMO_ERROR);
+  }
+  const txt = await res.text();
+  let data;
+  try{ data = JSON.parse(txt); }
+  catch(e){
+    /* El servidor respondió algo que no es JSON: casi siempre una página de error
+       o de inicio de sesión de Google. Se muestran los primeros caracteres, que es
+       lo que permite reconocerlo. */
+    ULTIMO_ERROR = 'Respuesta inesperada del servidor ('+res.status+'): '+txt.slice(0,120);
+    throw new Error(ULTIMO_ERROR);
+  }
+  if(!data.ok){
+    ULTIMO_ERROR = data.error || 'El servidor rechazó la auditoría';
+    throw new Error(ULTIMO_ERROR);
+  }
+  ULTIMO_ERROR='';
+  return data;
 }
 async function enviarPendientes(){
   const items=await colaAll(); if(!items.length){toast('No hay pendientes','ok');return;}
@@ -1941,7 +1968,7 @@ async function enviarPendientes(){
   btn.disabled=false; btn.textContent='Enviar ahora';
   await refrescarPend();
   if(failN===0){ toast('Enviadas '+okN+' auditoría(s) ✓','ok'); ecoLimpiarSinId(); }
-  else toast('Enviadas '+okN+', fallaron '+failN+' (reintenta con señal)','err');
+  else toast('Enviadas '+okN+', fallaron '+failN+'. Motivo: '+(ULTIMO_ERROR||'desconocido'),'err');
   cargarAud();
 }
 $('pendBtn').onclick=enviarPendientes;
