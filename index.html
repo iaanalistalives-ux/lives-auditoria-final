@@ -2108,7 +2108,29 @@ async function buscarMisAud(){
     // Buscando por OP: se busca en TODAS las auditorías, de cualquier auditor — no solo las propias.
     // Así, si alguien más hizo la auditoría que salió rechazada, quien va a reprocesarla igual la encuentra.
     // (El nombre se ve en la lista de resultados, no se usa aquí para filtrar.)
-    candidatos=candidatos.filter(r=>norm(r[50])===norm(opBuscar));
+    /* Primero por la columna OP. Pero la OP se guarda solo si la auditora la
+       escribió, y hoy la tiene menos del 3 % de las auditorías: buscar solo por
+       ahí devuelve "no auditaste nada" aunque las auditorías existan.
+
+       Si no aparece ninguna, se traduce la OP a sus lotes con la base de OP
+       —grupo, estilo, color y PO— y se busca por eso, que es lo mismo que ya
+       hace el formulario para mostrar las auditorías previas de un lote. */
+    const claves={}, grupos={};
+    (OPS_DB||[]).forEach(m=>{
+      if(norm(m.op)!==norm(opBuscar)) return;
+      grupos[norm(m.grupo)+'|'+norm(m.estilo)]=true;
+      claves[norm(m.grupo)+'|'+norm(m.estilo)+'|'+norm(m.color)+'|'+norm(m.po)]=true;
+    });
+    const hayLotes = Object.keys(grupos).length>0;
+    /* Se juntan las dos vías, no se elige una: dentro de un mismo lote puede
+       haber auditorías con la OP escrita y otras sin ella, y quedarse solo con
+       las primeras esconde justo las que se quieren corregir. */
+    candidatos=candidatos.filter(r=>{
+      if(norm(r[50])===norm(opBuscar)) return true;
+      if(!hayLotes) return false;
+      return !!(claves[norm(r[7])+'|'+norm(r[8])+'|'+norm(r[11])+'|'+norm(r[10])] ||
+                grupos[norm(r[7])+'|'+norm(r[8])]);
+    });
   } else if(nom){
     // Sin OP: "Mis auditorías" — solo lo propio, por nombre tolerante (sin tildes, por palabras)
     const nomN=nombreNorm(nom);
@@ -2132,7 +2154,7 @@ async function buscarMisAud(){
   const mias=candidatos;
   if(!mias.length){
     cont.innerHTML = opBuscar
-      ? '<div class="hint">No encontré ninguna auditoría con esa OP. (Las OPs solo quedaron guardadas desde hace poco — si es de antes, no va a aparecer así.)</div>'
+      ? '<div class="hint">No encontré auditorías con esa OP.<br>Se buscó por la OP y también por los lotes de esa OP (grupo, estilo, color y PO). Si la auditoría existe pero se registró con otro estilo o color, búscala escribiendo tu nombre en vez de la OP.</div>'
       : '<div class="hint">No encontré auditorías con ese nombre.</div>';
     return;
   }
@@ -2152,6 +2174,21 @@ async function buscarMisAud(){
     // AX=49 REPROCESA_DE: si alguna otra fila del historial ya apunta a esta auditoría como su origen,
     // significa que ya se reprocesó — no se debe poder volver a tocar "Reprocesar" sobre la misma.
     const yaReprocesada = (AUD_CACHE||[]).some(x=>x && String(x[49]||'').trim()===String(id).trim());
+    /* Anular: solo sobre las auditorías PROPIAS. Quien captura en planta puede
+       equivocarse y registrar una de más; corregirla no sirve, porque una
+       auditoría corregida sigue contando. Anular la deja fuera de los
+       indicadores sin borrarla.
+
+       No se ofrece sobre las de otra auditora: aquí cada una responde por lo
+       suyo, y una anulación ajena no tendría a quién preguntarle.
+
+       Tampoco sobre una que ya se reprocesó: su lote lo hereda el reproceso, y
+       anularla dejaría ese vínculo apuntando a algo que ya no cuenta. */
+    const esMia = nombreNorm(aud) === nombreNorm(quienSoy());
+    const anuBtn = (esMia && !yaReprocesada)
+      ? `<button class="addbtn" style="white-space:nowrap;padding:8px 12px;background:#fff;color:#c32030;border:1px solid #e6a4a0" onclick="pedirAnular('${id}')">🗑 Anular</button>`
+      : '';
+
     const reproBtn = res.indexOf('RECH')>=0
       ? (yaReprocesada
           ? `<span style="font-size:12px;color:#7a5a12;background:#fff4e0;border:1px solid #F59E0B;border-radius:8px;padding:8px 12px;white-space:nowrap">✓ Ya reprocesada</span>`
@@ -2163,6 +2200,7 @@ async function buscarMisAud(){
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${medBtn}${reproBtn}
           <button class="addbtn" style="white-space:nowrap;padding:8px 12px" onclick="cargarParaEditar('${id}')">✏️ Corregir</button>
+          ${anuBtn}
         </div>
       </div>
       <div style="margin-top:6px;font-size:12.5px;color:#334;line-height:1.5">
@@ -2241,6 +2279,44 @@ async function aprobarMedidaRapido(id, btnEl){
     if(j.ok){ toast('Medida de '+id+' marcada como Aprobado ✓','ok'); await cargarAud(); buscarMisAud(); }
     else { toast('No se pudo actualizar: '+(j.error||''),'err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
   }catch(e){ toast('Sin señal — inténtalo de nuevo con internet','err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
+}
+
+/* Quién está usando el formulario: el nombre que puso el portal, o el que se
+   escribió a mano si se abrió fuera de él. */
+function quienSoy(){
+  return (($('auditor')&&$('auditor').value) || ($('miNombre')&&$('miNombre').value) || '').trim();
+}
+
+/* Anular una auditoría propia. Pide el motivo: sin él, dentro de tres meses
+   nadie sabe por qué falta esa auditoría en el lote. */
+function pedirAnular(id){
+  const motivo = prompt('¿Por qué se anula la auditoría '+id+'?\n\n'+
+                        'No se borra: queda registrada como anulada y deja de contar '+
+                        'en los indicadores.');
+  if(motivo===null) return;
+  if(String(motivo).trim().length < 5){
+    toast('Escribe el motivo: sirve para entender después por qué se anuló.','err');
+    return;
+  }
+  const quien = quienSoy();
+  toast('Anulando…','ok');
+  fetch(APP_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({accion:'anular', clave:'livessac', id:id,
+                         motivo:String(motivo).trim(), usuario:quien})})
+    .then(r=>r.json())
+    .then(r=>{
+      if(r&&r.ok){
+        toast('Auditoría anulada.','ok');
+        /* Se quita de la lista en pantalla y de la memoria: si no, sigue
+           bloqueando el parcial y ofreciéndose para reprocesar. */
+        AUD_CACHE=(AUD_CACHE||[]).filter(x=>String(x[0]).trim()!==String(id).trim());
+        if(typeof refrescarAvisoRechazos==='function') refrescarAvisoRechazos();
+        if(typeof buscarMisAud==='function') buscarMisAud();
+      } else {
+        toast((r&&r.error)||'No se pudo anular.','err');
+      }
+    })
+    .catch(()=>toast('Sin conexión al anular. Inténtalo de nuevo.','err'));
 }
 
 async function cargarParaEditar(id){
