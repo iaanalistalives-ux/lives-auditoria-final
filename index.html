@@ -161,7 +161,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 
 <div class="wrap">
   <!-- MIS AUDITORÍAS (corregir) -->
-  <div class="card" style="border:2px dashed #d4e0ee;background:#f7fafc">
+  <div class="card" id="panelBuscarAud" style="border:2px dashed #d4e0ee;background:#f7fafc">
     <div class="sec"><span class="dot"></span>¿Necesitas corregir una auditoría que ya hiciste?</div>
     <div class="hint" style="margin:-6px 0 10px">Escribe la OP y verás aquí mismo tus auditorías de esa OP, con todos sus detalles, para elegir cuál corregir.</div>
     <div class="grid">
@@ -2281,6 +2281,42 @@ async function aprobarMedidaRapido(id, btnEl){
   }catch(e){ toast('Sin señal — inténtalo de nuevo con internet','err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
 }
 
+/* Al elegir Corregir o Reprocesar, el buscador de OP se pliega y deja a la vista
+   el formulario, que es donde hay que trabajar a partir de ahí. Antes se quedaba
+   abierto con la lista completa y en un celular había que bajar media pantalla
+   para encontrar los campos.
+
+   No se oculta del todo: queda una línea para volver a abrirlo, porque a veces
+   hay que consultar otra auditoría en medio de una corrección. */
+function plegarBuscador(motivo){
+  var c = $('panelBuscarAud'); if(!c) return;
+  var lista = $('misAudList'), grid = c.querySelector('.grid'),
+      btn = $('btnMisAud'), sec = c.querySelector('.sec'),
+      hint = c.querySelector('.hint');
+  [lista, grid, btn, hint].forEach(function(e){ if(e) e.style.display='none'; });
+  if(sec) sec.style.display='none';
+  if(!$('reabrirBuscador')){
+    var a = document.createElement('div');
+    a.id = 'reabrirBuscador';
+    a.style.cssText = 'font-size:13px;color:#0E3B36;cursor:pointer;padding:2px 0';
+    a.onclick = desplegarBuscador;
+    c.insertBefore(a, c.firstChild);
+  }
+  $('reabrirBuscador').textContent = '🔎 ' + (motivo || 'Buscar otra auditoría');
+  $('reabrirBuscador').style.display = '';
+}
+
+function desplegarBuscador(){
+  var c = $('panelBuscarAud'); if(!c) return;
+  var lista = $('misAudList'), grid = c.querySelector('.grid'),
+      btn = $('btnMisAud'), sec = c.querySelector('.sec'),
+      hint = c.querySelector('.hint');
+  [grid, btn, hint].forEach(function(e){ if(e) e.style.display=''; });
+  if(sec) sec.style.display='';
+  if(lista) lista.style.display='';
+  var a = $('reabrirBuscador'); if(a) a.style.display='none';
+}
+
 /* Quién está usando el formulario: el nombre que puso el portal, o el que se
    escribió a mano si se abrió fuera de él. */
 function quienSoy(){
@@ -2320,6 +2356,7 @@ function pedirAnular(id){
 }
 
 async function cargarParaEditar(id){
+  plegarBuscador('Buscar otra auditoría');
   const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
   if(!r){ toast('No se encontró la auditoría','err'); return; }
   // Cargar campos en el formulario — los que vienen de la OP quedan BLOQUEADOS al corregir:
@@ -2382,6 +2419,7 @@ async function cargarParaEditar(id){
 // todo lo que viene de la OP (bloqueado, igual que al corregir), pero con el lote, defectos y
 // medidas en blanco para volver a registrarlos — porque es una vuelta a auditar de verdad.
 async function iniciarReproceso(id){
+  plegarBuscador('Buscar otra auditoría');
   const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
   if(!r){ toast('No se encontró la auditoría','err'); return; }
   lockField('grupo',r[7]); lockField('estiloL',r[8]); lockField('estiloC',r[9]);
