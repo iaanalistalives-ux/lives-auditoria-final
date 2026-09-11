@@ -1995,7 +1995,11 @@ function armarPayload(){
   const recibido=parseInt(v('recibido'))||0;
   return {
     cliente_cod:cod,cliente:nom,fecha:v('fecha'),n_auditoria:S.nAud,proceso:S.proceso,int_ext:S.int_ext,reproceso:S.reproceso?'SÍ':'NO',
-    servicio:interno?'Acabados Final':v('taller'),grupo:v('grupo'),estilo_lives:v('estiloL'),estilo_cliente:v('estiloC'),
+    /* En la auditoría interna no hay taller: la hace LIVES. Antes se escribía aquí
+       'Acabados Final', que es el proceso, no un taller — y en el tablero aparecía
+       como si existiera un taller con ese nombre. El resto del sistema ya usa
+       LIVES para esto. */
+    servicio:interno?'LIVES':v('taller'),grupo:v('grupo'),estilo_lives:v('estiloL'),estilo_cliente:v('estiloC'),
     po:v('po'),color:v('color'),destino:v('destino'),cant_pedido:parseInt(v('pedido'))||'',total_recibido:recibido,
     lote_real:recibido,licencia:S.licencia?'SÍ':'NO',nivel_aql:parseFloat(S.nivel),
     cod_tela:S.codTela||'',desc_tela:S.descTela||'',
