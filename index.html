@@ -2391,6 +2391,10 @@ async function cargarParaEditar(id){
   const derCardEd=$('derivadosCard'); if(derCardEd) derCardEd.style.display = esCosturaEd ? 'block' : 'none';
   generarChecklistDefectos();
   generarChecklistDerivados();
+  /* El N° de auditoría se calcula solo a partir de las auditorías previas del
+     lote. Si el borrador no lo traía, hay que recalcularlo o el guardado se traba
+     pidiendo un dato que la auditora no puede escribir. */
+  if(!S.nAud && typeof calcOrdinal==='function') setTimeout(calcOrdinal, 400);
   S.detalleCargado=true;   // se pone en false solo si la lectura falla
   await cargarDetalleParaEditar(id);
   // medidas
@@ -2580,6 +2584,20 @@ function restaurarBorrador(){
 
   if(b.proceso){ const selP=$('proceso'); if(selP) selP.value=b.proceso; }
   S.proceso=b.proceso||''; S.int_ext=b.int_ext||''; S.nAud=b.nAud||''; S.nivel=b.nivel||'1.5';
+
+  /* Los borradores guardados con una versión anterior no traen 'proceso' ni
+     'int_ext' como campos propios: el desplegable sí se rellenaba —viene en la
+     lista de campos— pero el estado interno quedaba vacío. En pantalla se veía
+     "Costura (taller)" y al guardar decía "Falta completar: Proceso".
+
+     Se deriva de lo que quedó en el desplegable, que es el dato real. */
+  if(!S.proceso){
+    const selP2=$('proceso');
+    if(selP2 && selP2.value) S.proceso=selP2.value;
+  }
+  if(S.proceso && !S.int_ext){
+    S.int_ext = (S.proceso==='Acabados Final (interno)') ? 'INTERNA' : 'EXTERNA';
+  }
   S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso; S.liquidado=!!b.liquidado;
   if($('liquidadoSwitch')) $('liquidadoSwitch').checked=S.liquidado;
   fijarReproWrap(false);
