@@ -920,18 +920,31 @@ function rechazoPendiente(r, todas){
 // Rechazos pendientes de una OP. Se busca por dos vías porque la columna OP solo se guarda desde
 // hace poco: por OP guardada, y por el lote (grupo+estilo+color) que esa OP resuelve en la base
 // de OPs — así también aparecen los rechazos anteriores a que existiera el campo OP.
+/* ¿Esa auditoría es del mismo proceso que se está registrando ahora?
+
+   Un lote pasa por costura, por acabados en el taller y por la revisión interna.
+   Son tres auditorías distintas del mismo lote, y el reproceso de una no tiene
+   nada que ver con las otras: lo hace quien hizo esa auditoría, en su proceso.
+   Sin este filtro se ofrecía reprocesar el rechazo de costura al registrar una
+   auditoría de acabados. */
+function mismoProcesoQueAhora(r){
+  if(!S.proceso) return true;               /* aún no eligió: no se filtra */
+  return norm(r[3]) === norm(S.proceso);    /* col 4 = PROCESO */
+}
+
 function rechazosPendientesDeOP(op){
   const opN=norm(op); if(!opN) return [];
   const todas=filasValidas();
   const claves=new Set(OPS_DB.filter(m=>norm(m.op)===opN).map(m=>llaveLaxa(m.grupo,m.estilo,m.color)));
-  return todas.filter(r=>(norm(r[50])===opN || claves.has(llaveLaxaFila(r))) && rechazoPendiente(r,todas));
+  return todas.filter(r=>(norm(r[50])===opN || claves.has(llaveLaxaFila(r)))
+                         && mismoProcesoQueAhora(r) && rechazoPendiente(r,todas));
 }
 // Rechazos pendientes del lote que ya está escrito en el formulario (sirve cuando llenan a mano,
 // sin pasar por la OP).
 function rechazosPendientesDeLote(){
   if(!$('grupo').value || !$('estiloL').value || !$('color').value) return [];
   const todas=filasValidas(), k=llaveLaxaActual();
-  return todas.filter(r=>llaveLaxaFila(r)===k && rechazoPendiente(r,todas));
+  return todas.filter(r=>llaveLaxaFila(r)===k && mismoProcesoQueAhora(r) && rechazoPendiente(r,todas));
 }
 // Cuando la auditora dice que viene a auditar otro parcial, el aviso se guarda para esta
 // OP y no vuelve a molestar mientras siga en ella. El rechazo NO se marca como atendido:
