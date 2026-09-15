@@ -455,6 +455,23 @@ function normSec(s){
 
 /* ===== listas dinámicas (Sheet) ===== */
 let TALLERES=[], AUDITORAS=[], CLIENTES=[];
+
+/* Repite una lectura hasta tres veces antes de rendirse. La conexión con Google
+   desde la planta se corta de forma intermitente: la misma petición unas veces
+   llega y otras no, y perder un catálogo por eso deja el formulario mostrando
+   avisos falsos. */
+async function conReintentos(fn, veces){
+  veces = veces || 3;
+  let ultimo;
+  for(let i=1;i<=veces;i++){
+    try{ return await fn(); }
+    catch(e){
+      ultimo=e;
+      if(i<veces) await new Promise(function(r){ setTimeout(r, i*1000); });
+    }
+  }
+  throw ultimo;
+}
 /* ===== Lector del Sheet =====
    Se lee en formato CSV, no JSON, a propósito.
    Motivo (verificado sobre el Sheet real): gviz en formato JSON le asigna UN SOLO tipo a cada
@@ -1196,7 +1213,10 @@ async function loadLists(){
     const c=cacheLeer('cat'); if(c&&c.length) CAT=c;
   }
   try{
-    const rows=await gviz('CLIENTES');               // A=PREFIJO, B=CLIENTE
+    /* Se reintenta: con la red de la planta una sola oportunidad no basta, y
+       quedarse sin lista de clientes deja al formulario avisando de un error
+       inexistente. */
+    const rows=await conReintentos(function(){ return gviz('CLIENTES'); });
     CLIENTES=rows.filter(r=>r[0]&&r[0].toUpperCase()!=='PREFIJO'&&r[1])
                  .map(r=>[r[0].trim().toUpperCase(), r[1].trim()]);
     cacheGuardar('clientes', CLIENTES);
@@ -1217,7 +1237,18 @@ function aplicarCliente(){
   $('cliente').value=cli;
   const h=$('cliHint');
   const deOP=$('grupo').readOnly; // si el grupo vino bloqueado de la OP, la instrucción de "escríbelo" no aplica
-  if($('grupo').value && !cli){ h.className='hint warn'; h.textContent='Ese prefijo no está en la lista de clientes. Revisa el grupo.'; }
+  /* Dos motivos distintos para que el cliente salga vacío, y hay que separarlos:
+     que el prefijo no exista de verdad, o que la lista de clientes no haya
+     llegado a descargarse. Con la conexión de la planta pasa lo segundo, y el
+     aviso mandaba a revisar un grupo que estaba bien escrito.
+
+     Ahí no hay nada que corregir: el servidor deduce el cliente del prefijo del
+     grupo al guardar, así que la auditoría entra igual. */
+  if($('grupo').value && !cli && !CLIENTES.length){
+    h.className='hint';
+    h.textContent='La lista de clientes no cargó. No importa: el cliente se completa al guardar.';
+  }
+  else if($('grupo').value && !cli){ h.className='hint warn'; h.textContent='Ese prefijo no está en la lista de clientes. Revisa el grupo.'; }
   else if(deOP){ h.className='hint'; h.textContent=''; }
   else { h.className='hint'; h.textContent='Escribe el grupo y el cliente aparece solo.'; }
   validate();
