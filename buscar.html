@@ -236,6 +236,74 @@ async function cargar(){
   buscar();
 }
 
+/* Una llamada al backend, con reintentos.
+
+   La conexión de la planta con Google es intermitente: la misma consulta unas
+   veces llega y otras se corta a medio camino. Cambiar el tamaño de la respuesta
+   ayuda pero no lo resuelve — 6 kB también se pierden.
+
+   Así que en vez de rendirse al primer fallo, se reintenta hasta tres veces con
+   esperas crecientes. En la práctica la segunda suele entrar, y quien está
+   delante no ve más que "reintentando" un segundo.
+
+   El plazo es de 12 segundos por intento, no 45: si va a fallar, mejor saberlo
+   pronto y volver a pedirlo que esperar casi un minuto para nada. */
+const INTENTOS = 3, PLAZO_MS = 12000;
+
+/* Fecha de hace N meses, en AAAA-MM-DD. La ventana avanza sola con el
+   calendario: no hay ninguna fecha escrita a mano que haya que cambiar. */
+function fechaCorte(meses){
+  const d=new Date(); d.setMonth(d.getMonth()-meses);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+
+function pedirUnaVez(params){
+  return new Promise((ok,fail)=>{
+    const fn='cb'+Math.random().toString(36).slice(2);
+    const sc=document.createElement('script');
+    let listo=false;
+    const limpiar=()=>{ try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.remove(); };
+    window[fn]=r=>{ listo=true; limpiar(); ok(r); };
+    const qs=Object.keys(params)
+      .filter(k=>params[k]!==''&&params[k]!==null&&params[k]!==undefined)
+      .map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
+    sc.src=APP_URL+'?'+qs+'&callback='+fn+'&_='+Date.now();
+    sc.onerror=()=>{ if(!listo){ limpiar(); fail(new Error('se cortó la descarga')); } };
+    document.body.appendChild(sc);
+    setTimeout(()=>{ if(!listo){ limpiar(); fail(new Error('no respondió a tiempo')); } }, PLAZO_MS);
+  });
+}
+
+const esperar = ms => new Promise(r=>setTimeout(r,ms));
+
+async function pedir(params, avisar){
+  let ultimo;
+  for(let i=1;i<=INTENTOS;i++){
+    try{
+      return await pedirUnaVez(params);
+    }catch(e){
+      ultimo=e;
+      if(i<INTENTOS){
+        if(avisar) avisar('La conexión falló. Reintentando ('+i+' de '+(INTENTOS-1)+')…');
+        await esperar(i*1200);      /* 1,2 s y luego 2,4 s: da aire a la red */
+      }
+    }
+  }
+  throw ultimo;
+}
+
+async function cargar(){
+  try{
+    document.getElementById('estado').textContent='Cargando…';
+    const op=await pedir({accion:'opcionesconsulta'});
+    if(op&&op.ok){
+      llenarSelect('fCliente', op.clientes||[]);
+      llenarSelect('fAuditor', op.auditores||[]);
+    }
+  }catch(e){ /* sin desplegables se puede buscar igual escribiendo */ }
+  buscar();
+}
+
 /* Una llamada al backend, con los parámetros que se le pasen. */
 function pedir(params){
   return new Promise((ok,fail)=>{
@@ -298,15 +366,20 @@ async function buscar(){
       cliente:val('fCliente'), auditor:val('fAuditor'), resultado:val('fResultado'),
       desde:val('fDesde'), hasta:val('fHasta'),
       repro:flag(filtroReproceso), lic:flag(filtroLicencia), liq:flag(filtroLiquidado),
-      limite:60, pagina:0
-    });
+      /* Si no se pidió un rango, se limita a los últimos 3 meses: es lo que se
+         consulta casi siempre, y cuanto menos recorra el servidor, menos tarda.
+         Poniendo una fecha en DESDE se busca tan atrás como se quiera. */
+      desde: val('fDesde') || fechaCorte(3),
+      limite:40, pagina:0
+    }, msg => { est.textContent = msg; });
     if(mio!==_idBusqueda) return;
     if(!r||!r.ok) throw new Error((r&&r.error)||'respuesta inesperada');
     pintar(r.rows||[], r.total||0, !!r.hayMas);
   }catch(e){
     if(mio!==_idBusqueda) return;
     est.style.display='block';
-    est.textContent='No se pudo buscar: '+e.message+'. Inténtalo de nuevo.';
+    est.textContent='No se pudo buscar ('+e.message+') tras varios intentos. '+
+      'La conexión está inestable: vuelve a intentarlo o acota los filtros.';
   }
 }
 
