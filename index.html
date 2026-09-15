@@ -1882,7 +1882,11 @@ function calcularFaltantes(){
   const esReproceso = !!S.reprocesaDe;
   // Tolera los dos formatos: el histórico guarda '1ra' y desde el Paso 14 se guarda '1'.
   const ordinalDicePrimera = (S.nAud==='' || numParcial(S.nAud)===1) && S.nAud!=='Reproceso';
-  const fotoMedOK = editando || esReproceso || !ordinalDicePrimera || loteYaAuditadoAntes() || S.fotosMed.length>0;
+  /* La foto de las hojas de medidas dejó de ser obligatoria en la primera
+     auditoría, a pedido de Calidad: en planta no siempre hay medidas que
+     fotografiar cuando el lote recién llega, y exigirla frenaba el registro de
+     una auditoría que por lo demás estaba completa. Se puede adjuntar igual. */
+  const fotoMedOK = true;
 
   const faltan=[];
   if(!v2('grupo')) faltan.push('Grupo');
@@ -2563,6 +2567,13 @@ function recolectarBorrador(){
     ts: Date.now(), campos, checks,
     proceso:S.proceso, nAud:S.nAud, int_ext:S.int_ext, nivel:S.nivel,
     override:S.override, licencia:S.licencia, reproceso:S.reproceso, liquidado:S.liquidado, editId:S.editId||null,
+    /* El vínculo al rechazo que se corrige. Sin esto, quien toca "Reprocesar" y
+       continúa la auditoría más tarde —al volver de otra app o al día siguiente—
+       la guardaba marcada como reproceso pero SIN decir a cuál corrige: el
+       rechazo seguía apareciendo pendiente y el lote no se descontaba, así que la
+       suma del pedido se pasaba del total. */
+    reprocesaDe:S.reprocesaDe||null,
+    motivoRepro:($('motivoReproceso')?$('motivoReproceso').value:''),
     defs:S.defs.map(b=>({seccion:b.seccion,categoria:b.categoria,detalle:b.detalle,cant:b.cant,foto:b.foto,subs:(b.subs||[]).map(s=>({subtipo:s.subtipo,cant:s.cant,foto:s.foto}))})),
     ders:S.ders.map(b=>({categoria:b.categoria,detalle:b.detalle,cant:b.cant,foto:b.foto,subs:(b.subs||[]).map(s=>({subtipo:s.subtipo,cant:s.cant,foto:s.foto}))})),
     fotosMed:S.fotosMed, fotosPro:S.fotosPro
@@ -2628,6 +2639,15 @@ function restaurarBorrador(){
 
   if(b.proceso){ const selP=$('proceso'); if(selP) selP.value=b.proceso; }
   S.proceso=b.proceso||''; S.int_ext=b.int_ext||''; S.nAud=b.nAud||''; S.nivel=b.nivel||'1.5';
+  S.reprocesaDe=b.reprocesaDe||null;
+  if(S.reprocesaDe){
+    /* Se vuelve a mostrar el aviso: si no, la auditora no tiene forma de saber
+       que el vínculo sigue puesto. */
+    var mrE=$('modoReproceso'); if(mrE) mrE.style.display='';
+    var rdE=$('reprocesaDeId'); if(rdE) rdE.textContent=S.reprocesaDe;
+    var mrwE=$('motivoReprocesoWrap'); if(mrwE) mrwE.style.display='';
+    if($('motivoReproceso') && b.motivoRepro) $('motivoReproceso').value=b.motivoRepro;
+  }
 
   /* Los borradores guardados con una versión anterior no traen 'proceso' ni
      'int_ext' como campos propios: el desplegable sí se rellenaba —viene en la
