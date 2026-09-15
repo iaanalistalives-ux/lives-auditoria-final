@@ -328,6 +328,7 @@ async function buscar(){
   est.style.display='block'; est.textContent='Buscando…';
   document.getElementById('count').textContent='';
 
+  guardarFiltros();
   const flag=v=>v===true?'1':(v===false?'0':'');
   try{
     const r=await pedir({
@@ -396,6 +397,7 @@ document.getElementById('btnLimpiar').onclick=()=>{
   ['fPo','fOp','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
   filtroReproceso=null; filtroLicencia=null; filtroLiquidado=null;
+  try{ sessionStorage.removeItem('buscar_filtros'); }catch(e){}
   pintarBotonFiltro('btnReprocesos', null, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
   pintarBotonFiltro('btnLicencias', null, 'Licencias', 'Solo licencias', 'Sin licencias');
   pintarBotonFiltro('btnLiquidados', null, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
@@ -434,6 +436,41 @@ document.getElementById('btnLiquidados').onclick=()=>{
    nuevo: parecía que el filtro no funcionaba cuando la respuesta iba en camino.
    Ahora se busca al pulsar el botón o Enter, y se sabe exactamente qué se pidió. */
 document.getElementById('btnBuscar').onclick = buscar;
+
+/* Los filtros se recuerdan al ir a un reporte y volver.
+
+   Antes, al pulsar "Ver / PDF" y regresar con el botón atrás, la pantalla se
+   cargaba de cero y había que escribirlo todo otra vez. Aquí duele especialmente,
+   donde cada búsqueda cuesta varios segundos. Se guardan solo mientras la pestaña
+   siga abierta. */
+const CAMPOS_FILTRO = ['fProceso','fGrupo','fOp','fEstilo','fColor','fPo',
+                       'fCliente','fAuditor','fResultado','fDesde','fHasta'];
+
+function guardarFiltros(){
+  try{
+    const f={};
+    CAMPOS_FILTRO.forEach(function(id){ const e=document.getElementById(id); if(e) f[id]=e.value; });
+    f._repro=filtroReproceso; f._lic=filtroLicencia; f._liq=filtroLiquidado;
+    sessionStorage.setItem('buscar_filtros', JSON.stringify(f));
+  }catch(e){ /* sin memoria de pestaña se sigue igual, solo sin recordar */ }
+}
+
+function restaurarFiltros(){
+  try{
+    const f=JSON.parse(sessionStorage.getItem('buscar_filtros')||'null');
+    if(!f) return false;
+    CAMPOS_FILTRO.forEach(function(id){
+      const e=document.getElementById(id); if(e && f[id]!==undefined) e.value=f[id];
+    });
+    filtroReproceso=(f._repro===undefined?null:f._repro);
+    filtroLicencia =(f._lic===undefined?null:f._lic);
+    filtroLiquidado=(f._liq===undefined?null:f._liq);
+    pintarBotonFiltro('btnReprocesos', filtroReproceso, 'Reprocesos', 'Solo reprocesos', 'Sin reprocesos');
+    pintarBotonFiltro('btnLicencias',  filtroLicencia,  'Licencias',  'Solo licencias',  'Sin licencias');
+    pintarBotonFiltro('btnLiquidados', filtroLiquidado, 'Liquidados', 'Solo liquidados', 'Sin liquidados');
+    return true;
+  }catch(e){ return false; }
+}
 
 ['fGrupo','fEstilo','fColor','fPo','fOp','fDesde','fHasta'].forEach(id=>{
   document.getElementById(id).addEventListener('keydown', e=>{
@@ -488,6 +525,8 @@ function sugerir(id, valores){
   if(valores.length===1 && !inp.value) inp.value=valores[0];
 }
 
+/* Si se vuelve de un reporte, se reponen los filtros antes de buscar. */
+restaurarFiltros();
 cargar();
 </script>
 </body>
