@@ -78,7 +78,10 @@ tr:hover td{background:#f6f9fb}
       <div><label>OP</label><input id="fOp" placeholder="24978"></div>
       <div><label>Estilo LIVES</label><input id="fEstilo" placeholder="24647"></div>
       <div><label>Color</label><input id="fColor" placeholder="White"></div>
-      <div><label>PO</label><input id="fPo" placeholder="6002469"></div>
+      <div><label>PO</label><input id="fPo" placeholder="6002469">
+        </div>
+        <div class="f">
+          <label>TALLER</label><input id="fTaller" placeholder="MARUDI"></div>
       <div><label>Cliente</label><select id="fCliente"><option value="">Todos</option></select></div>
       <div><label>Auditor</label><select id="fAuditor"><option value="">Todos</option></select></div>
       <div><label>Resultado</label><select id="fResultado"><option value="">Todos</option><option value="aprob">Aprobado</option><option value="rech">Rechazado</option><option value="override">Override</option></select></div>
@@ -92,7 +95,7 @@ tr:hover td{background:#f6f9fb}
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
       <button class="btn toggle" id="btnLiquidados" type="button">Liquidados</button>
     </div>
-    <div class="hint">Empieza por la <b>OP</b>: al buscarla se completan el grupo, el estilo, el color y el PO de esa orden. Si no la tienes, puedes filtrar por cualquier otro campo. Pulsa <b>Buscar</b> o la tecla Enter. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
+    <div class="hint">Aquí se ven las auditorías <b>capturadas en planta con el formulario</b>; las transcritas por digitación no aparecen. Empieza por la <b>OP</b>: al buscarla se completan el grupo, el estilo, el color y el PO de esa orden. Si no la tienes, puedes filtrar por cualquier otro campo. Pulsa <b>Buscar</b> o la tecla Enter. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
   </div>
 
   <div class="card">
@@ -336,6 +339,7 @@ async function buscar(){
       proceso:val('fProceso'), grupo:val('fGrupo'), op:val('fOp'),
       estilo:val('fEstilo'), color:val('fColor'), po:val('fPo'),
       cliente:val('fCliente'), auditor:val('fAuditor'), resultado:val('fResultado'),
+      taller:val('fTaller'),
       desde:val('fDesde'), hasta:val('fHasta'),
       repro:flag(filtroReproceso), lic:flag(filtroLicencia), liq:flag(filtroLiquidado),
       /* Si no se pidió un rango, se limita a los últimos 3 meses: es lo que se
@@ -364,8 +368,10 @@ function pintar(res, total, hayMas){
     cnt.textContent=''; return;
   }
   est.style.display='none';
+  /* Cuando la consulta se corta pronto —para no recorrer miles de filas— el
+     total es aproximado. Se dice "más de" en vez de dar una cifra que no es. */
   cnt.textContent = hayMas
-    ? (res.length+' de '+total+' auditorías · afina los filtros para ver el resto')
+    ? (res.length+' de más de '+total+' auditorías · afina los filtros para ver el resto')
     : (total+' auditoría(s) encontrada(s)');
 
   /* Cada fila llega como arreglo, en este orden fijo:
@@ -394,6 +400,7 @@ function pintar(res, total, hayMas){
 function val(id){return document.getElementById(id).value.trim();}
 
 document.getElementById('btnLimpiar').onclick=()=>{
+  const t=document.getElementById('fTaller'); if(t) t.value='';
   ['fPo','fOp','fGrupo','fEstilo','fColor','fDesde','fHasta'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fProceso').value=''; document.getElementById('fCliente').value=''; document.getElementById('fAuditor').value=''; document.getElementById('fResultado').value='';
   filtroReproceso=null; filtroLicencia=null; filtroLiquidado=null;
@@ -443,7 +450,7 @@ document.getElementById('btnBuscar').onclick = buscar;
    cargaba de cero y había que escribirlo todo otra vez. Aquí duele especialmente,
    donde cada búsqueda cuesta varios segundos. Se guardan solo mientras la pestaña
    siga abierta. */
-const CAMPOS_FILTRO = ['fProceso','fGrupo','fOp','fEstilo','fColor','fPo',
+const CAMPOS_FILTRO = ['fProceso','fGrupo','fOp','fEstilo','fColor','fPo','fTaller',
                        'fCliente','fAuditor','fResultado','fDesde','fHasta'];
 
 function guardarFiltros(){
@@ -472,7 +479,7 @@ function restaurarFiltros(){
   }catch(e){ return false; }
 }
 
-['fGrupo','fEstilo','fColor','fPo','fOp','fDesde','fHasta'].forEach(id=>{
+['fGrupo','fEstilo','fColor','fPo','fOp','fTaller','fDesde','fHasta'].forEach(id=>{
   document.getElementById(id).addEventListener('keydown', e=>{
     if(e.key==='Enter'){ e.preventDefault(); buscar(); }
   });
