@@ -226,7 +226,10 @@ function leerHojaScript(tab,id){
       else reject(new Error((res&&res.error)||'respuesta inválida'));
     };
     const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
+    /* 'UNA' es el atajo para pedir una sola auditoría por su id. */
+    sc.src = (tab==='UNA')
+      ? (APP_URL+'?accion=unaauditoria&id='+encodeURIComponent(id)+'&callback='+fn+'&_='+Date.now())
+      : (APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now());
     sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
     document.body.appendChild(sc);
   });
@@ -295,7 +298,11 @@ async function cargar(){
        gviz para esa hoja, y el PO volviera a llegar vacío sin que nada avisara. buscar.html no
        lo sufría porque pide menos hojas a la vez.
        Una detrás de otra tarda un poco más pero llega completo, que es lo que importa. */
-    rows = await gviz('AUDITORÍAS');
+    /* Solo esta auditoría, no la tabla entera. Antes se descargaban cientos de
+       filas para mostrar una sola: con la conexión de la planta eso tarda varios
+       segundos y a veces no llega. */
+    rows = await leerHojaScript('UNA', ID).catch(function(){ return null; })
+           || await gviz('AUDITORÍAS');
     /* Se pide SOLO el detalle de esta auditoría: el servidor filtra por id. La tabla
        de detalle del maestro pasa de 16.000 filas y traerlas enteras a un celular con
        datos móviles se cae por tiempo de espera. */
