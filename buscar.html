@@ -292,36 +292,6 @@ async function pedir(params, avisar){
   throw ultimo;
 }
 
-async function cargar(){
-  try{
-    document.getElementById('estado').textContent='Cargando…';
-    const op=await pedir({accion:'opcionesconsulta'});
-    if(op&&op.ok){
-      llenarSelect('fCliente', op.clientes||[]);
-      llenarSelect('fAuditor', op.auditores||[]);
-    }
-  }catch(e){ /* sin desplegables se puede buscar igual escribiendo */ }
-  buscar();
-}
-
-/* Una llamada al backend, con los parámetros que se le pasen. */
-function pedir(params){
-  return new Promise((ok,fail)=>{
-    const fn='cb'+Math.random().toString(36).slice(2);
-    const sc=document.createElement('script');
-    let listo=false;
-    const limpiar=()=>{ try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.remove(); };
-    window[fn]=r=>{ listo=true; limpiar(); ok(r); };
-    const qs=Object.keys(params)
-      .filter(k=>params[k]!==''&&params[k]!==null&&params[k]!==undefined)
-      .map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
-    sc.src=APP_URL+'?'+qs+'&callback='+fn+'&_='+Date.now();
-    sc.onerror=()=>{ if(!listo){ limpiar(); fail(new Error('sin conexión')); } };
-    document.body.appendChild(sc);
-    setTimeout(()=>{ if(!listo){ limpiar(); fail(new Error('tardó demasiado')); } }, 45000);
-  });
-}
-
 function llenarSelect(id,vals){
   const s=document.getElementById(id);
   vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});
