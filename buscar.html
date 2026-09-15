@@ -325,6 +325,35 @@ function badge(res){
 }
 let _idBusqueda=0;
 
+/* Memoria de las últimas búsquedas, mientras la pestaña siga abierta.
+
+   Con la conexión de la planta cada consulta cuesta varios segundos, y en la
+   práctica se repiten mucho: se mira un reporte, se vuelve, se cambia un filtro
+   y se deshace. Guardando el resultado, volver a una búsqueda ya hecha es
+   instantáneo y no se gasta la red.
+
+   Dura 10 minutos: lo bastante para moverse por la pantalla, lo bastante poco
+   para no esconder una auditoría recién registrada. */
+const CACHE_MINUTOS = 10, CACHE_MAX = 12;
+const _cache = new Map();
+
+function claveDe(params){
+  return Object.keys(params).sort().map(k=>k+'='+params[k]).join('&');
+}
+
+function deCache(clave){
+  const e=_cache.get(clave);
+  if(!e) return null;
+  if(Date.now()-e.ts > CACHE_MINUTOS*60000){ _cache.delete(clave); return null; }
+  return e.dato;
+}
+
+function aCache(clave, dato){
+  _cache.set(clave, {ts:Date.now(), dato:dato});
+  /* No crece sin límite: se descarta lo más antiguo. */
+  while(_cache.size > CACHE_MAX) _cache.delete(_cache.keys().next().value);
+}
+
 async function buscar(){
   const mio=++_idBusqueda;          /* si llegan dos respuestas, gana la última pedida */
   const est=document.getElementById('estado');
@@ -333,23 +362,30 @@ async function buscar(){
 
   guardarFiltros();
   const flag=v=>v===true?'1':(v===false?'0':'');
-  try{
-    const r=await pedir({
+  const params={
       accion:'consultar',
       proceso:val('fProceso'), grupo:val('fGrupo'), op:val('fOp'),
       estilo:val('fEstilo'), color:val('fColor'), po:val('fPo'),
-      cliente:val('fCliente'), auditor:val('fAuditor'), resultado:val('fResultado'),
       taller:val('fTaller'),
-      desde:val('fDesde'), hasta:val('fHasta'),
+      cliente:val('fCliente'), auditor:val('fAuditor'), resultado:val('fResultado'),
       repro:flag(filtroReproceso), lic:flag(filtroLicencia), liq:flag(filtroLiquidado),
-      /* Si no se pidió un rango, se limita a los últimos 3 meses: es lo que se
-         consulta casi siempre, y cuanto menos recorra el servidor, menos tarda.
-         Poniendo una fecha en DESDE se busca tan atrás como se quiera. */
       desde: val('fDesde') || fechaCorte(3),
       limite:40, pagina:0
-    }, msg => { est.textContent = msg; });
+  };
+
+  /* Si esta misma búsqueda ya se hizo hace poco, se pinta al momento. */
+  const clave=claveDe(params);
+  const guardado=deCache(clave);
+  if(guardado){
+    pintar(guardado.rows||[], guardado.total||0, !!guardado.hayMas);
+    return;
+  }
+
+  try{
+    const r=await pedir(params, msg => { est.textContent = msg; });
     if(mio!==_idBusqueda) return;
     if(!r||!r.ok) throw new Error((r&&r.error)||'respuesta inesperada');
+    aCache(clave, r);
     pintar(r.rows||[], r.total||0, !!r.hayMas);
   }catch(e){
     if(mio!==_idBusqueda) return;
