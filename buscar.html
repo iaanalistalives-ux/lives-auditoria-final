@@ -173,7 +173,9 @@ function leerHojaScript(tab,id){
       else reject(new Error((res&&res.error)||'respuesta inválida'));
     };
     const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
+    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')
+            +(window.DESDE_CARGA?('&desde='+encodeURIComponent(window.DESDE_CARGA)):'')
+            +'&callback='+fn+'&_='+Date.now();
     sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
     document.body.appendChild(sc);
   });
@@ -213,8 +215,24 @@ function fechaTxt(v){
 }
 function esEnc(r){return !r[0]||norm(r[0])==='id_auditoria'||norm(r[0])==='';}
 
+/* Cuántos meses se traen. Se pide al servidor, no se filtra aquí: traer la tabla
+   entera para después descartar casi todo es lo que hacía fallar la carga en un
+   celular — la respuesta era un único bloque de texto de varios megas.
+
+   Son SIEMPRE los últimos 6 meses, contados desde el día en que se abre la
+   pantalla. No es una fecha fija: la ventana avanza sola con el calendario, así
+   que no hay que tocar nada nunca. */
+const MESES_CARGA = 6;
+
+function fechaCorte(meses){
+  const d=new Date(); d.setMonth(d.getMonth()-meses);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+
 async function cargar(){
   try{
+    document.getElementById('estado').textContent='Cargando…';
+    window.DESDE_CARGA = fechaCorte(MESES_CARGA);
     const rows=await gviz('AUDITORÍAS');
     DATA=rows.filter(r=>!esEnc(r));
     // poblar selects de cliente y auditor
@@ -222,9 +240,11 @@ async function cargar(){
     llenarSelect('fAuditor', [...new Set(DATA.map(r=>r[C.auditor]).filter(Boolean))].sort());
     buscar();
   }catch(e){
-    document.getElementById('estado').textContent='No se pudo cargar. Revisa tu conexión.';
+    document.getElementById('estado').textContent=
+      'No se pudo cargar. Revisa tu conexión o prueba con menos meses.';
   }
 }
+
 function llenarSelect(id,vals){
   const s=document.getElementById(id);
   vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});
