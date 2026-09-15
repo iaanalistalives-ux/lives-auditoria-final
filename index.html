@@ -1899,6 +1899,22 @@ function calcularFaltantes(){
   if(!lote) faltan.push('Total recibido');
   if(!S.proceso) faltan.push('Proceso');
   if(!v2('auditor')) faltan.push('Auditor');
+  /* El nombre tiene que existir en el catálogo de personal.
+
+     Aquí el nombre lo pone el portal y nadie lo teclea, así que un nombre mal
+     escrito NO es un desliz: significa que en el portal esa persona está
+     registrada de otra forma —"JESICA" por "JESSICA"— y entonces TODAS sus
+     auditorías entran mal, una tras otra, por mucho que se limpie el Sheet.
+     Avisarlo aquí es la única manera de que se note y se corrija en el origen.
+
+     Si el catálogo no cargó no se bloquea: dejar a una auditora sin poder
+     registrar por una lista que no llegó sería peor. */
+  else if(AUDITORAS && AUDITORAS.length){
+    const q = nombreNorm(v('auditor'));
+    if(!AUDITORAS.some(a => nombreNorm(a) === q)){
+      faltan.push('Auditor: "'+v('auditor')+'" no está en la lista de personal — avisa a Sistemas');
+    }
+  }
   if(!v('fecha')) faltan.push('Fecha');
   if(!S.nAud) faltan.push('N° de auditoría');
   if(!fotoMedOK) faltan.push('Foto de hojas de medidas');
