@@ -86,12 +86,13 @@ tr:hover td{background:#f6f9fb}
       <div><label>Hasta</label><input id="fHasta" type="date"></div>
     </div>
     <div class="btns">
+      <button class="btn" id="btnBuscar" type="button">Buscar</button>
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
       <button class="btn toggle" id="btnLiquidados" type="button">Liquidados</button>
     </div>
-    <div class="hint">Los resultados se actualizan solos según vas eligiendo o escribiendo. Puedes combinar filtros. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
+    <div class="hint">Empieza por la <b>OP</b>: al buscarla se completan el grupo, el estilo, el color y el PO de esa orden. Si no la tienes, puedes filtrar por cualquier otro campo. Pulsa <b>Buscar</b> o la tecla Enter. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
   </div>
 
   <div class="card">
@@ -426,10 +427,66 @@ document.getElementById('btnLiquidados').onclick=()=>{
 };
 // Filtros en vivo: los selects y fechas filtran apenas cambian; los campos de texto
 // filtran mientras se escribe, con una pausa corta para no recalcular en cada tecla.
-let _buscarTimer=null;
-function buscarDebounced(){ clearTimeout(_buscarTimer); _buscarTimer=setTimeout(buscar,200); }
-['fGrupo','fEstilo','fColor','fPo','fOp'].forEach(id=>document.getElementById(id).addEventListener('input',buscarDebounced));
-['fProceso','fCliente','fAuditor','fResultado','fDesde','fHasta'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
+/* La búsqueda ya NO se dispara sola al escribir.
+
+   Con la conexión de la planta cada consulta tarda varios segundos, así que al
+   teclear un grupo salían resultados del filtro anterior mientras llegaba el
+   nuevo: parecía que el filtro no funcionaba cuando la respuesta iba en camino.
+   Ahora se busca al pulsar el botón o Enter, y se sabe exactamente qué se pidió. */
+document.getElementById('btnBuscar').onclick = buscar;
+
+['fGrupo','fEstilo','fColor','fPo','fOp','fDesde','fHasta'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); buscar(); }
+  });
+});
+/* Los desplegables sí buscan al cambiar: ahí se elige de una lista, no se teclea. */
+['fProceso','fCliente','fAuditor','fResultado'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
+
+/* Al salir del campo OP se traen los lotes de esa orden y se completan los demás
+   filtros. Si la OP tiene un solo grupo y un solo estilo, se rellenan solos; si
+   tiene varios, quedan como sugerencias al escribir. */
+document.getElementById('fOp').addEventListener('change', cargarLotesDeOp);
+
+async function cargarLotesDeOp(){
+  const op = val('fOp');
+  ['fGrupo','fEstilo','fColor','fPo'].forEach(id=>{
+    const d=document.getElementById('lista_'+id); if(d) d.innerHTML='';
+  });
+  if(!op) return;
+  const est=document.getElementById('estado');
+  est.style.display='block'; est.textContent='Buscando los lotes de la OP '+op+'…';
+  try{
+    const r = await pedir({accion:'lotesdeop', op:op});
+    if(!r||!r.ok||!r.filas){
+      est.textContent='Esa OP no está en la tabla de órdenes. Puedes buscar igual por los demás filtros.';
+      return;
+    }
+    sugerir('fGrupo',  r.grupos);
+    sugerir('fEstilo', r.estilos);
+    sugerir('fColor',  r.colores);
+    sugerir('fPo',     r.pos);
+    est.textContent='';
+    buscar();
+  }catch(e){
+    est.textContent='No se pudieron traer los lotes de la OP. Busca igual: la OP por sí sola ya filtra.';
+  }
+}
+
+/* Deja la lista como sugerencias del campo, y lo completa si solo hay un valor. */
+function sugerir(id, valores){
+  const inp=document.getElementById(id);
+  if(!inp || !valores) return;
+  let d=document.getElementById('lista_'+id);
+  if(!d){
+    d=document.createElement('datalist');
+    d.id='lista_'+id;
+    document.body.appendChild(d);
+    inp.setAttribute('list', d.id);
+  }
+  d.innerHTML = valores.map(v=>'<option value="'+String(v).replace(/"/g,'&quot;')+'">').join('');
+  if(valores.length===1 && !inp.value) inp.value=valores[0];
+}
 
 cargar();
 </script>
