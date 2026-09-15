@@ -81,7 +81,7 @@ tr:hover td{background:#f6f9fb}
       <div><label>PO</label><input id="fPo" placeholder="6002469">
         </div>
         <div class="f">
-          <label>TALLER</label><input id="fTaller" placeholder="MARUDI"></div>
+          <label>TALLER</label><select id="fTaller"><option value="">Todos</option></select></div>
       <div><label>Cliente</label><select id="fCliente"><option value="">Todos</option></select></div>
       <div><label>Auditor</label><select id="fAuditor"><option value="">Todos</option></select></div>
       <div><label>Resultado</label><select id="fResultado"><option value="">Todos</option><option value="aprob">Aprobado</option><option value="rech">Rechazado</option><option value="override">Override</option></select></div>
@@ -235,6 +235,7 @@ async function cargar(){
     if(op&&op.ok){
       llenarSelect('fCliente', op.clientes||[]);
       llenarSelect('fAuditor', op.auditores||[]);
+      llenarSelect('fTaller',  op.talleres||[]);
     }
   }catch(e){ /* sin desplegables se puede buscar igual escribiendo */ }
   buscar();
@@ -515,13 +516,13 @@ function restaurarFiltros(){
   }catch(e){ return false; }
 }
 
-['fGrupo','fEstilo','fColor','fPo','fOp','fTaller','fDesde','fHasta'].forEach(id=>{
+['fGrupo','fEstilo','fColor','fPo','fOp','fDesde','fHasta'].forEach(id=>{
   document.getElementById(id).addEventListener('keydown', e=>{
     if(e.key==='Enter'){ e.preventDefault(); buscar(); }
   });
 });
 /* Los desplegables sí buscan al cambiar: ahí se elige de una lista, no se teclea. */
-['fProceso','fCliente','fAuditor','fResultado'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
+['fProceso','fCliente','fAuditor','fResultado','fTaller'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
 
 /* Al salir del campo OP se traen los lotes de esa orden y se completan los demás
    filtros. Si la OP tiene un solo grupo y un solo estilo, se rellenan solos; si
