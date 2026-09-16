@@ -262,7 +262,284 @@ function fechaCorte(meses){
   return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
 }
 
+/* =====================================================================
+   LECTURA DE AUDITORÍAS DESDE SUPABASE (desde el 16/09/2026)
+   ---------------------------------------------------------------------
+   Historial de Auditoría Final, detalle de defectos/derivados, búsqueda,
+   opciones de búsqueda y lotes de una OP. Cada función devuelve EXACTAMENTE
+   lo que devolvía el Apps Script, así que el resto de la pantalla no cambia.
+   Lo que se guarda llega a Supabase en el mismo momento, así que estas
+   lecturas nunca están atrasadas. Si Supabase no responde, la pantalla usa
+   el Apps Script como antes.
+   ===================================================================== */
+var SBA_URL = 'https://xxfufpddgoyhbotjmaiy.supabase.co';
+var SBA_KEY = 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+var SBA_PAGINA = 1000;
+var SBA_ESPERA = 15000;
+
+function sbaT(v){ return String(v == null ? '' : v).trim(); }
+function sbaU(v){ return sbaT(v).toUpperCase(); }
+function sbaTxt(v){ return v == null ? '' : String(v); }
+
+/* Lee una vista completa (o filtrada) de mil en mil. */
+function sbaLeer(vista, select, orden, filtro){
+  var todas = [];
+  function pagina(desde){
+    var url = SBA_URL + '/rest/v1/' + vista + '?select=' + encodeURIComponent(select) +
+              (filtro ? '&' + filtro : '') +
+              '&order=' + encodeURIComponent(orden) + '&limit=' + SBA_PAGINA + '&offset=' + desde;
+    var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var reloj = setTimeout(function(){ if (control) control.abort(); }, SBA_ESPERA);
+    return fetch(url, { headers: { apikey: SBA_KEY }, cache: 'no-store',
+                        signal: control ? control.signal : undefined })
+      .then(function(r){
+        clearTimeout(reloj);
+        if (!r.ok) throw new Error('Supabase ' + r.status);
+        return r.json();
+      }, function(e){ clearTimeout(reloj); throw e; })
+      .then(function(lote){
+        todas = todas.concat(lote);
+        return lote.length === SBA_PAGINA ? pagina(desde + SBA_PAGINA) : todas;
+      });
+  }
+  return pagina(0);
+}
+
+/* Las 54 columnas, en el orden que espera la pantalla (VISTA_PILOTO del backend). */
+var SBA_COLS = ['id_auditoria','fecha','n_parcial','proceso','int_ext','servicio','cliente',
+  'grupo','estilo_lives','estilo_cliente','po','color','destino','cant_pedido','total_recibido',
+  'lote_real','licencia','lote_aql','muestra','nivel_aql','acepta_max','rechaza_min','total_def',
+  'resultado_aql','override','override_autoriza','override_motivo','resultado_final',
+  'muestra_medidas','def_medidas','resultado_medidas','auditor','semana','foto_general_url',
+  'lote_key','repetido','lote_contable','anio','computable','reproceso','comentario','total_der',
+  'fotos_medidas','fotos_proceso','muestra_contable','cod_tela','desc_tela','hora_envio',
+  'reproceso_motivo','reprocesa_de','op','liquidado','n_auditoria','captura'];
+var SBA_I_REPETIDO = SBA_COLS.indexOf('repetido');
+var SBA_I_LIQUIDADO = SBA_COLS.indexOf('liquidado');
+
+function sbaFila(x){
+  var f = SBA_COLS.map(function(c){ return sbaTxt(x[c]); });
+  /* Dos columnas cambian de forma entre los dos sistemas: se entregan como las
+     espera la pantalla, igual que hace el Apps Script. */
+  f[SBA_I_REPETIDO]  = (sbaT(f[SBA_I_REPETIDO]) === '1') ? 'REPETIDO' : '1ra vez';
+  f[SBA_I_LIQUIDADO] = (sbaT(f[SBA_I_LIQUIDADO]) === '1') ? 'SÍ' : 'NO';
+  return f;
+}
+
+/* accion=hoja&nombre=AUDITORÍAS */
+function sbaVistaPiloto(){
+  return sbaLeer('publico_vista_piloto', SBA_COLS.join(','), 'fila_hoja.asc.nullslast')
+    .then(function(filas){
+      if (!filas.length) throw new Error('publico_vista_piloto llegó vacía');
+      return filas.map(sbaFila);
+    });
+}
+
+/* accion=unaauditoria&id=… */
+function sbaUnaAuditoria(id){
+  var b = sbaT(id);
+  return sbaLeer('publico_vista_piloto', SBA_COLS.join(','), 'fila_hoja.asc.nullslast',
+                 'id_auditoria=eq.' + encodeURIComponent(b))
+    .then(function(filas){
+      if (!filas.length) throw new Error('No se encontró la auditoría ' + b + '.');
+      return [sbaFila(filas[0])];
+    });
+}
+
+/* accion=hoja&nombre=DEFECTOS|DERIVADOS&id=…
+   ID_AUDITORIA | COD | SECCION | CATEGORIA | SUBTIPO | CANTIDAD | NOTA | FOTO_URL */
+function sbaDetallePiloto(soloDerivados, id){
+  var b = sbaT(id);
+  if (!b) return Promise.reject(new Error('detalle sin id: se usa el Apps Script'));
+  return sbaLeer('publico_detalle_piloto',
+                 'orden,id_auditoria,cod,seccion,categoria,subtipo,cantidad,nota,foto_url,es_derivado',
+                 'orden.asc', 'id_auditoria=eq.' + encodeURIComponent(b))
+    .then(function(filas){
+      return filas.filter(function(x){ return !!x.es_derivado === !!soloDerivados; })
+        .map(function(x){
+          return [x.id_auditoria, x.cod, x.seccion, x.categoria, x.subtipo,
+                  x.cantidad, x.nota, x.foto_url].map(sbaTxt);
+        });
+    });
+}
+
+/* Proceso reducido a una clave, igual que procesoCanonico_ del backend. */
+function sbaProceso(v){
+  var p = sbaU(v);
+  if (!p) return '';
+  if (p.indexOf('COSTURA') >= 0) return 'COSTURA';
+  if (p.indexOf('ACABADOS') >= 0) return (p.indexOf('INTERN') >= 0) ? 'ACABADOS_INT' : 'ACABADOS_EXT';
+  return p;
+}
+function sbaSN(v){
+  var t = sbaU(v);
+  if (t === '') return 0;
+  if (t === 'SI' || t === 'SÍ' || t === 'TRUE' || t === 'VERDADERO') return 1;
+  if (t === 'NO' || t === 'FALSE' || t === 'FALSO') return 0;
+  var n = parseFloat(t);
+  return (isFinite(n) && n !== 0) ? 1 : 0;
+}
+
+/* Vistas que se reutilizan dentro de la misma página. "vigencia" en segundos:
+   pasado ese tiempo se vuelven a pedir, para que una búsqueda repetida vea las
+   auditorías guardadas mientras la pantalla estaba abierta. */
+var SBA_CACHE = {};
+function sbaUna(nombre, fn, vigencia){
+  var c = SBA_CACHE[nombre];
+  if (c && vigencia && (Date.now() - c.t) > vigencia * 1000) c = null;
+  if (!c) {
+    c = SBA_CACHE[nombre] = { t: Date.now(), p: fn() };
+    c.p.catch(function(){ if (SBA_CACHE[nombre] === c) delete SBA_CACHE[nombre]; });
+  }
+  return c.p;
+}
+function sbaOpsTabla(){
+  return sbaUna('ops', function(){
+    return sbaLeer('publico_ref_ops', 'op,grupo,estilo,color,po,orden', 'orden.asc');
+  }, 600);
+}
+
+/* accion=lotesdeop */
+function sbaLotesDeOp(p){
+  var op = sbaT(p.op);
+  if (!op) return Promise.resolve({ ok: true, grupos: [], estilos: [], colores: [], pos: [] });
+  var buscado = sbaU(op);
+  return sbaOpsTabla().then(function(tabla){
+    var g = {}, e = {}, c = {}, po = {}, n = 0;
+    tabla.forEach(function(r){
+      if (sbaU(r.op) !== buscado) return;
+      n++;
+      if (sbaT(r.grupo))  g[sbaT(r.grupo)] = true;
+      if (sbaT(r.estilo)) e[sbaT(r.estilo)] = true;
+      if (sbaT(r.color))  c[sbaT(r.color)] = true;
+      if (sbaT(r.po))     po[sbaT(r.po)] = true;
+    });
+    return { ok: true, filas: n,
+             grupos: Object.keys(g).sort(), estilos: Object.keys(e).sort(),
+             colores: Object.keys(c).sort(), pos: Object.keys(po).sort() };
+  });
+}
+
+/* Datos que usan la búsqueda y sus desplegables: auditorías vigentes de Final,
+   en orden de hoja. Se piden una sola vez por página. */
+function sbaVistaBusqueda(){
+  return sbaUna('busqueda', function(){
+    return sbaLeer('publico_vista_piloto',
+      'fila_hoja,id_auditoria,fecha,proceso,grupo,op,estilo_lives,color,po,cliente,auditor,' +
+      'resultado_final,reproceso,licencia,liquidado,servicio,captura',
+      'fila_hoja.asc.nullslast');
+  }, 60);
+}
+
+/* accion=opcionesconsulta */
+function sbaOpcionesConsulta(){
+  return Promise.all([sbaVistaBusqueda(),
+                      sbaLeer('publico_ref_talleres', 'nombre,activo,orden', 'orden.asc')])
+    .then(function(r){
+      var cli = {}, aud = {};
+      r[0].forEach(function(x){
+        if (sbaU(x.captura) !== 'EN VIVO') return;
+        var a = sbaT(x.cliente); if (a) cli[a] = true;
+        var b = sbaT(x.auditor); if (b) aud[b] = true;
+      });
+      var talleres = ['LIVES'];
+      r[1].forEach(function(t){
+        if (!sbaT(t.nombre)) return;
+        if (sbaU(t.activo) === 'NO') return;
+        talleres.push(sbaT(t.nombre));
+      });
+      return { ok: true, clientes: Object.keys(cli).sort(),
+               auditores: Object.keys(aud).sort(), talleres: talleres.sort() };
+    });
+}
+
+/* accion=consultar — misma lógica que accionConsultar_ del backend. */
+function sbaConsultar(p){
+  var pide = function(v){ return sbaU(v).replace(/\s+/g, ' ').trim(); };
+  var cumple = function(celda, buscado){ return !buscado || sbaU(celda).indexOf(buscado) >= 0; };
+  var bandera = function(celda, filtro){
+    if (filtro !== '1' && filtro !== '0') return true;
+    var esSi = sbaSN(celda) === 1;
+    return (filtro === '1') ? esSi : !esSi;
+  };
+  var fPro = sbaProceso(p.proceso), fGru = pide(p.grupo), fOp = pide(p.op),
+      fEs = pide(p.estilo), fCo = pide(p.color), fPo = pide(p.po),
+      fCli = pide(p.cliente), fAud = pide(p.auditor), fRes = pide(p.resultado),
+      fTal = pide(p.taller), desde = sbaT(p.desde), hasta = sbaT(p.hasta),
+      fRep = sbaT(p.repro), fLic = sbaT(p.lic), fLiq = sbaT(p.liq);
+  var soloEnVivo = sbaT(p.incluirDigitado) !== '1';
+  var limN = parseFloat(p.limite); var pagN = parseFloat(p.pagina);
+  var limite = Math.min(Math.max((isFinite(limN) && limN) || 60, 1), 200);
+  var pagina = Math.max((isFinite(pagN) && pagN) || 0, 0);
+
+  return Promise.all([sbaVistaBusqueda(), fOp ? sbaOpsTabla() : Promise.resolve([])])
+    .then(function(r){
+      var filas = r[0], lotes = null;
+      if (fOp) {
+        lotes = { claves: {}, grupos: {} };
+        r[1].forEach(function(o){
+          if (sbaU(o.op) !== fOp) return;
+          lotes.grupos[sbaU(o.grupo) + '|' + sbaU(o.estilo)] = true;
+          lotes.claves[sbaU(o.grupo) + '|' + sbaU(o.estilo) + '|' + sbaU(o.color) + '|' + sbaU(o.po)] = true;
+        });
+      }
+      var esDeOp = function(f){
+        if (!lotes) return false;
+        if (lotes.claves[sbaU(f.grupo) + '|' + sbaU(f.estilo_lives) + '|' + sbaU(f.color) + '|' + sbaU(f.po)]) return true;
+        return !!lotes.grupos[sbaU(f.grupo) + '|' + sbaU(f.estilo_lives)];
+      };
+
+      var encontradas = [], total = 0, hayMasSeguro = false;
+      var inicio = pagina * limite, fin = inicio + limite;
+      for (var i = filas.length - 1; i >= 0; i--) {
+        var f = filas[i];
+        if (!sbaT(f.id_auditoria)) continue;
+        if (soloEnVivo && sbaU(f.captura) !== 'EN VIVO') continue;
+        var fecha = sbaT(f.fecha).substring(0, 10);
+        if (desde && fecha < desde) continue;
+        if (hasta && fecha > hasta) continue;
+        if (fPro && sbaProceso(f.proceso) !== fPro) continue;
+        if (!cumple(f.grupo, fGru)) continue;
+        if (fOp && !cumple(f.op, fOp) && !esDeOp(f)) continue;
+        if (!cumple(f.estilo_lives, fEs)) continue;
+        if (!cumple(f.color, fCo)) continue;
+        if (!cumple(f.po, fPo)) continue;
+        if (fCli && sbaU(f.cliente) !== fCli) continue;
+        if (fAud && sbaU(f.auditor) !== fAud) continue;
+        if (fRes && sbaU(f.resultado_final) !== fRes) continue;
+        if (!cumple(f.servicio, fTal)) continue;
+        if (!bandera(f.reproceso, fRep)) continue;
+        if (!bandera(f.licencia, fLic)) continue;
+        if (!bandera(f.liquidado, fLiq)) continue;
+
+        total++;
+        if (total <= inicio || total > fin) {
+          if (total > fin + 5) { hayMasSeguro = true; break; }
+          continue;
+        }
+        encontradas.push([sbaT(f.id_auditoria), fecha, sbaT(f.cliente), sbaT(f.grupo),
+                          sbaT(f.estilo_lives), sbaT(f.po), sbaT(f.auditor),
+                          sbaT(f.resultado_final), (sbaU(f.captura) === 'DIGITADO' ? 1 : 0)]);
+      }
+      return { ok: true, rows: encontradas, total: total, pagina: pagina, limite: limite,
+               hayMas: hayMasSeguro || total > fin, totalExacto: !hayMasSeguro };
+    });
+}
+/* ================= fin de la lectura de auditorías ================= */
+
+
+/* Búsqueda, desplegables y lotes de una OP: primero Supabase. Si no responde, el
+   Apps Script de siempre, con sus reintentos. */
+var SBA_ACCIONES={ consultar: sbaConsultar, opcionesconsulta: sbaOpcionesConsulta, lotesdeop: sbaLotesDeOp };
 function pedirUnaVez(params){
+  var local=SBA_ACCIONES[params && params.accion];
+  if(!local) return pedirUnaVezGAS(params);
+  return local(params).catch(function(e){
+    console.warn('Supabase no respondió para '+params.accion+', se usa el Apps Script:', e);
+    return pedirUnaVezGAS(params);
+  });
+}
+function pedirUnaVezGAS(params){
   return new Promise((ok,fail)=>{
     const fn='cb'+Math.random().toString(36).slice(2);
     const sc=document.createElement('script');
