@@ -152,7 +152,10 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 
 <div id="pendBar" style="display:none;position:sticky;top:0;z-index:50;background:#0E3B36;color:#fff;padding:10px 14px;display:none;align-items:center;justify-content:space-between;gap:10px;font-size:14px">
   <span id="pendTxt">📥 Tienes auditorías pendientes de enviar</span>
-  <button id="pendBtn" style="background:#F59E0B;color:#0E3B36;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;white-space:nowrap">Enviar ya</button>
+  <span style="display:flex;gap:6px;flex-shrink:0">
+    <button id="pendVer" style="background:#fff;color:#0E3B36;border:none;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;white-space:nowrap;min-height:44px">Ver</button>
+    <button id="pendBtn" style="background:#F59E0B;color:#0E3B36;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;white-space:nowrap;min-height:44px">Enviar ya</button>
+  </span>
 </div>
 <div id="borradorBar" style="display:none;position:sticky;top:0;z-index:49;background:#0F7A5A;color:#fff;padding:8px 14px;align-items:center;justify-content:space-between;gap:10px;font-size:13px">
   <span>💾 Continuando tu auditoría en progreso</span>
@@ -2459,10 +2462,19 @@ function confirmarGuardado(tipo, id, detalle){
     tit.textContent='Auditoría enviada y guardada';
     msg.textContent='Ya quedó registrada en el sistema.'+(detalle?(' Resultado: '+detalle+'.'):'');
     idEl.textContent=id?('N.º '+id):'';
+  } else if(tipo==='error'){
+    icon.textContent='⛔';
+    tit.textContent='No se guardó: el sistema la rechazó';
+    msg.textContent='Motivo: '+(detalle||'desconocido')+'. Tu auditoría sigue escrita en el formulario: corrige lo indicado y vuelve a presionar Guardar. Si no sabes qué corregir, toma captura de este mensaje y envíala a Christian.';
+    idEl.textContent='';
+    ov.style.display='flex';
+    $('confirmBtn').textContent='Entendido, volver al formulario';
+    $('confirmBtn').onclick=()=>{ ov.style.display='none'; $('confirmBtn').textContent='Listo, continuar'; };
+    return;
   } else {
     icon.textContent='📱';
-    tit.textContent='Guardada en tu celular';
-    msg.textContent='Aún no hay señal para enviarla — se manda sola apenas tengas internet. No la pierdes si cierras la app.';
+    tit.textContent='Guardada en tu celular (aún no enviada)';
+    msg.textContent='No hubo conexión con el sistema. Se enviará sola mientras este formulario esté abierto y haya internet, y también cada vez que lo vuelvas a abrir. No borres los datos del navegador ni cambies de celular hasta que la barra de pendientes desaparezca.';
     idEl.textContent='';
   }
   ov.style.display='flex';
@@ -2478,11 +2490,24 @@ async function colaAdd(payload){const d=await db();return new Promise((res,rej)=
 async function colaAll(){const d=await db();return new Promise((res,rej)=>{const tx=d.transaction(STORE,'readonly');const rq=tx.objectStore(STORE).getAll();rq.onsuccess=()=>res(rq.result||[]);rq.onerror=()=>rej(rq.error);});}
 async function colaDel(id){const d=await db();return new Promise((res,rej)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}
 async function colaCount(){try{return (await colaAll()).length;}catch(e){return 0;}}
+async function colaPut(item){const d=await db();return new Promise((res,rej)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).put(item);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}
+/* Pide al navegador que no borre la cola por falta de espacio ni por días sin uso. */
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 
 async function refrescarPend(){
-  const n=await colaCount(); const bar=$('pendBar');
-  if(n>0){bar.style.display='flex';$('pendTxt').textContent='📥 '+n+' pendiente(s) · se enviarán solas al volver la señal';}
-  else{bar.style.display='none';}
+  let items=[]; try{ items=await colaAll(); }catch(e){}
+  const n=items.length; const bar=$('pendBar');
+  if(n>0){
+    bar.style.display='flex';
+    const rech=items.filter(i=>i.tipoError==='rechazo');
+    if(rech.length){
+      bar.style.background='#DC2626';
+      $('pendTxt').textContent='⛔ '+n+' auditoría(s) sin enviar · el sistema rechazó '+rech.length+': '+(rech[0].ultimoError||'motivo desconocido')+' · Avisa a Christian';
+    }else{
+      bar.style.background='#0E3B36';
+      $('pendTxt').textContent='📥 '+n+' auditoría(s) guardada(s) en este celular, aún sin enviar'+(items.some(i=>i.ultimoError)?(' · último intento: '+items.find(i=>i.ultimoError).ultimoError):'');
+    }
+  } else { bar.style.display='none'; }
 }
 /* Guarda el último error real del servidor, para poder mostrarlo tal cual.
    Antes cualquier fallo se contaba como "sin señal": el servidor podía estar
@@ -2496,7 +2521,7 @@ async function enviarUno(payload){
     res = await fetch(APP_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
   }catch(e){
     ULTIMO_ERROR = 'Sin conexión con el servidor';
-    throw new Error(ULTIMO_ERROR);
+    const er=new Error(ULTIMO_ERROR); er.tipo='red'; throw er;
   }
   const txt = await res.text();
   let data;
@@ -2506,30 +2531,77 @@ async function enviarUno(payload){
        o de inicio de sesión de Google. Se muestran los primeros caracteres, que es
        lo que permite reconocerlo. */
     ULTIMO_ERROR = 'Respuesta inesperada del servidor ('+res.status+'): '+txt.slice(0,120);
-    throw new Error(ULTIMO_ERROR);
+    /* Suele ser una caída momentánea de Google: se trata como falta de conexión y se reintenta. */
+    const er=new Error(ULTIMO_ERROR); er.tipo='red'; throw er;
   }
   if(!data.ok){
     ULTIMO_ERROR = data.error || 'El servidor rechazó la auditoría';
-    throw new Error(ULTIMO_ERROR);
+    const er=new Error(ULTIMO_ERROR); er.tipo='rechazo'; throw er;
   }
   ULTIMO_ERROR='';
   return data;
 }
-async function enviarPendientes(){
-  const items=await colaAll(); if(!items.length){toast('No hay pendientes','ok');return;}
+/* Candado: nunca dos envíos de la cola a la vez (al abrir, al volver la señal y el
+   reintento de cada minuto podían coincidir y mandar la misma auditoría dos veces). */
+let _enviandoCola=false;
+async function enviarPendientes(auto){
+  auto = (auto===true);
+  if(_enviandoCola) return;
+  _enviandoCola=true;   // se toma ANTES de cualquier espera, si no dos llamadas pasan juntas
+  let items=[]; try{ items=await colaAll(); }catch(e){ _enviandoCola=false; return; }
+  if(!items.length){ _enviandoCola=false; if(!auto) toast('No hay pendientes','ok'); return; }
   const btn=$('pendBtn'); btn.disabled=true; btn.textContent='Enviando…';
-  let okN=0, failN=0;
-  for(const it of items){
-    try{ await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend(); }
-    catch(e){ failN++; }
+  let okN=0, failN=0, motivo='';
+  try{
+    for(const it of items){
+      try{ await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend(); }
+      catch(e){
+        failN++; motivo=e.message||String(e);
+        try{ it.ultimoError=motivo; it.tipoError=e.tipo||'red'; it.intentos=(it.intentos||0)+1; it.ultimoIntento=Date.now(); await colaPut(it); }catch(_){}
+      }
+    }
+  } finally {
+    _enviandoCola=false;
+    btn.disabled=false; btn.textContent='Enviar ya';
   }
-  btn.disabled=false; btn.textContent='Enviar ahora';
   await refrescarPend();
-  if(failN===0){ toast('Enviadas '+okN+' auditoría(s) ✓','ok'); ecoLimpiarSinId(); }
-  else toast('Enviadas '+okN+', fallaron '+failN+'. Motivo: '+(ULTIMO_ERROR||'desconocido'),'err');
-  cargarAud();
+  if(failN===0){ toast((auto?'Se enviaron ':'Enviadas ')+okN+' auditoría(s) pendiente(s) ✓','ok'); ecoLimpiarSinId(); }
+  else if(!auto) toast('Enviadas '+okN+', fallaron '+failN+'. Motivo: '+(motivo||'desconocido'),'err');
+  if(okN>0) cargarAud();
 }
-$('pendBtn').onclick=enviarPendientes;
+$('pendBtn').onclick=()=>enviarPendientes(false);
+
+/* Ver y rescatar lo que está guardado en este celular */
+function verPendientes(){
+  colaAll().then(items=>{
+    if(!items.length){ toast('No hay pendientes','ok'); return; }
+    const f=t=>{ try{ return new Date(t).toLocaleString('es-PE'); }catch(e){ return ''; } };
+    const lineas=items.map((it,i)=>{
+      const p=it.payload||{};
+      return (i+1)+'. '+(p.grupo||'?')+' · lote '+(p.total_recibido||'?')+' · '+(p.auditor||'?')+' · auditoría del '+(p.fecha||'?')+
+        '\n   Guardada: '+f(it.ts)+' · intentos: '+(it.intentos||0)+(it.ultimoError?('\n   Último error: '+it.ultimoError):'');
+    }).join('\n\n');
+    if(confirm(lineas+'\n\n¿Descargar una copia de respaldo de estas auditorías? (Envíala a Christian si no se logran enviar)')) exportarPendientes(items);
+  });
+}
+function exportarPendientes(items){
+  try{
+    const blob=new Blob([JSON.stringify({exportado:new Date().toISOString(), origen:location.href, items:items},null,1)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='pendientes_auditoria_'+new Date().toISOString().slice(0,16).replace(/[-:T]/g,'')+'.json';
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }catch(e){ toast('No se pudo descargar: '+e.message,'err'); }
+}
+$('pendVer').onclick=verPendientes;
+
+/* Reintento automático: cada minuto mientras haya pendientes, y al volver a la app.
+   Cubre el caso "wifi conectado pero sin internet", donde el celular nunca avisa el cambio. */
+async function reintentarSiHay(){
+  if(document.hidden || navigator.onLine===false) return;
+  const n=await colaCount(); if(n>0) enviarPendientes(true);
+}
+setInterval(reintentarSiHay, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) reintentarSiHay(); });
 
 // Anota la huella del lote recién guardado (ver ecoLeer). Solo para auditorías NUEVAS:
 // las correcciones no crean un parcial nuevo, y los reprocesos no cuentan como parcial.
@@ -2572,7 +2644,8 @@ function armarPayload(){
     derivados: (S.proceso==='Costura (taller)') ? expandirBloques(S.ders,'Derivados') : [],
     fotos_medidas:S.fotosMed, fotos_proceso:S.fotosPro, comentario:v('comentario'),
     modo: S.editId ? 'actualizar' : 'nuevo',
-    edit_id: S.editId || ''
+    edit_id: S.editId || '',
+    id_envio: 'E'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)
   };
 }
 
@@ -2614,7 +2687,14 @@ $('save').onclick=async()=>{
     borrarBorrador();
     confirmarGuardado('enviado', data.id, data.resultado);
   }catch(err){
-    // falló el envío (señal intermitente) -> guardar en cola
+    if(err && err.tipo==='rechazo'){
+      // El sistema respondió y dijo que no: NO se encola (se rechazaría para siempre).
+      // El formulario queda lleno tal cual para corregir y volver a guardar.
+      btn.disabled=false; btn.textContent='Guardar';
+      confirmarGuardado('error', '', err.message);
+      return;
+    }
+    // falló el envío (sin conexión o caída momentánea) -> guardar en cola
     try{ await colaAdd(payload); anotarEco(''); await refrescarPend(); borrarBorrador();
       confirmarGuardado('cola');
     }catch(e){ toast('No se pudo guardar: '+e.message,'err'); btn.disabled=false;btn.textContent='Guardar'; }
@@ -2623,7 +2703,7 @@ $('save').onclick=async()=>{
 
 // reintento automático suave al recuperar conexión (no envía solo, solo avisa)
 // Al recuperar señal, intenta enviar las pendientes automáticamente
-window.addEventListener('online', async ()=>{ await refrescarPend(); const n=await colaCount(); if(n>0) enviarPendientes(); });
+window.addEventListener('online', async ()=>{ await refrescarPend(); const n=await colaCount(); if(n>0) enviarPendientes(true); });
 window.addEventListener('offline', ()=>{ const b=$('pendBar'); });
 
 /* ===== mayúsculas automáticas (excepto proceso) ===== */
@@ -3261,7 +3341,7 @@ Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   restaurarBorrador();
   recalc();
 });
-refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount(); if(n>0) enviarPendientes(); } });
+refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount(); if(n>0) enviarPendientes(true); } });
 </script>
 <script>
 /* ============================================================================
