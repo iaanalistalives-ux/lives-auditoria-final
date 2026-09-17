@@ -157,6 +157,13 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <button id="pendBtn" style="background:#F59E0B;color:#0E3B36;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;white-space:nowrap;min-height:44px">Enviar ya</button>
   </span>
 </div>
+<div id="avisoDemo" style="display:none;position:sticky;top:0;z-index:52;background:#F59E0B;color:#0E3B36;padding:10px 14px;font-size:14px;font-weight:700">
+  🧪 Modo demostración: puedes llenar y probar todo el formulario, pero nada se guarda en el sistema.
+</div>
+<div id="avisoPortal" style="display:none;position:sticky;top:0;z-index:51;background:#DC2626;color:#fff;padding:10px 14px;align-items:center;justify-content:space-between;gap:10px;font-size:14px">
+  <span>⚠️ Abriste el formulario fuera del portal. Para registrar, entra desde el portal LIVES: tu nombre se toma de tu inicio de sesión.</span>
+  <a href="https://iaanalistalives-ux.github.io/lives-portal/" target="_top" style="background:#fff;color:#DC2626;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;white-space:nowrap">Ir al portal</a>
+</div>
 <div id="borradorBar" style="display:none;position:sticky;top:0;z-index:49;background:#0F7A5A;color:#fff;padding:8px 14px;align-items:center;justify-content:space-between;gap:10px;font-size:13px">
   <span>💾 Continuando tu auditoría en progreso</span>
   <button id="descartarBorrador" onclick="if(confirm('¿Descartar lo que llevabas y empezar en blanco?')) descartarBorradorYEmpezar();" style="display:none;background:#fff;color:#c32030;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Empezar de cero</button>
@@ -271,7 +278,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <div id="candadoTexto" style="font-size:12.5px;line-height:1.6;margin-bottom:10px"></div>
         <button type="button" class="addbtn" id="btnConfirmarParcial" style="width:100%;padding:11px 12px;font-weight:700"></button>
       </div>
-      <div class="full"><label>Auditor *</label><input id="auditor" list="auditoras" autocomplete="off" placeholder="Escribe y selecciona tu nombre">
+      <div class="full"><label>Auditor (se toma de tu inicio de sesión)</label><input id="auditor" list="auditoras" autocomplete="off" readonly style="background:#eef3f1;font-weight:600;color:var(--green)">
         <datalist id="auditoras"></datalist></div>
       <div class="full"><label>Fecha (automática)</label><input id="fecha" type="date" readonly style="background:#eef3f1;font-weight:600;color:var(--green)"></div>
     </div>
@@ -428,6 +435,42 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 <input type="file" accept="image/*" capture="environment" id="camGlobal" hidden>
 
 <script>
+/* ===== QUIÉN AUDITA: siempre el usuario que inició sesión en el portal =====
+   El portal abre este formulario con ?usuario=NOMBRE. Ese nombre se guarda en la
+   pestaña (sessionStorage) para que no se pierda al recargar después de guardar;
+   antes la recarga quitaba el parámetro y desde la segunda auditoría el nombre
+   había que escribirlo a mano. La auditora ya no elige ni escribe su nombre. */
+const NOMBRE_PORTAL = (function(){
+  let n='';
+  try{ const p=new URLSearchParams(location.search); n=(p.get('usuario')||p.get('nombre')||'').trim().toUpperCase(); }catch(e){}
+  try{
+    if(n) sessionStorage.setItem('lives_nombre_portal', n);
+    else n=(sessionStorage.getItem('lives_nombre_portal')||'').trim().toUpperCase();
+  }catch(e){}
+  return n;
+})();
+const PORTAL_URL = 'https://iaanalistalives-ux.github.io/lives-portal/';
+/* MODO DEMOSTRACIÓN — solo estas personas (nombre del portal, sin tildes).
+   Pueden recorrer y "guardar", pero nada llega al sistema y la pantalla lo dice.
+   Es una lista cerrada a propósito: una auditora con el nombre mal escrito NO debe
+   caer aquí, porque perdería auditorías reales sin darse cuenta. */
+const USUARIOS_DEMO = ['CHRISTIAN TALEPCIO','RODRIGO CAMOGLIANO'];
+const MODO_DEMO = (function(){
+  const q=NOMBRE_PORTAL.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  return !!q && USUARIOS_DEMO.indexOf(q)>=0;
+})();
+function avisoDemo(){ toast('Modo demostración: esta acción no se aplica al sistema.','err'); }
+/* Fija el campo Auditor: nadie lo edita. En una corrección se conserva la autora original. */
+function fijarAuditor(){
+  const el=document.getElementById('auditor'); if(!el) return;
+  el.readOnly=true;
+  el.removeAttribute('list');
+  el.style.background='#eef3f1'; el.style.fontWeight='600'; el.style.color='#0F7A5A';
+  if(S && S.editId) return;
+  el.value = NOMBRE_PORTAL || '';
+  el.placeholder = NOMBRE_PORTAL ? '' : 'Entra desde el portal para registrar';
+}
+
 /* ===== CONFIG: reemplaza ambos al desplegar ===== */
 /* Backend ÚNICO: el del Sheet maestro. El piloto ya no tiene script propio.
    Las auditorías, el detalle y los catálogos salen todos de ahí. */
@@ -2395,7 +2438,8 @@ function calcularFaltantes(){
   if(!/^[0-9]+$/.test(v('pedido'))) faltan.push('Cant. pedido');
   if(!lote) faltan.push('Total recibido');
   if(!S.proceso) faltan.push('Proceso');
-  if(!v2('auditor')) faltan.push('Auditor');
+  if(!S.editId && !NOMBRE_PORTAL) faltan.push('Entrar desde el portal (tu nombre se toma de tu inicio de sesión)');
+  else if(!v2('auditor')) faltan.push('Auditor');
   /* El nombre tiene que existir en el catálogo de personal.
 
      Aquí el nombre lo pone el portal y nadie lo teclea, así que un nombre mal
@@ -2406,10 +2450,10 @@ function calcularFaltantes(){
 
      Si el catálogo no cargó no se bloquea: dejar a una auditora sin poder
      registrar por una lista que no llegó sería peor. */
-  else if(AUDITORAS && AUDITORAS.length){
+  else if(!MODO_DEMO && AUDITORAS && AUDITORAS.length){
     const q = nombreNorm(v('auditor'));
     if(!AUDITORAS.some(a => nombreNorm(a) === q)){
-      faltan.push('Auditor: "'+v('auditor')+'" no está en la lista de personal — avisa a Sistemas');
+      faltan.push('Auditor: "'+v('auditor')+'" no está en la lista de personal — avisa a Christian');
     }
   }
   if(!v('fecha')) faltan.push('Fecha');
@@ -2462,6 +2506,11 @@ function confirmarGuardado(tipo, id, detalle){
     tit.textContent='Auditoría enviada y guardada';
     msg.textContent='Ya quedó registrada en el sistema.'+(detalle?(' Resultado: '+detalle+'.'):'');
     idEl.textContent=id?('N.º '+id):'';
+  } else if(tipo==='demo'){
+    icon.textContent='🧪';
+    tit.textContent='Simulación: NO se guardó';
+    msg.textContent='Estás en modo demostración ('+NOMBRE_PORTAL+'). Así se vería el guardado para una auditora, pero esta auditoría no llegó al sistema ni cuenta en los indicadores.';
+    idEl.textContent='';
   } else if(tipo==='error'){
     icon.textContent='⛔';
     tit.textContent='No se guardó: el sistema la rechazó';
@@ -2516,6 +2565,7 @@ async function refrescarPend(){
 var ULTIMO_ERROR = '';
 
 async function enviarUno(payload){
+  if(MODO_DEMO){ const er=new Error('Modo demostración: no se envía nada'); er.tipo='demo'; throw er; }
   let res;
   try{
     res = await fetch(APP_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
@@ -2546,6 +2596,7 @@ async function enviarUno(payload){
 let _enviandoCola=false;
 async function enviarPendientes(auto){
   auto = (auto===true);
+  if(MODO_DEMO) return;
   if(_enviandoCola) return;
   _enviandoCola=true;   // se toma ANTES de cualquier espera, si no dos llamadas pasan juntas
   let items=[]; try{ items=await colaAll(); }catch(e){ _enviandoCola=false; return; }
@@ -2654,6 +2705,10 @@ $('save').onclick=async()=>{
   const faltan=calcularFaltantes();
   if(faltan.length>0){
     toast('Falta completar: '+faltan.join(', '),'err');
+    return;
+  }
+  if(MODO_DEMO){
+    confirmarGuardado('demo');
     return;
   }
   const btn=$('save');btn.disabled=true;btn.textContent='Guardando…';
@@ -2913,6 +2968,7 @@ async function reintentarDetalle(){
 }
 
 async function aprobarMedidaRapido(id, btnEl){
+  if(MODO_DEMO){ avisoDemo(); return; }
   if(!confirm('¿Marcar el resultado de medidas de '+id+' como Aprobado?\n\nEsto NO cuenta como reproceso — es solo un dato informativo.')) return;
   btnEl.disabled=true; const txtOrig=btnEl.textContent; btnEl.textContent='Guardando…';
   try{
@@ -2968,6 +3024,7 @@ function quienSoy(){
 /* Anular una auditoría propia. Pide el motivo: sin él, dentro de tres meses
    nadie sabe por qué falta esa auditoría en el lote. */
 function pedirAnular(id){
+  if(MODO_DEMO){ avisoDemo(); return; }
   const motivo = prompt('¿Por qué se anula la auditoría '+id+'?\n\n'+
                         'No se borra: queda registrada como anulada y deja de contar '+
                         'en los indicadores.');
@@ -3009,7 +3066,7 @@ async function cargarParaEditar(id){
   lockField('po',r[10]); lockField('color',r[11]); lockField('destino',r[12]); lockField('pedido',r[13]);
   $('recibido').value=r[14]||'';
   S.codTela=r[45]||''; S.descTela=r[46]||''; // AT/AU: se conservan tal cual, no se piden de nuevo al corregir
-  $('auditor').value=r[31]||''; $('fecha').value=fechaTxtForm(r[1]);
+  $('auditor').value=r[31]||''; $('auditor').readOnly=true; $('fecha').value=fechaTxtForm(r[1]);
   // proceso
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
   // N° de auditoría: conservar el mismo de la auditoría original (col C = idx 2)
@@ -3073,7 +3130,7 @@ async function iniciarReproceso(id){
   S.codTela=r[45]||''; S.descTela=r[46]||'';
   S.pedidoDeOP=true; // viene de la auditoría rechazada original — igual de confiable, que no se desbloquee
   $('recibido').value=''; // el lote reprocesado puede ser distinto al original (reproceso parcial)
-  $('auditor').value='';
+  fijarAuditor(); // quien reprocesa es quien inició sesión, no quien hizo la auditoría rechazada
   $('fecha').valueAsDate=new Date(); // fecha real de hoy, no la de la auditoría rechazada
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
   S.int_ext=(norm(proc).indexOf('INTERNO')>=0)?'INTERNA':(proc?'EXTERNA':'');
@@ -3115,7 +3172,7 @@ function cancelarReproceso(){
 
 function recargarLimpio(){
   // recarga sin ningún parámetro en la URL (evita volver a entrar en modo edición tras guardar)
-  location.href = location.pathname;
+  location.href = location.pathname + (NOMBRE_PORTAL ? ('?usuario=' + encodeURIComponent(NOMBRE_PORTAL)) : '');
 }
 function cancelarEdicion(){
   S.editId=null;
@@ -3144,7 +3201,8 @@ $('btnCancelEdit').onclick=cancelarEdicion;
 $('btnCancelRepro').onclick=cancelarReproceso;
 
 /* =================== BORRADOR AUTOMÁTICO (no perder el trabajo al cambiar de app) =================== */
-const BORRADOR_KEY='ac009_borrador_v1';
+const BORRADOR_BASE='ac009_borrador_v1';
+const BORRADOR_KEY = BORRADOR_BASE + (NOMBRE_PORTAL ? ('_' + NOMBRE_PORTAL.replace(/[^A-Z0-9Ñ]+/g,'_')) : '');
 const BORRADOR_MAX_HORAS=18; // no restaurar borradores más viejos que esto
 
 function recolectarBorrador(){
@@ -3217,6 +3275,18 @@ function aplicarValoresGuardados(actual,guardado){
 }
 function restaurarBorrador(){
   let raw; try{ raw=localStorage.getItem(BORRADOR_KEY); }catch(e){ return; }
+  /* Borrador guardado por la versión anterior (sin usuaria en la clave): solo se
+     recupera si es de esta misma persona o no tenía nombre. Si es de otra, se deja. */
+  if(!raw && BORRADOR_KEY!==BORRADOR_BASE){
+    try{
+      const viejo=localStorage.getItem(BORRADOR_BASE);
+      if(viejo){
+        const bv=JSON.parse(viejo);
+        const suyo=((bv&&bv.campos&&bv.campos.auditor)||'').trim().toUpperCase();
+        if(!suyo || suyo===NOMBRE_PORTAL){ raw=viejo; localStorage.removeItem(BORRADOR_BASE); }
+      }
+    }catch(e){}
+  }
   if(!raw) return;
   let b; try{ b=JSON.parse(raw); }catch(e){ localStorage.removeItem(BORRADOR_KEY); return; }
   if(!b||!b.ts) return;
@@ -3322,15 +3392,15 @@ crearBuscadorChecklist({inputId:'buscarDer',resultsId:'resultadosDer',activoId:'
 // Nombre automático desde el portal (?nombre=...) — se llena solo, pero se queda editable
 // por si alguna vez se abre esta página fuera del portal (nunca se bloquea sin salida).
 (function aplicarNombreDesdePortal(){
-  const params=new URLSearchParams(location.search);
-  const nombreUrl=params.get('nombre')||params.get('usuario')||'';
-  const nombre=(nombreUrl||'').trim().toUpperCase();
-  if(nombre){
-    if($('auditor')&&!$('auditor').value) $('auditor').value=nombre;
-    if($('miNombre')&&!$('miNombre').value) $('miNombre').value=nombre;
+  fijarAuditor();
+  if(MODO_DEMO){ const d=document.getElementById('avisoDemo'); if(d) d.style.display='block'; }
+  if(NOMBRE_PORTAL){
+    if($('miNombre')&&!$('miNombre').value) $('miNombre').value=NOMBRE_PORTAL;
   } else {
-    // Sin nombre del portal (ej. se abrió fuera de él): mostrar el campo para escribirlo a mano — nunca se bloquea.
+    /* Abierto fuera del portal (enlace guardado, marcador): no se sabe quién es.
+       Se puede mirar, pero no guardar: así ninguna auditoría queda a nombre de otra persona. */
     const w=$('miNombreWrap'); if(w) w.style.display='';
+    const av=document.getElementById('avisoPortal'); if(av) av.style.display='flex';
   }
 })();
 
@@ -3339,6 +3409,7 @@ Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   generarChecklistDefectos();
   generarChecklistDerivados();
   restaurarBorrador();
+  fijarAuditor();
   recalc();
 });
 refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount(); if(n>0) enviarPendientes(true); } });
