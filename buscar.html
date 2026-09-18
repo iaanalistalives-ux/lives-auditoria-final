@@ -56,7 +56,12 @@ tr:hover td{background:#f6f9fb}
 .tablewrap{overflow-x:auto;max-height:62vh;overflow-y:auto}
 .estado{padding:24px;text-align:center;color:#889}
 .count{font-size:13px;color:#667;margin-bottom:10px}
-@media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
+/* En el celular caben pocas columnas: se ocultan Estilo/PO y Color, y se deja
+   visible el AUDITOR, que es lo que se busca cuando se pregunta "quién auditó". */
+@media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}
+  th,td{padding:8px 7px}
+  .colorcel{font-size:12px}}
+.fotoic{display:inline-block;margin-left:5px;font-size:12px;color:#4A5A57;background:#EEF2F1;border-radius:9px;padding:1px 6px;white-space:nowrap;cursor:help}
 .tlogo{height:32px;display:block;flex-shrink:0}
 @media(max-width:600px){.tlogo{height:26px}}
 </style>
@@ -102,7 +107,7 @@ tr:hover td{background:#f6f9fb}
     <div class="count" id="count"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>ID</th><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
+        <thead><tr><th>ID</th><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Color</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -431,6 +436,26 @@ function sbaVistaBusqueda(){
   }, 60);
 }
 
+/* Cuántas fotos tiene cada auditoría (SQL 19). Se pide una sola vez y sirve para
+   el ícono 📷 de la lista: así se sabe qué auditoría trae fotos sin abrirla.
+   Si esta lectura falla, la lista se muestra igual, sin íconos. */
+var FOTOS_POR_ID = null;
+function sbaFotos(){
+  return sbaUna('fotos', function(){
+    return sbaLeer('publico_fotos_auditoria', 'id_auditoria,fotos', 'id_auditoria.asc');
+  }, 60).then(function(filas){
+    var m = {};
+    filas.forEach(function(x){ m[sbaT(x.id_auditoria)] = Number(x.fotos) || 0; });
+    return m;
+  });
+}
+function cargarFotos(){
+  sbaFotos().then(function(m){
+    FOTOS_POR_ID = m;
+    if (typeof repintarFotos === 'function') repintarFotos();
+  }).catch(function(){ FOTOS_POR_ID = null; });
+}
+
 /* accion=opcionesconsulta */
 function sbaOpcionesConsulta(){
   return Promise.all([sbaVistaBusqueda(),
@@ -519,7 +544,8 @@ function sbaConsultar(p){
         }
         encontradas.push([sbaT(f.id_auditoria), fecha, sbaT(f.cliente), sbaT(f.grupo),
                           sbaT(f.estilo_lives), sbaT(f.po), sbaT(f.auditor),
-                          sbaT(f.resultado_final), (sbaU(f.captura) === 'DIGITADO' ? 1 : 0)]);
+                          sbaT(f.resultado_final), (sbaU(f.captura) === 'DIGITADO' ? 1 : 0),
+                          sbaT(f.color)]);
       }
       return { ok: true, rows: encontradas, total: total, pagina: pagina, limite: limite,
                hayMas: hayMasSeguro || total > fin, totalExacto: !hayMasSeguro };
@@ -690,7 +716,7 @@ function pintar(res, total, hayMas){
 
   /* Cada fila llega como arreglo, en este orden fijo:
      0 id · 1 fecha · 2 cliente · 3 grupo · 4 estilo · 5 po · 6 auditor
-     7 resultado · 8 digitado (1/0)
+     7 resultado · 8 digitado (1/0) · 9 color
      Se manda así, y no como objeto, para que la respuesta quepa en la conexión
      de la planta: repetir el nombre de cada campo en cada fila multiplicaba el
      tamaño y la descarga no llegaba a completarse. */
@@ -700,14 +726,34 @@ function pintar(res, total, hayMas){
       ? '<br><span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;'+
         'background:#EEF2F1;color:#4A5A57;font-size:11px;white-space:nowrap">Digitado en Planta</span>'
       : '';
-    tr.innerHTML=`<td><b>${r[0]||''}</b></td>
+    tr.innerHTML=`<td data-id="${esc(r[0]||'')}"><b>${r[0]||''}</b>${iconoFotos(r[0])}</td>
       <td>${fechaTxt(r[1])}</td>
       <td>${r[2]||''}<br><span style="color:#889">${r[3]||''}</span></td>
       <td>${r[4]||''}<br><span style="color:#889">${r[5]||''}</span></td>
+      <td class="colorcel">${r[9]||''}</td>
       <td>${r[6]||''}${marca}</td>
       <td>${badge(r[7])}</td>
       <td><a class="ver" href="ver.html?id=${encodeURIComponent(r[0])}">Ver / PDF</a></td>`;
     tb.appendChild(tr);
+  });
+}
+
+/* Ícono de fotos. Vacío mientras la lista de fotos no haya llegado. */
+function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function iconoFotos(id){
+  if(!FOTOS_POR_ID) return '';
+  var n=FOTOS_POR_ID[String(id||'').trim()]||0;
+  if(!n) return '';
+  return '<span class="fotoic" title="Esta auditoría tiene '+n+' foto(s). Ábrela con Ver / PDF.">📷 '+n+'</span>';
+}
+/* Cuando la lista de fotos llega después de pintar la tabla, se agregan los íconos
+   sin volver a consultar nada. */
+function repintarFotos(){
+  if(!FOTOS_POR_ID) return;
+  [].forEach.call(document.querySelectorAll('#tbody td[data-id]'), function(td){
+    if(td.querySelector('.fotoic')) return;
+    var html=iconoFotos(td.getAttribute('data-id'));
+    if(html) td.insertAdjacentHTML('beforeend', html);
   });
 }
 
@@ -849,6 +895,7 @@ function sugerir(id, valores){
 /* Si se vuelve de un reporte, se reponen los filtros antes de buscar. */
 restaurarFiltros();
 cargar();
+cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
 </script>
 </body>
 </html>
