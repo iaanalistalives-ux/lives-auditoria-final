@@ -66,7 +66,15 @@
 
   /* ---------- guardar y leer la sesión (mismo formato que el portal) ---------- */
   function leerJ(area, k){ try{ return JSON.parse(area.getItem(k) || 'null'); }catch(e){ return null; } }
-  function valida(d){ return !!(d && d.token && d.permisos); }
+  function valida(d){
+    /* 21/09: una sesión sin llave de Supabase (d.sb.refresh) es una sesión VIEJA,
+       de antes del cambio del lunes — típicamente una pestaña o app que nunca se
+       cerró desde entonces. Antes se aceptaba igual y fallaba después, en silencio,
+       en la primera lectura a Supabase: parecía "conectada" pero no leía nada, y al
+       escribir la clave de nuevo no siempre se notaba el arreglo. Ahora se descarta
+       de una vez y se pide entrar limpio, con recarga, como una sesión nueva. */
+    return !!(d && d.token && d.permisos && d.sb && d.sb.access && d.sb.refresh);
+  }
 
   /* La sesión vigente. Si hay dos copias (la de esta pestaña y el respaldo común) y son
      de la misma persona, se queda con la llave más nueva: otra pestaña o el portal pudo
@@ -582,7 +590,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
          la auditora realmente está mirando: nadie entra a "Ver auditorías" a buscar su reproceso. -->
     <div id="opRechazos" style="display:none;margin:-6px 0 10px;padding:11px 13px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px">
       <div style="font-size:12.5px;font-weight:700;color:#7a2318;margin-bottom:3px" id="opRechazosTitulo"></div>
-      <div style="font-size:11.5px;color:#8d4b40;margin-bottom:9px">Llena la auditoría normal. <b>Al guardar</b> te preguntaremos si es el reproceso de uno de estos rechazos o si es otro lote del pedido.</div>
+      <div style="font-size:11.5px;color:#8d4b40;margin-bottom:9px">En un momento te preguntamos si es el reproceso de uno de estos rechazos o si es otro lote del pedido.</div>
       <div id="opRechazosList" style="display:flex;flex-direction:column;gap:6px"></div>
       <!-- Salida explícita. Antes solo había un texto diciendo "ignora este aviso", pero un
            recuadro rojo con botones dentro empuja a tocarlos: la auditora que venía a auditar
@@ -1881,6 +1889,8 @@ function omitirAvisoRechazos(){
 function refrescarAvisoRechazos(){
   const caja=$('opRechazos'); if(!caja) return;
   const marca = ($('opInput') ? ($('opInput').value||'').trim() : '') + '|' + llaveLaxaActual();
+  /* Cambió de lote: la ventana temprana puede volver a ofrecerse para este lote nuevo. */
+  if(REPRO_OFRECIDO && REPRO_OFRECIDO.split('#')[0]!==llaveLaxaActual()) REPRO_OFRECIDO='';
   if(AVISO_OMITIDO && AVISO_OMITIDO===marca){ caja.style.display='none'; return; }
   // Dentro de un reproceso o de una corrección el aviso sobra: ya se está trabajando sobre eso.
   const listaEl=$('opRechazosList');
@@ -1893,6 +1903,19 @@ function refrescarAvisoRechazos(){
   const vistos=new Set(); const lista=[];
   base.forEach(r=>{ const id=String(r[0]).trim(); if(!vistos.has(id)){ vistos.add(id); lista.push(r); } });
   if(!lista.length){ caja.style.display='none'; if(listaEl) listaEl.dataset.firma=''; return; }
+  /* 21/09: si el lote (no toda la OP) ya tiene rechazos sin reprocesar, se pregunta ahora, no
+     al guardar. delLote (no "base") es lo mismo que usa pendientesParaPreguntar(): con toda la
+     OP se referencia de lejos, pero la pregunta binaria solo tiene sentido con el lote exacto. */
+  if(delLote.length){
+    const pend=pendientesParaPreguntar();
+    if(pend.length){
+      const firma=firmaRepro(pend);
+      if(REPRO_DECIDIDO!==firma && REPRO_OFRECIDO!==firma){
+        REPRO_OFRECIDO=firma;
+        preguntarReproceso(pend);
+      }
+    }
+  }
   lista.sort((a,b)=>String(fechaDe(b)).localeCompare(String(fechaDe(a))));
   const cont=$('opRechazosList');
   // Esta función se dispara con cada tecla del formulario. Si volviera a dibujar los botones cada
@@ -3073,6 +3096,11 @@ function armarPayload(){
    elegir: es el reproceso de uno de ellos, o es otro lote del pedido. Sin elegir no se guarda.
    Así ningún reproceso queda sin marcar ni sin vínculo. */
 let REPRO_DECIDIDO='';           // firma del lote para el que ya se eligió "otro lote"
+/* 21/09: la pregunta de reproceso ya no espera a Guardar — se ofrece apenas se conoce
+   el lote (grupo+estilo+color), para que la auditora mida sabiendo de una vez si es
+   reproceso o parcial nuevo. REPRO_OFRECIDO evita reabrir la ventana en cada tecla: se
+   marca al mostrarla (elija o no elija) y solo se resetea si el lote cambia. */
+let REPRO_OFRECIDO='';
 function firmaRepro(pend){
   return [llaveLaxaActual(), norm(S.proceso), pend.map(r=>String(r[0]).trim()).sort().join(',')].join('#');
 }
@@ -3086,6 +3114,7 @@ function pendientesParaPreguntar(){
   out.sort((a,b)=>String(fechaDe(b)).localeCompare(String(fechaDe(a))));
   return out;
 }
+let ABRIENDO_DESDE_GUARDAR=false;
 function preguntarReproceso(pend){
   const ov=$('reproOverlay'), box=$('reproOpciones');
   let eleccion=null;
@@ -3126,9 +3155,15 @@ function preguntarReproceso(pend){
       marcarComoReproceso(eleccion.id, mot);
     } else {
       REPRO_DECIDIDO = firmaRepro(pend);
+      AVISO_OMITIDO = ($('opInput') ? ($('opInput').value||'').trim() : '') + '|' + llaveLaxaActual();
+      const c=$('opRechazos'); if(c) c.style.display='none';
     }
     ov.style.display='none';
-    $('save').onclick();
+    /* Si esto vino de la ventana temprana (recién se completó el lote), no hay nada más que
+       enviar todavía: sigue llenando muestra y defectos. Guardar la sigue llamando solo cuando
+       de verdad se pulsó Guardar (ov ya estaba abierta por eso). El intento original de guardar
+       se reintenta solo si la ventana se abrió DESDE el botón Guardar. */
+    if(ABRIENDO_DESDE_GUARDAR){ ABRIENDO_DESDE_GUARDAR=false; $('save').onclick(); }
   };
   ov.style.display='flex';
 }
@@ -3170,6 +3205,7 @@ $('save').onclick=async()=>{
   // Rechazos pendientes del lote: hay que decidir antes de guardar.
   const pendRepro=pendientesParaPreguntar();
   if(pendRepro.length && REPRO_DECIDIDO!==firmaRepro(pendRepro)){
+    ABRIENDO_DESDE_GUARDAR=true;
     preguntarReproceso(pendRepro);
     return;
   }
