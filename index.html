@@ -2875,6 +2875,53 @@ async function refrescarPend(){
    que el problema se buscaba en el celular y en el wifi durante un día entero. */
 var ULTIMO_ERROR = '';
 
+/* ===== PARALELO — solo comparación, NUNCA afecta lo que ve la auditora (21/09) =====
+   Cada guardado real (Apps Script) manda además, en segundo plano, los mismos datos
+   a sync_guardar_auditoria_paralelo en Supabase, que escribe en tablas APARTE
+   (auditorias_paralelo), nunca en la tabla real que ya alimenta los dashboards.
+   Usa el mismo id_envio como token, para poder comparar más tarde con SQL.
+   Va por XMLHttpRequest a propósito, no por window.fetch: así nunca dispara el
+   aviso de "sin sesión" del bloque de sesión si algo falla — esto es invisible
+   siempre, incluso si falla. */
+function compararParalelo(payload, idReal){
+  try{
+    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
+    window.LIVES_SESION.llave().then(function(tk){
+      if (!tk) return;
+      try{
+        var defs = [];
+        try{ defs = (payload.defectos||[]).map(function(d){
+          return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad };
+        }); }catch(e){ defs = []; }
+        var body = {
+          tipo: 'FINAL', fecha: payload.fecha, grupo: payload.grupo, estilo: payload.estilo_lives,
+          nivelAql: String(payload.nivel_aql || '1.5'), lote: payload.total_recibido,
+          captura: 'EN VIVO',
+          licencia: payload.licencia === 'SÍ', override: payload.override === 'SÍ',
+          reproceso: !!payload.reprocesa_de, esReauditoria: payload.reprocesa_de ? 'SI' : '',
+          reprocesaDe: payload.reprocesa_de || '', motivoReproceso: payload.motivo_reproceso || '',
+          pedido: payload.cant_pedido || 0, op: payload.op || '',
+          proceso: payload.proceso || '', intExt: payload.int_ext || '', servicio: payload.servicio || '',
+          auditores: [payload.auditor], digitador: payload.auditor,
+          colores: [{ color: payload.color, po: payload.po, eCliente: payload.estilo_cliente }],
+          destinos: [{ codigo: payload.destino }],
+          defectos: defs,
+          observacion: payload.comentario || '', liquidado: payload.liquidado === 'SÍ',
+          token: payload.id_envio
+        };
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+        /* sin manejo de respuesta a propósito: esto es solo para comparar después con
+           SQL. Ni un error aquí debe tocar lo que la auditora ve o hace. */
+        xhr.send(JSON.stringify({ payload: body }));
+      }catch(e){}
+    }).catch(function(){});
+  }catch(e){}
+}
+
 async function enviarUno(payload){
   if(MODO_DEMO){ const er=new Error('Modo demostración: no se envía nada'); er.tipo='demo'; throw er; }
   let res;
@@ -3164,6 +3211,7 @@ $('save').onclick=async()=>{
     anotarEco(data.id);
     borrarBorrador();
     confirmarGuardado('enviado', data.id, data.resultado);
+    compararParalelo(payload, data.id);
   }catch(err){
     if(err && err.tipo==='rechazo'){
       // El sistema respondió y dijo que no: NO se encola (se rechazaría para siempre).
