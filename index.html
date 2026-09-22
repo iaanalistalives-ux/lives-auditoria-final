@@ -499,9 +499,9 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <select id="taller"><option value="">— Seleccionar —</option></select>
       <div class="hint">Solo se muestran los talleres del proceso elegido.</div>
     </div>
-    <div class="field"><label>OP (Orden de Producción)</label>
+    <div class="field"><label>OP (Orden de Producción) *</label>
       <input id="opInput" inputmode="numeric" autocomplete="off" placeholder="70085">
-      <div class="hint" id="opHint">Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.</div>
+      <div class="hint" id="opHint">Obligatoria. Escríbela y los datos del pedido salen solos de la base de OPs: grupo, estilo, PO, color, destino y pedido no se escriben a mano.</div>
     </div>
     <div id="opSelector" style="display:none;margin:-6px 0 10px;padding:10px 12px;background:#fff4e0;border:1px solid #F59E0B;border-radius:10px">
       <div style="font-size:12px;font-weight:700;color:#7a5a12;margin-bottom:8px">Esta OP tiene varias opciones — toca la que corresponde:</div>
@@ -521,24 +521,24 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       </button>
     </div>
     <div class="grid">
-      <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="EFI-102">
-        <div class="hint" id="grupoHint">Escribe las 3 letras y el número: el "-" sale solo (ej. EFI102 → EFI-102).</div>
+      <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="Sale de la OP">
+        <div class="hint" id="grupoHint">Sale de la OP.</div>
         <datalist id="grupos"></datalist></div>
       <div class="full"><label>Cliente (automático)</label>
         <input id="cliente" readonly placeholder="Se completa según el grupo" style="background:#eef3f1;font-weight:600;color:var(--green)">
-        <div class="hint" id="cliHint">Escribe el grupo y el cliente aparece solo.</div></div>
-      <div><label>Estilo LIVES</label><input id="estiloL" list="dlEstilo" autocomplete="off" placeholder="24647">
+        <div class="hint" id="cliHint">Sale del grupo de la OP.</div></div>
+      <div><label>Estilo LIVES</label><input id="estiloL" list="dlEstilo" autocomplete="off" placeholder="Sale de la OP">
         <datalist id="dlEstilo"></datalist></div>
-      <div><label id="poLabel">PO *</label><input id="po" list="dlPo" autocomplete="off" placeholder="6002469 o con letras">
-        <div class="hint" id="poHint" style="display:none">En Costura, si aún no tienen el PO, pueden dejarlo vacío y completarlo después en "Mis auditorías".</div>
+      <div><label id="poLabel">PO *</label><input id="po" list="dlPo" autocomplete="off" placeholder="Sale de la OP">
+        <div class="hint" id="poHint" style="display:none"></div>
         <datalist id="dlPo"></datalist></div>
-      <div><label>Color</label><input id="color" list="dlColor" autocomplete="off" placeholder="White">
+      <div><label>Color</label><input id="color" list="dlColor" autocomplete="off" placeholder="Sale de la OP">
         <datalist id="dlColor"></datalist></div>
-      <div><label>Estilo cliente</label><input id="estiloC" list="dlEstC" autocomplete="off" placeholder="QRKRS-T6539M">
+      <div><label>Estilo cliente</label><input id="estiloC" list="dlEstC" autocomplete="off" placeholder="Sale de la OP">
         <datalist id="dlEstC"></datalist></div>
-      <div><label>Destino</label><input id="destino" list="dlDest" autocomplete="off" placeholder="USA (SEA)">
+      <div><label>Destino</label><input id="destino" list="dlDest" autocomplete="off" placeholder="Sale de la OP">
         <datalist id="dlDest"></datalist></div>
-      <div><label>Cant. pedido *</label><input id="pedido" inputmode="numeric" placeholder="500">
+      <div><label>Cant. pedido *</label><input id="pedido" inputmode="numeric" placeholder="Sale de la OP">
         <div class="hint" id="pedHint"></div></div>
       <div><label>Total recibido (lote) *</label><input id="recibido" inputmode="numeric" placeholder="503">
         <div class="hint">El lote que llegó para auditar.</div></div>
@@ -1512,7 +1512,9 @@ function loteYaAuditadoAntes(){
   if(enHistorial) return true;
   return ecosVigentes().some(e=>e.keyLaxa===k && e.proc===proc);
 }
-function poEsOpcional(){ return S.proceso==='Costura (taller)'; }
+/* 22/09: el PO sale siempre de la OP y es obligatorio en todos los procesos, Costura incluida.
+   Ya no existe guardar sin PO y completarlo después. */
+function poEsOpcional(){ return false; }
 function loteCompleto(){
   const poOK = poEsOpcional() ? true : !!$('po').value;
   return $('grupo').value&&$('estiloL').value&&$('estiloC').value&&$('color').value&&poOK&&$('destino').value&&S.proceso;
@@ -2030,8 +2032,8 @@ function aplicarPedido(){
     inp.readOnly=true; inp.style.background='#eef3f1';
     h.className='hint'; h.textContent='Dato de la base de OPs. Bloqueado.';
   } else {
-    inp.readOnly=false; inp.style.background='#fbfcfd';
-    h.className='hint'; h.textContent='Aún nadie puso el pedido de este lote. Escríbelo tú.';
+    inp.readOnly=true; inp.style.background='#eef3f1';
+    h.className='hint'; h.textContent='Sale de la base de OPs al elegir la OP.';
   }
   validate();
 }
@@ -2134,8 +2136,8 @@ $('proceso').onchange=()=>{
   if(!interno && S.licencia){ S.licencia=false; if($('licSwitch')) $('licSwitch').checked=false; }
   // PO opcional solo en Costura (taller): actualizar el asterisco y el aviso
   const esCostura = S.proceso==='Costura (taller)';
-  const poLabel=$('poLabel'); if(poLabel) poLabel.textContent = esCostura ? 'PO' : 'PO *';
-  const poHint=$('poHint'); if(poHint) poHint.style.display = esCostura ? 'block' : 'none';
+  const poLabel=$('poLabel'); if(poLabel) poLabel.textContent = 'PO *';
+  const poHint=$('poHint'); if(poHint) poHint.style.display = 'none';
   // Derivados SOLO aplica a Costura (taller). En Acabados y Auditoría Final no se muestra ni se guarda.
   const derCard=$('derivadosCard');
   if(derCard) derCard.style.display = esCostura ? 'block' : 'none';
@@ -2185,9 +2187,14 @@ function fijarReproWrap(mostrar){
   sw.disabled=!mostrar;
 }
 function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.display='none'; $('opSelectorList').innerHTML=''; } }
+/* 22/09: nada se escribe a mano. Sin OP resuelta, los datos del pedido quedan vacíos y
+   bloqueados; solo se llenan eligiendo la OP. En una corrección o un reproceso los datos
+   vienen de la auditoría original y no se tocan. */
+function bloquearCamposOP(){ CAMPOS_OP.forEach(id=>{ const el=$(id); if(el) lockField(id, el.value); }); }
 function liberarCamposOP(){
-  CAMPOS_OP.forEach(unlockField); S.codTela=''; S.descTela=''; S.pedidoDeOP=false; S.opResuelta='';
-  const gh=$('grupoHint'); if(gh) gh.style.display='';
+  if(S.editId || S.reprocesaDe){ S.opResuelta=''; return; }
+  CAMPOS_OP.forEach(id=>lockField(id,'')); S.codTela=''; S.descTela=''; S.pedidoDeOP=false; S.opResuelta='';
+  const cl=$('cliente'); if(cl) cl.value='';
 }
 function autocompletarDesdeOP(m){
   lockField('grupo',m.grupo); lockField('estiloL',m.estilo); lockField('estiloC',m.estiloCli); lockField('po',m.po);
@@ -2199,7 +2206,11 @@ function autocompletarDesdeOP(m){
   aplicarCliente(); refrescarCascada(); validate();
   pedirOrdinal(); // los campos se llenaron por código (lockField), no por tecleo, así que hay que
                   // disparar el cálculo del N° de auditoría a mano — si no, se queda en "—" para siempre.
-  const h=$('opHint'); if(h){ h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
+  const h=$('opHint');
+  if(h){
+    if(!String(m.po||'').trim()){ h.className='hint warn'; h.textContent='Esta OP no tiene PO en la base de OPs, así que no se puede guardar. Avisa a Christian para que actualice la base.'; }
+    else { h.className='hint'; h.textContent='✓ Datos completados desde la base de OPs.'; }
+  }
 }
 function buscarOP(){
   clearTimeout(opTimer);
@@ -2207,7 +2218,7 @@ function buscarOP(){
   const h=$('opHint');
   if(!op){
     ocultarSelectorOP(); liberarCamposOP();
-    if(h){ h.className='hint'; h.textContent='Escríbela y se completan los datos del pedido. Si no la encuentra, llena todo abajo a mano — no bloquea nada.'; }
+    if(h){ h.className='hint'; h.textContent='Obligatoria. Escríbela y los datos del pedido salen solos de la base de OPs.'; }
     refrescarAvisoRechazos(); validate(); return;
   }
   // Ya se eligió una variante de esta OP: no volver a abrir el selector.
@@ -2226,11 +2237,14 @@ function buscarOP(){
   ocultarSelectorOP();
   if(matches.length===0){
     liberarCamposOP();
-    if(h){ h.className='hint warn'; h.textContent='OP no encontrada en la base (puede ser anterior a 2025). Completa los datos abajo a mano.'; }
+    if(h){ h.className='hint warn'; h.textContent = OPS_DB.length
+      ? 'Esa OP no está en la base de OPs. Sin ella no se puede registrar: revisa el número o avisa a Christian para que actualice la base.'
+      : 'No se pudo cargar la base de OPs. Recarga la página con buena señal.'; }
     refrescarAvisoRechazos(); validate();
   } else if(matches.length===1){
     autocompletarDesdeOP(matches[0]);
   } else {
+    liberarCamposOP();   // no dejar a la vista los datos de la OP anterior mientras elige
     if(h){ h.className='hint'; h.textContent='Esta OP tiene varias opciones — elige abajo.'; }
     const sel=$('opSelector'), list=$('opSelectorList');
     list.innerHTML=''; list.dataset.op=op;
@@ -2740,6 +2754,12 @@ function calcularFaltantes(){
   const fotoMedOK = true;
 
   const faltan=[];
+  /* 22/09: toda auditoría nueva sale de una OP de la base. Corrección y reproceso heredan
+     los datos de la auditoría original, que ya está en el sistema. */
+  if(!S.editId && !S.reprocesaDe){
+    const opEscrita=(($('opInput')&&$('opInput').value)||'').trim();
+    if(!opEscrita || S.opResuelta!==opEscrita) faltan.push('OP de la base de OPs (escríbela y elige su variante)');
+  }
   if(!v2('grupo')) faltan.push('Grupo');
   if(!v2('estiloL')) faltan.push('Estilo LIVES');
   if(!tieneContenidoReal('estiloC',2)) faltan.push('Estilo cliente');
@@ -3922,11 +3942,19 @@ crearBuscadorChecklist({inputId:'buscarDer',resultsId:'resultadosDer',activoId:'
   }
 })();
 
+bloquearCamposOP();   // desde el primer momento: los datos del pedido no se escriben a mano
 Promise.all([loadLists(), cargarAud(), cargarOPS()]).then(()=>{
   refrescarCascada();
   generarChecklistDefectos();
   generarChecklistDerivados();
   restaurarBorrador();
+  bloquearCamposOP();
+  /* Un borrador nuevo vuelve a tomar sus datos de la OP (no de lo que quedó escrito). */
+  if(!S.editId && !S.reprocesaDe){
+    S.opResuelta='';
+    if((($('opInput')&&$('opInput').value)||'').trim()) buscarOP();
+    else liberarCamposOP();
+  }
   fijarAuditor();
   recalc();
 });
