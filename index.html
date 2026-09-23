@@ -1522,12 +1522,64 @@ function loteCompleto(){
 function ordinalTexto(n){
   const t={1:'1ra',2:'2da',3:'3ra'}; return t[n]||(n+'ta');
 }
+/* 23/09 · Conteo que ven las auditoras: cuenta las VUELTAS del lote, o sea los
+   reprocesos. Un lote que llega limpio es siempre 1ra auditoría, aunque sea el 2do
+   o 3er lote parcial del mismo pedido. Si lo rechazan, su reproceso es la 2da; si
+   lo vuelven a rechazar, el siguiente reproceso es la 3ra, y así.
+   La cadena se arma con el vínculo REPROCESA_DE, que guarda cada reproceso.
+   Lo que se GUARDA no cambia: el n° que va a la base y a los indicadores sigue
+   saliendo de la regla de siempre (S.nAud). Esto es lo que se muestra en pantalla. */
+const IDX_REPROCESA_DE=49;
+function filaPorId(id){
+  id=String(id||'').trim(); if(!id) return null;
+  return (AUD_CACHE||[]).filter(r=>r&&String(r[0]||'').trim()===id)[0]||null;
+}
+/* Vuelta de una auditoría ya guardada: 1 + los reprocesos que tiene encima. */
+function vueltaDeFila(r, prof){
+  if(!r) return 1;
+  const padre=filaPorId(r[IDX_REPROCESA_DE]);
+  if(padre && (prof||0)<20) return vueltaDeFila(padre,(prof||0)+1)+1;
+  return esSi(r[39]) ? 2 : 1;       // marcada reproceso pero sin el vínculo
+}
+function vueltaDeId(id){ return vueltaDeFila(filaPorId(id), 0); }
+function tipoDeFila(r){
+  if(esSi(r[39])) return 'reproceso';
+  if(esSi(r[16])) return 'licencia';
+  return '';
+}
+/* Lo que se muestra arriba: "1ra", "2da · reproceso", "3ra · reproceso"… y, si la
+   auditoría es con licencia, se agrega esa palabra sin cambiar el número. */
+function etiquetaVuelta(v, lic){
+  return ordinalTexto(v) + (v>1 ? ' · reproceso' : '') + (lic ? ' · licencia' : '');
+}
+function etiquetaConTipo(n, tipo){ return ordinalTexto(n) + (tipo ? ' · ' + tipo : ''); }
+/* Todas las auditorías ya guardadas de este lote y proceso, en orden, con su tipo. */
+function historialDelLote(){
+  const key=llaveActual(), proc=norm(S.proceso), out=[];
+  (AUD_CACHE||[]).forEach(r=>{
+    if(!r||r[0]==null||norm(r[0])==='ID_AUDITORIA') return;
+    if(S.editId && String(r[0]).trim()===String(S.editId).trim()) return;  // no contarse a sí misma
+    if(llaveFila(r)===key && norm(r[3])===proc) out.push({ tipo: tipoDeFila(r) });
+  });
+  ecosVigentes().forEach(e=>{ if(e.key===key && e.proc===proc) out.push({ tipo: e.reproceso ? 'reproceso' : '' }); });
+  return out;
+}
+function tipoActual(){
+  if(S.reprocesaDe || S.reproceso) return 'reproceso';
+  if(S.licencia) return 'licencia';
+  return '';
+}
 async function calcOrdinal(){
   const out=$('ordinal'), h=$('ordHint');
   if(S.editId){ /* en modo corrección, el N° no se recalcula (se mantiene el original) */ validate(); return; }
   if(S.reprocesaDe){
-    S.nAud='Reproceso'; out.value='Reproceso';
-    h.className='hint'; h.textContent='No cuenta como un parcial nuevo — es la corrección de la auditoría rechazada.';
+    S.nAud='Reproceso';                       // lo que se guarda no cambia
+    const v=vueltaDeId(S.reprocesaDe)+1;
+    out.value = etiquetaVuelta(v, S.licencia);
+    h.className='hint';
+    h.innerHTML = '<b>Sí cuenta como auditoría:</b> es la <b>' + ordinalTexto(v) + '</b> de este lote, '
+      + (v===2 ? 'su primer reproceso' : 'su reproceso n.º ' + (v-1))
+      + '. No suma prendas nuevas al pedido, porque son las mismas que se rechazaron.';
     aplicarPedido(); mostrarPanelPrevias(); calcAvance(); validate(); return;
   }
   if(!loteCompleto()){ out.value='—'; S.nAud=''; h.className='hint'; h.textContent='Completa grupo, estilo, PO, color y proceso.'; validate(); return; }
@@ -1542,15 +1594,16 @@ async function calcOrdinal(){
   });
   // Suma las auditorías guardadas hace segundos que el Sheet todavía no devuelve (ver ecoLeer)
   ecosVigentes().forEach(e=>{ if(!e.reproceso && e.key===key && e.proc===proc) previas++; });
-  const n=previas+1; S.nAud=ordinalTexto(n);
-  out.value=S.nAud;
-  // El número solo no dice nada: hay que decir en palabras QUÉ significa, porque 1ra/2da/3ra son
-  // lotes distintos del mismo pedido y ahí es donde se confunden.
+  const n=previas+1; S.nAud=ordinalTexto(n);    // lo que se guarda: sigue contando solo lotes nuevos
+  out.value = etiquetaVuelta(1, S.licencia);     // lote que llega limpio: siempre 1ra
+  // El número solo no dice nada: hay que decir en palabras QUÉ significa. El número
+  // cuenta las vueltas del lote: sube solo cuando hay un reproceso.
   h.className='hint';
   h.innerHTML = previas
-    ? ('<b>Es un LOTE NUEVO de este mismo pedido.</b> Ya hubo '+previas+' auditoría(s) antes. '
-       +'Escribe abajo solo las prendas que te llegaron <u>ahora</u>, no el pedido completo.')
-    : 'Primera auditoría de este lote en este proceso.';
+    ? ('<b>1ra auditoría de este lote.</b> Es un LOTE NUEVO del mismo pedido (ya hubo '+previas+' antes): '
+       + 'escribe abajo solo las prendas que te llegaron <u>ahora</u>, no el pedido completo. '
+       + 'El número sube a 2da solo si este lote se rechaza y vuelve reprocesado.')
+    : ('<b>1ra auditoría de este lote.</b> Si se rechaza y vuelve reprocesado, esa será la 2da.');
   aplicarPedido();
   mostrarPanelPrevias();
   calcAvance();
@@ -1956,9 +2009,11 @@ function mostrarPanelPrevias(){
     // marca visible del duplicado: mismo día y misma cantidad que otra fila ya listada
     let dup=false;
     if(!esRepro && rec){ const hu=fec+'#'+rec; if(vistosPanel.has(hu)) dup=true; else vistosPanel.add(hu); }
-    const etq=esRepro
-      ? '<span style="background:#fdeceb;color:#7a2318;border-radius:6px;padding:1px 6px;font-size:11.5px;font-weight:700">Reproceso</span>'
-      : '<span style="background:#e6eef8;color:#0E3B36;border-radius:6px;padding:1px 6px;font-size:11.5px;font-weight:700">'+esc(String(nro))+'</span>';
+    const tipoFila=tipoDeFila(r);
+    const etq = '<span style="background:'+(esRepro?'#fdeceb':(tipoFila==='licencia'?'#fff4e0':'#e6eef8'))
+      +';color:'+(esRepro?'#7a2318':(tipoFila==='licencia'?'#7a5a12':'#0E3B36'))
+      +';border-radius:6px;padding:1px 6px;font-size:11.5px;font-weight:700">'
+      + esc(etiquetaVuelta(vueltaDeFila(r,0), tipoFila==='licencia')) + '</span>';
     const marca=dup?' <span style="background:#fff4e0;color:#7a5a12;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">repetida — no suma</span>':'';
     return `<div style="padding:5px 0;border-bottom:1px solid #dfe7f1${dup?';opacity:.62':''}">${etq} <b>${esc(String(rec))} prendas</b> · ${esc(fec)}${marca}<br><span style="color:#778;font-size:12px">${esc(String(aud))} · ${esc(String(proc))} · <b>${esc(String(res))}</b> · PO ${esc(String(po))} · ${esc(String(dest))}</span></div>`;
   }).join('');
@@ -2283,13 +2338,13 @@ $('btnConfirmarParcial').onclick=()=>{
 };
 
 /* ===== reproceso (solo visible/editable dentro del flujo dedicado "Reprocesar") ===== */
-$('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;recalc();};
+$('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;pedirOrdinal();recalc();};
 
 $('inMed').onchange=e=>{agregarFotos(e.target.files,'med');e.target.value='';};
 $('inPro').onchange=e=>{agregarFotos(e.target.files,'pro');e.target.value='';};
 
 /* ===== licencia ===== */
-$('licSwitch').onchange=()=>{S.licencia=$('licSwitch').checked;
+$('licSwitch').onchange=()=>{S.licencia=$('licSwitch').checked; pedirOrdinal();
   // En licencia la muestra = recibido (100%): el formulario ya lo refleja en el panel AQL.
   recalc();};
 $('liquidadoSwitch').onchange=()=>{S.liquidado=$('liquidadoSwitch').checked;};
