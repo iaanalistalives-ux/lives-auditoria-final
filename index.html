@@ -698,7 +698,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-04b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-24 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -2982,7 +2982,8 @@ function compararParalelo(payload, idReal){
           destinos: [{ codigo: payload.destino }],
           defectos: defs,
           observacion: payload.comentario || '', liquidado: payload.liquidado === 'SÍ',
-          token: payload.id_envio
+          token: payload.id_envio,
+          idReal: idReal || ''   /* 24/09 (SQL 44): enlaza la copia con la auditoría real */
         };
         var xhr = new XMLHttpRequest();
         xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
@@ -3038,7 +3039,13 @@ async function enviarPendientes(auto){
   let okN=0, failN=0, motivo='';
   try{
     for(const it of items){
-      try{ await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend(); }
+      try{
+        const dataCola = await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend();
+        /* 24/09: lo que salió por la cola (sin señal o respuesta lenta) también manda su copia
+           al paralelo. Antes solo la mandaba el guardado inmediato y 1 de cada 3 quedaba sin
+           comparar. Mismo token: si la copia ya existía, Supabase no la duplica. */
+        if (it.payload && it.payload.modo !== 'actualizar') compararParalelo(it.payload, dataCola && dataCola.id);
+      }
       catch(e){
         failN++; motivo=e.message||String(e);
         try{ it.ultimoError=motivo; it.tipoError=e.tipo||'red'; it.intentos=(it.intentos||0)+1; it.ultimoIntento=Date.now(); await colaPut(it); }catch(_){}
