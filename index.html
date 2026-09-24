@@ -698,7 +698,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-24 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-24b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -3040,6 +3040,8 @@ async function enviarPendientes(auto){
   try{
     for(const it of items){
       try{
+        /* 24/09: lo que quedó en la cola con fecha futura (el error de las 7 p. m.) sale con la de hoy. */
+        if(it.payload && it.payload.modo!=='actualizar' && it.payload.fecha && it.payload.fecha>sbrHoyLima()) it.payload.fecha=sbrHoyLima();
         const dataCola = await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend();
         /* 24/09: lo que salió por la cola (sin señal o respuesta lenta) también manda su copia
            al paralelo. Antes solo la mandaba el guardado inmediato y 1 de cada 3 quedaba sin
@@ -3263,6 +3265,9 @@ $('save').onclick=async()=>{
     confirmarGuardado('demo');
     return;
   }
+  /* 24/09: una auditoría nueva nunca sale con fecha futura. Cubre también los
+     borradores guardados anoche con la fecha equivocada ("Continuando tu auditoría"). */
+  if(!S.editId){ const hoyL=sbrHoyLima(); if(!$('fecha').value || $('fecha').value>hoyL) $('fecha').value=hoyL; }
   const btn=$('save');btn.disabled=true;btn.textContent='Guardando…';
   const payload=armarPayload();
   // CORRECCIÓN: requiere conexión (no se encola, para no duplicar)
@@ -3326,7 +3331,10 @@ function upperOf(id){
 ['estiloL','estiloC','po','color','destino','auditor','comentario','ovWho','ovWhy'].forEach(upperOf);
 
 /* init */
-$('fecha').valueAsDate=new Date();
+/* 24/09: la fecha es la de HOY EN LIMA. Antes se usaba valueAsDate=new Date(), que
+   pone la fecha en hora universal: desde las 7 p. m. de Lima ya era "mañana" y el
+   sistema rechazaba la auditoría por fecha futura. */
+$('fecha').value=sbrHoyLima();
 /* =================== MIS AUDITORÍAS (corregir) =================== */
 S.editId=null;  // si está en modo edición, aquí va el ID
 
@@ -3731,7 +3739,7 @@ async function iniciarReproceso(id){
   S.pedidoDeOP=true; // viene de la auditoría rechazada original — igual de confiable, que no se desbloquee
   $('recibido').value=''; // el lote reprocesado puede ser distinto al original (reproceso parcial)
   fijarAuditor(); // quien reprocesa es quien inició sesión, no quien hizo la auditoría rechazada
-  $('fecha').valueAsDate=new Date(); // fecha real de hoy, no la de la auditoría rechazada
+  $('fecha').value=sbrHoyLima(); // fecha real de hoy en Lima, no la de la auditoría rechazada
   const proc=r[3]||''; const selP=$('proceso'); if(selP){ selP.value=proc; S.proceso=proc; }
   S.int_ext=(norm(proc).indexOf('INTERNO')>=0)?'INTERNA':(proc?'EXTERNA':'');
   const licWrap=$('licWrap'); if(licWrap) licWrap.style.display=(norm(proc).indexOf('INTERNO')>=0)?'flex':'none';
