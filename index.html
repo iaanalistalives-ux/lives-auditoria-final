@@ -698,7 +698,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-24b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-28 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -1694,7 +1694,7 @@ function pintarFotos(cual){
   cont.innerHTML='';
   arr.forEach((b64,i)=>{
     const d=document.createElement('div');d.className='fotoItem';
-    d.innerHTML=`<img src="${b64}"><button class="del" data-i="${i}">×</button>`;
+    d.innerHTML=`${fotoMini(b64)}<button class="del" data-i="${i}">×</button>`;
     d.querySelector('.del').onclick=()=>{arr.splice(i,1);pintarFotos(cual);validate();};
     cont.appendChild(d);
   });
@@ -2483,13 +2483,16 @@ function abrirCamaraPara(target,btnEl){
   _camTarget={target,btnEl};
   $('camGlobal').click();
 }
+/* Una foto ya guardada (Drive o almacén) no se puede mostrar como miniatura sin
+   pedir permiso aparte: se marca con 📷✓ y se conserva tal cual al guardar. */
+function fotoMini(v){ return /^data:image\//.test(String(v||'')) ? `<img src="${v}">` : '📷✓'; }
 function pintarBotonCam(btnEl,b64){
   btnEl.classList.add('has');
-  btnEl.innerHTML = b64 ? `<img src="${b64}">` : '📷';
+  btnEl.innerHTML = b64 ? fotoMini(b64) : '📷';
 }
 
 function filaSubHTML(label,cant,foto,idx){
-  const camContent = foto ? `<img src="${foto}">` : '📷';
+  const camContent = foto ? fotoMini(foto) : '📷';
   return `<div class="subRow" data-idx="${idx}">
     <span class="subLabel">${esc(label)}</span>
     <div class="qty"><button type="button" class="qM">–</button><input class="qVal" inputmode="numeric" value="${cant||0}"><button type="button" class="qP">+</button></div>
@@ -2937,7 +2940,7 @@ async function refrescarPend(){
     const rech=items.filter(i=>i.tipoError==='rechazo');
     if(rech.length){
       bar.style.background='#DC2626';
-      $('pendTxt').textContent='⛔ '+n+' auditoría(s) sin enviar · el sistema rechazó '+rech.length+': '+(rech[0].ultimoError||'motivo desconocido')+' · Avisa a Christian';
+      $('pendTxt').textContent='⛔ '+n+' auditoría(s) sin enviar · el sistema rechazó '+rech.length+': '+(rech[0].ultimoError||'motivo desconocido')+' · Toca Ver para descargarla y quitarla';
     }else{
       bar.style.background='#0E3B36';
       $('pendTxt').textContent='📥 '+n+' auditoría(s) guardada(s) en este celular, aún sin enviar'+(items.some(i=>i.ultimoError)?(' · último intento: '+items.find(i=>i.ultimoError).ultimoError):'');
@@ -2998,6 +3001,122 @@ function compararParalelo(payload, idReal){
   }catch(e){}
 }
 
+/* ===== 28/09 · Auditoría Final directo en Supabase =====
+   Mientras Supabase diga que Final todavía no es directo (antes del corte), todo
+   sigue por el Apps Script como siempre. Desde el corte:
+     1. las fotos nuevas se suben al almacén "auditorias-fotos" (con la sesión);
+     2. la auditoría se guarda con final_guardar_directo;
+     3. nada pasa por el Apps Script ni por Drive. */
+const SB_BASE='https://xxfufpddgoyhbotjmaiy.supabase.co';
+const SB_PUB='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+const SB_BUCKET='auditorias-fotos';
+let _finalDirecto=null, _finalDirectoTs=0;
+function errTipo(msg,tipo){ const er=new Error(msg); er.tipo=tipo; return er; }
+
+async function finalEsDirecto(){
+  if(_finalDirecto!==null && Date.now()-_finalDirectoTs < 5*60000) return _finalDirecto;
+  let res;
+  try{
+    res=await fetch(SB_BASE+'/rest/v1/rpc/es_tipo_directo',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({p_tipo:'FINAL'})});
+  }catch(e){ throw errTipo('Sin conexión con la base de datos','red'); }
+  if(!res.ok) throw errTipo('La base de datos no respondió ('+res.status+')','red');
+  _finalDirecto = (await res.json())===true; _finalDirectoTs=Date.now();
+  return _finalDirecto;
+}
+
+function dataUrlABlob(dataUrl){
+  const m=String(dataUrl).match(/^data:([^;]+);base64,(.*)$/);
+  const bin=atob(m[2]); const u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return new Blob([u],{type:m[1]||'image/jpeg'});
+}
+/* Sube una foto nueva y devuelve su ruta en el almacén. Si ya se había subido en un
+   intento anterior (misma ruta), el almacén responde "ya existe" y se da por buena. */
+async function subirFotoSB(dataUrl, ruta){
+  const tk = (window.LIVES_SESION && typeof window.LIVES_SESION.llave==='function') ? await window.LIVES_SESION.llave() : null;
+  if(!tk) throw errTipo('Sin sesión: vuelve a entrar desde el portal','red');
+  const blob=dataUrlABlob(dataUrl);
+  let res;
+  try{
+    res=await fetch(SB_BASE+'/storage/v1/object/'+SB_BUCKET+'/'+ruta,{method:'POST',
+      headers:{apikey:SB_PUB,Authorization:'Bearer '+tk,'Content-Type':blob.type},body:blob});
+  }catch(e){ throw errTipo('Sin conexión al subir una foto','red'); }
+  if(res.ok) return ruta;
+  const t=await res.text();
+  if(res.status===409 || /duplicate|already exists/i.test(t)) return ruta;
+  throw errTipo('No se pudo subir una foto ('+res.status+'): '+t.slice(0,120), (res.status>=500||res.status===401)?'red':'rechazo');
+}
+
+/* Convierte lo que arma el formulario en lo que recibe Supabase, subiendo las fotos
+   nuevas. Las fotos que ya estaban (de una corrección) se mandan tal cual. */
+async function payloadSB(p){
+  const carpeta='nuevas/'+(p.fecha||'sin-fecha')+'/'+p.id_envio;
+  const subir=async (val,nombre)=>{
+    if(!val) return '';
+    const s=String(val);
+    if(/^data:image\//.test(s)){
+      const ext=((s.match(/^data:image\/(\w+)/)||[])[1]||'jpg').replace('jpeg','jpg');
+      return await subirFotoSB(s, carpeta+'/'+nombre+'.'+ext);
+    }
+    return s;
+  };
+  const lista=async (arr,pref)=>{ const out=[]; let i=0;
+    for(const d of (arr||[])){ i++;
+      out.push({seccion:d.seccion||'', categoria:d.categoria||'', subtipo:d.subtipo||'',
+                cantidad:d.cantidad, nota:d.detalle||'',
+                nombre:((d.categoria||'')+' '+(d.subtipo||'')).trim(),
+                foto: await subir(d.foto_base64, pref+'-'+i)});
+    } return out; };
+  const fotos=async (arr,pref)=>{ const out=[]; let i=0;
+    for(const f of (arr||[])){ i++; const r=await subir(f, pref+'-'+i); if(r) out.push(r); } return out; };
+  const n=Number(p.nivel_aql);
+  return {
+    token:p.id_envio, idExistente:(p.modo==='actualizar'?(p.edit_id||''):''), captura:'EN VIVO',
+    fecha:p.fecha, proceso:p.proceso, intExt:p.int_ext, servicio:p.servicio,
+    grupo:p.grupo, estilo:p.estilo_lives, eCliente:p.estilo_cliente, color:p.color, po:p.po,
+    destino:p.destino, op:p.op, pedido:(p.cant_pedido===''?null:p.cant_pedido),
+    codTela:p.cod_tela, descTela:p.desc_tela, lote:p.total_recibido,
+    licencia:p.licencia==='SÍ', nivelAql:(n===1?'1.0':n===2.5?'2.5':'1.5'),
+    override:p.override==='SÍ', overrideAutoriza:p.override_autoriza, overrideMotivo:p.override_motivo,
+    reproceso:(p.reproceso==='SÍ' || !!p.reprocesa_de), reprocesaDe:p.reprocesa_de||'',
+    motivoReproceso:p.motivo_reproceso||'', liquidado:p.liquidado==='SÍ',
+    auditor:p.auditor, auditores:[p.auditor], usuario:p.auditor,
+    defectos: await lista(p.defectos,'defecto'), derivados: await lista(p.derivados,'derivado'),
+    muestraMedidas:(p.muestra_medidas===''?null:p.muestra_medidas),
+    defMedidas:(p.def_medidas===''?null:p.def_medidas), resultadoMedidas:p.resultado_medidas||'',
+    fotosMedidas: await fotos(p.fotos_medidas,'medidas'), fotosProceso: await fotos(p.fotos_proceso,'proceso'),
+    observacion:p.comentario||''
+  };
+}
+
+/* Punto único de envío. Devuelve lo mismo que antes (ok, id, resultado) más "via". */
+async function enviar(payload){
+  if(MODO_DEMO) throw errTipo('Modo demostración: no se envía nada','demo');
+  if(!(await finalEsDirecto())){
+    const d=await enviarUno(payload); d.via='sheet'; return d;
+  }
+  const cuerpo=await payloadSB(payload);
+  let res;
+  try{
+    res=await fetch(SB_BASE+'/rest/v1/rpc/final_guardar_directo',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({payload:cuerpo})});
+  }catch(e){ ULTIMO_ERROR='Sin conexión con la base de datos'; throw errTipo(ULTIMO_ERROR,'red'); }
+  if(!res.ok){
+    ULTIMO_ERROR='La base de datos no respondió ('+res.status+')';
+    throw errTipo(ULTIMO_ERROR,'red');
+  }
+  const data=await res.json();
+  if(data && data.noDirecto){ _finalDirecto=false; const d=await enviarUno(payload); d.via='sheet'; return d; }
+  if(!data || !data.ok){
+    if(data && data.reintentar){ ULTIMO_ERROR=data.error||'Reintentar'; throw errTipo(ULTIMO_ERROR,'red'); }
+    ULTIMO_ERROR=(data&&(data.mensaje||data.error))||'La base de datos rechazó la auditoría';
+    throw errTipo(ULTIMO_ERROR,'rechazo');
+  }
+  ULTIMO_ERROR=''; data.via='supabase';
+  return data;
+}
+
 async function enviarUno(payload){
   if(MODO_DEMO){ const er=new Error('Modo demostración: no se envía nada'); er.tipo='demo'; throw er; }
   let res;
@@ -3042,11 +3161,11 @@ async function enviarPendientes(auto){
       try{
         /* 24/09: lo que quedó en la cola con fecha futura (el error de las 7 p. m.) sale con la de hoy. */
         if(it.payload && it.payload.modo!=='actualizar' && it.payload.fecha && it.payload.fecha>sbrHoyLima()) it.payload.fecha=sbrHoyLima();
-        const dataCola = await enviarUno(it.payload); await colaDel(it.id); okN++; await refrescarPend();
+        const dataCola = await enviar(it.payload); await colaDel(it.id); okN++; await refrescarPend();
         /* 24/09: lo que salió por la cola (sin señal o respuesta lenta) también manda su copia
            al paralelo. Antes solo la mandaba el guardado inmediato y 1 de cada 3 quedaba sin
            comparar. Mismo token: si la copia ya existía, Supabase no la duplica. */
-        if (it.payload && it.payload.modo !== 'actualizar') compararParalelo(it.payload, dataCola && dataCola.id);
+        if (it.payload && it.payload.modo !== 'actualizar' && dataCola && dataCola.via==='sheet') compararParalelo(it.payload, dataCola && dataCola.id);
       }
       catch(e){
         failN++; motivo=e.message||String(e);
@@ -3075,6 +3194,14 @@ function verPendientes(){
         '\n   Guardada: '+f(it.ts)+' · intentos: '+(it.intentos||0)+(it.ultimoError?('\n   Último error: '+it.ultimoError):'');
     }).join('\n\n');
     if(confirm(lineas+'\n\n¿Descargar una copia de respaldo de estas auditorías? (Envíala a Christian si no se logran enviar)')) exportarPendientes(items);
+    /* 28/09: lo que el sistema rechazó por un dato no se va a enviar nunca. Se puede
+       quitar de la cola (después de bajar la copia) y volver a registrar bien. */
+    const rech=items.filter(i=>i.tipoError==='rechazo');
+    if(rech.length && confirm('Hay '+rech.length+' auditoría(s) que el sistema rechazó por un dato:\n\n'+
+        rech.map(i=>'· '+((i.payload||{}).grupo||'?')+' · lote '+((i.payload||{}).total_recibido||'?')+' · '+(i.ultimoError||'')).join('\n')+
+        '\n\n¿Quitarlas de este celular? Después vuelve a registrarlas con el dato corregido.')){
+      Promise.all(rech.map(i=>colaDel(i.id))).then(()=>{ refrescarPend(); toast('Se quitaron '+rech.length+'. Vuelve a registrarlas corregidas.','ok'); });
+    }
   });
 }
 function exportarPendientes(items){
@@ -3254,6 +3381,18 @@ $('save').onclick=async()=>{
     toast('Falta completar: '+faltan.join(', '),'err');
     return;
   }
+  /* 28/09: los defectos se cuentan por prenda de la muestra. Si suman más que la
+     muestra, el sistema los rechazaría después y la auditoría quedaba atascada en el
+     celular. Se frena aquí, frente a la prenda, donde todavía se puede corregir. */
+  {
+    const loteN=parseInt(v('recibido'))||0;
+    const q=S.licencia ? {muestra:loteN} : aqlFor(loteN,S.nivel);
+    const totD=S.defs.reduce((s,b)=>s+totalBloque(b),0);
+    if(q && q.muestra && totD>q.muestra){
+      toast('Hay '+totD+' prendas con defecto y la muestra es de '+q.muestra+'. Los defectos se cuentan por prenda revisada; lo del lote completo va en Derivados.','err');
+      return;
+    }
+  }
   // Rechazos pendientes del lote: hay que decidir antes de guardar.
   const pendRepro=pendientesParaPreguntar();
   if(pendRepro.length && REPRO_DECIDIDO!==firmaRepro(pendRepro)){
@@ -3277,10 +3416,10 @@ $('save').onclick=async()=>{
       btn.disabled=false; btn.textContent='Guardar'; return;
     }
     try{
-      const data=await enviarUno(payload);
+      const data=await enviar(payload);
       borrarBorrador();
       confirmarGuardado('enviado', data.id||S.editId);
-      compararParaleloActualizar(S.editId, payload);
+      if(data.via==='sheet') compararParaleloActualizar(S.editId, payload);
     }catch(err){
       toast('No se pudo guardar la corrección: '+(err.message||err),'err');
       btn.disabled=false; btn.textContent='Guardar';
@@ -3295,11 +3434,11 @@ $('save').onclick=async()=>{
     return;
   }
   try{
-    const data=await enviarUno(payload);
+    const data=await enviar(payload);
     anotarEco(data.id);
     borrarBorrador();
     confirmarGuardado('enviado', data.id, data.resultado);
-    compararParalelo(payload, data.id);
+    if(data.via==='sheet') compararParalelo(payload, data.id);
   }catch(err){
     if(err && err.tipo==='rechazo'){
       // El sistema respondió y dijo que no: NO se encola (se rechazaría para siempre).
@@ -3534,8 +3673,15 @@ async function aprobarMedidaRapido(id, btnEl){
   if(!confirm('¿Marcar el resultado de medidas de '+id+' como Aprobado?\n\nEsto NO cuenta como reproceso — es solo un dato informativo.')) return;
   btnEl.disabled=true; const txtOrig=btnEl.textContent; btnEl.textContent='Guardando…';
   try{
-    const res=await fetch(APP_URL,{method:'POST',body:JSON.stringify({modo:'aprobar_medida',edit_id:id}),headers:{'Content-Type':'text/plain;charset=utf-8'}});
-    const j=await res.json();
+    /* 28/09: en Supabase (final_aprobar_medida). Antes del corte cae al Apps Script. */
+    let j;
+    const r1=await fetch(SB_BASE+'/rest/v1/rpc/final_aprobar_medida',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({p_id:id,p_usuario:quienSoy()})});
+    j = r1.ok ? await r1.json() : {noDirecto:true};
+    if(j && j.noDirecto){
+      const res=await fetch(APP_URL,{method:'POST',body:JSON.stringify({modo:'aprobar_medida',edit_id:id}),headers:{'Content-Type':'text/plain;charset=utf-8'}});
+      j=await res.json();
+    }
     if(j.ok){ toast('Medida de '+id+' marcada como Aprobado ✓','ok'); await cargarAud(); buscarMisAud(); }
     else { toast('No se pudo actualizar: '+(j.error||''),'err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
   }catch(e){ toast('Sin señal — inténtalo de nuevo con internet','err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
@@ -3642,10 +3788,16 @@ function pedirAnular(id){
   }
   const quien = quienSoy();
   toast('Anulando…','ok');
-  fetch(APP_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+  /* 28/09: primero Supabase. Si Final todavía no es directo, responde noDirecto y se
+     anula por el Apps Script como siempre. */
+  const anularSheet=()=>fetch(APP_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({accion:'anular', clave:'livessac', id:id,
-                         motivo:String(motivo).trim(), usuario:quien})})
-    .then(r=>r.json())
+                         motivo:String(motivo).trim(), usuario:quien})}).then(r=>r.json());
+  fetch(SB_BASE+'/rest/v1/rpc/registro_anular_directo',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SB_PUB},
+      body:JSON.stringify({p_id:id, p_motivo:String(motivo).trim(), p_usuario:quien})})
+    .then(r=>r.ok ? r.json() : {noDirecto:true})
+    .then(r=>(r && r.noDirecto) ? anularSheet() : r)
     .then(r=>{
       if(r&&r.ok){
         toast('Auditoría anulada.','ok');
