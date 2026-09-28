@@ -695,8 +695,8 @@ function sbaOpcionesConsulta(){
                       sbaLeer('publico_ref_talleres', 'nombre,activo,orden', 'orden.asc')])
     .then(function(r){
       var cli = {}, aud = {};
+      /* 28/09: también lo digitado por Athina (antes se dejaba fuera por lentitud). */
       r[0].forEach(function(x){
-        if (sbaU(x.captura) !== 'EN VIVO') return;
         var a = sbaT(x.cliente); if (a) cli[a] = true;
         var b = sbaT(x.auditor); if (b) aud[b] = true;
       });
@@ -725,9 +725,12 @@ function sbaConsultar(p){
       fCli = pide(p.cliente), fAud = pide(p.auditor), fRes = pide(p.resultado),
       fTal = pide(p.taller), desde = sbaT(p.desde), hasta = sbaT(p.hasta),
       fRep = sbaT(p.repro), fLic = sbaT(p.lic), fLiq = sbaT(p.liq);
-  var soloEnVivo = sbaT(p.incluirDigitado) !== '1';
+  /* 28/09: todo sale de Supabase y la búsqueda es rápida. Se muestra lo capturado por
+     las auditoras y lo digitado por Athina, sin tope de 40: hasta 5000 por búsqueda
+     (hoy hay menos de 1000 Auditorías Final en total). */
+  var soloEnVivo = sbaT(p.soloEnVivo) === '1';
   var limN = parseFloat(p.limite); var pagN = parseFloat(p.pagina);
-  var limite = Math.min(Math.max((isFinite(limN) && limN) || 60, 1), 200);
+  var limite = Math.min(Math.max((isFinite(limN) && limN) || 5000, 1), 5000);
   var pagina = Math.max((isFinite(pagN) && pagN) || 0, 0);
 
   return Promise.all([sbaVistaBusqueda(), fOp ? sbaOpsTabla() : Promise.resolve([])])
@@ -888,7 +891,7 @@ async function buscar(){
       cliente:val('fCliente'), auditor:val('fAuditor'), resultado:val('fResultado'),
       repro:flag(filtroReproceso), lic:flag(filtroLicencia), liq:flag(filtroLiquidado),
       desde: val('fDesde') || fechaCorte(3),
-      limite:40, pagina:0
+      limite:5000, pagina:0
   };
 
   /* Si esta misma búsqueda ya se hizo hace poco, se pinta al momento. */
