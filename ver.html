@@ -447,7 +447,6 @@ td{padding:7px 9px;border-bottom:1px solid #eef1f4}
 </div>
 
 <script>
-const SHEET_ID='1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
 const C={id:0,fecha:1,nAud:2,proceso:3,intext:4,servicio:5,cliente:6,grupo:7,estiloL:8,estiloC:9,po:10,color:11,
   destino:12,pedido:13,recibido:14,lote:15,licencia:16,loteAql:17,muestra:18,nivel:19,aceptaMax:20,rechazaMin:21,
   totalDef:22,resAql:23,override:24,ovWho:25,ovWhy:26,resFinal:27,medMuestra:28,medDef:29,medRes:30,auditor:31,
@@ -485,7 +484,7 @@ function parseCSV(txt){
 }
 /* URL del backend del formulario. Se usa para leer las hojas por Apps Script en vez de
    por gviz — ver el comentario de leerHoja(). */
-const APP_URL='https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
+/* 28/09/2026: sin Apps Script (archivado). */
 
 /* Lectura por Apps Script con getDisplayValues().
    POR QUÉ: gviz le asigna UN tipo a cada columna y devuelve vacías las celdas que no calzan.
@@ -760,52 +759,20 @@ function sbaConsultar(p){
 /* ================= fin de la lectura de auditorías ================= */
 
 
-/* La ficha se lee primero de Supabase (rápido y al día). Si no responde, se usa
-   el Apps Script de siempre, sin que la pantalla lo note. */
+/* La ficha se lee de Supabase. Si no responde, un reintento; si tampoco, se avisa.
+   Ya no hay respaldo al Apps Script (archivado el 28/09). */
 function leerHojaScript(tab,id){
-  var p=null;
-  if(tab==='UNA') p=sbaUnaAuditoria(id);
-  else if(tab==='AUDITORÍAS' && !id) p=sbaVistaPiloto();
-  else if((tab==='DEFECTOS' || tab==='DERIVADOS') && id) p=sbaDetallePiloto(tab==='DERIVADOS', id);
-  if(!p) return leerHojaScriptGAS(tab,id);
-  return p.catch(function(e){
-    console.warn('Supabase no respondió para '+tab+', se usa el Apps Script:', e);
-    return leerHojaScriptGAS(tab,id);
+  function pedirSB(){
+    if(tab==='UNA') return sbaUnaAuditoria(id);
+    if(tab==='AUDITORÍAS' && !id) return sbaVistaPiloto();
+    if((tab==='DEFECTOS' || tab==='DERIVADOS') && id) return sbaDetallePiloto(tab==='DERIVADOS', id);
+    return Promise.reject(new Error('Lectura no disponible: '+tab));
+  }
+  return pedirSB().catch(function(e){
+    console.warn('Supabase no respondió para '+tab+', se reintenta:', e);
+    return new Promise(function(r){ setTimeout(r, 2000); }).then(pedirSB);
   });
 }
-function leerHojaScriptGAS(tab,id){
-  return new Promise(function(resolve,reject){
-    const fn='cbHoja'+Math.random().toString(36).slice(2);
-    const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 45000);
-    function limpiar(){ clearTimeout(t); try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
-    window[fn]=function(res){
-      limpiar();
-      if(res && res.ok && res.rows) resolve(res.rows.map(f=>f.map(c=>String(c==null?'':c))));
-      else reject(new Error((res&&res.error)||'respuesta inválida'));
-    };
-    const sc=document.createElement('script');
-    /* 'UNA' es el atajo para pedir una sola auditoría por su id. */
-    sc.src = (tab==='UNA')
-      ? (APP_URL+'?accion=unaauditoria&id='+encodeURIComponent(id)+'&callback='+fn+'&_='+Date.now())
-      : (APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now());
-    sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
-    document.body.appendChild(sc);
-  });
-}
-async function gvizCSV(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'});
-  if(!r.ok) throw new Error('No se pudo leer la hoja '+tab+' (HTTP '+r.status+')');
-  const t=await r.text();
-  if(/^\s*</.test(t)) throw new Error('El Sheet respondió una página en vez del CSV');
-  const filas=parseCSV(t);
-  if(!filas.length) throw new Error('La hoja '+tab+' volvió vacía');
-  return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));   // slice(1) descarta el encabezado
-}
-
-/* Enrutador: primero Apps Script (no puede perder datos), y si falla se cae a gviz CSV
-   para no dejar la pantalla en blanco. */
-let LECTURA_DEGRADADA=false;
 async function gviz(tab,id){
   /* Ya no hay respaldo por gviz: leía el Sheet del piloto, que quedó CONGELADO como
      copia cuando las auditorías pasaron al maestro. Devolvería datos viejos sin
