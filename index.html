@@ -698,7 +698,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-28 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-28b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -769,7 +769,8 @@ function fijarAuditor(){
 /* ===== CONFIG: reemplaza ambos al desplegar ===== */
 /* Backend ÚNICO: el del Sheet maestro. El piloto ya no tiene script propio.
    Las auditorías, el detalle y los catálogos salen todos de ahí. */
-const APP_URL  = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
+/* 28/09/2026: el Apps Script del Sheet maestro quedó archivado. Todo lee y guarda en
+   Supabase; su dirección y su clave ya no están en este código. */
 const SHEET_ID = '1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
 
 /* ===== AQL ===== */
@@ -1361,46 +1362,18 @@ function sbaConsultar(p){
 
 
 
-function leerHojaScript(tab,id){
-  return new Promise(function(resolve,reject){
-    const fn='cbHoja'+Math.random().toString(36).slice(2);
-    const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 45000);
-    function limpiar(){ clearTimeout(t); try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
-    window[fn]=function(res){
-      limpiar();
-      if(res && res.ok && res.rows) resolve(res.rows.map(f=>f.map(c=>String(c==null?'':c))));
-      else reject(new Error((res&&res.error)||'respuesta inválida'));
-    };
-    const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')+'&callback='+fn+'&_='+Date.now();
-    sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
-    document.body.appendChild(sc);
-  });
-}
-
 async function gviz(tab,id){
-  /* Antes, si la lectura por Apps Script fallaba, se caía a leer el Sheet del piloto
-     por gviz. Ese respaldo ya no sirve y sería peligroso: ese Sheet quedó congelado
-     como copia y devolvería datos viejos sin avisar. Es mejor fallar visiblemente
-     que mostrar una auditoría desactualizada como si fuera la actual. */
-  /* Catálogos: primero Supabase (rápido). Si no responde, el Apps Script de siempre. */
-  if(!id && ['TALLERES','AUDITORAS','CATÁLOGO','CLIENTES'].indexOf(tab)>=0){
-    try{ return await sbrHoja(tab); }
-    catch(e){ console.warn('Supabase no respondió para '+tab+', se usa el Apps Script:', e); }
-  }
-  /* Historial y detalle de una auditoría: primero Supabase. Lo que se guarda llega
-     allí en el mismo momento, así que no hay riesgo de ver datos atrasados. */
-  if(!id && tab==='AUDITORÍAS'){
-    try{ const f=await sbaVistaPiloto(); marcarOrigen('datos: maestro'); return f; }
-    catch(e){ console.warn('Supabase no respondió para el historial, se usa el Apps Script:', e); }
-  }
-  if(id && (tab==='DEFECTOS' || tab==='DERIVADOS')){
-    try{ return await sbaDetallePiloto(tab==='DERIVADOS', id); }
-    catch(e){ console.warn('Supabase no respondió para el detalle, se usa el Apps Script:', e); }
-  }
-  const filas=await leerHojaScript(tab,id);
-  if(tab==='AUDITORÍAS') marcarOrigen('datos: maestro');
-  return filas;
+  /* 28/09: todo sale de Supabase, sin respaldo al Apps Script (archivado). Si falla,
+     se reintenta una vez; si tampoco, quien llama usa la copia del celular y avisa. */
+  const leer=async()=>{
+    if(!id && ['TALLERES','AUDITORAS','CATÁLOGO','CLIENTES'].indexOf(tab)>=0) return await sbrHoja(tab);
+    if(!id && tab==='AUDITORÍAS'){ const f=await sbaVistaPiloto(); marcarOrigen('datos: maestro'); return f; }
+    if(id && (tab==='DEFECTOS' || tab==='DERIVADOS')) return await sbaDetallePiloto(tab==='DERIVADOS', id);
+    throw new Error('Lectura no disponible: '+tab);
+  };
+  try{ return await leer(); }
+  catch(e){ console.warn('Supabase no respondió para '+tab+', se reintenta:', e);
+            await new Promise(r=>setTimeout(r,2000)); return await leer(); }
 }
 
 /* ===== AUDITORÍAS en vivo (para ordinal, pedido y panel) ===== */
@@ -3010,20 +2983,7 @@ function compararParalelo(payload, idReal){
 const SB_BASE='https://xxfufpddgoyhbotjmaiy.supabase.co';
 const SB_PUB='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
 const SB_BUCKET='auditorias-fotos';
-let _finalDirecto=null, _finalDirectoTs=0;
 function errTipo(msg,tipo){ const er=new Error(msg); er.tipo=tipo; return er; }
-
-async function finalEsDirecto(){
-  if(_finalDirecto!==null && Date.now()-_finalDirectoTs < 5*60000) return _finalDirecto;
-  let res;
-  try{
-    res=await fetch(SB_BASE+'/rest/v1/rpc/es_tipo_directo',{method:'POST',
-      headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({p_tipo:'FINAL'})});
-  }catch(e){ throw errTipo('Sin conexión con la base de datos','red'); }
-  if(!res.ok) throw errTipo('La base de datos no respondió ('+res.status+')','red');
-  _finalDirecto = (await res.json())===true; _finalDirectoTs=Date.now();
-  return _finalDirecto;
-}
 
 function dataUrlABlob(dataUrl){
   const m=String(dataUrl).match(/^data:([^;]+);base64,(.*)$/);
@@ -3090,58 +3050,25 @@ async function payloadSB(p){
   };
 }
 
-/* Punto único de envío. Devuelve lo mismo que antes (ok, id, resultado) más "via". */
+/* Punto único de envío: Supabase. Si la base de datos no responde, la auditoría
+   queda en la cola del celular y se reintenta sola; si la rechaza por un dato, se
+   avisa tal cual. */
 async function enviar(payload){
   if(MODO_DEMO) throw errTipo('Modo demostración: no se envía nada','demo');
-  if(!(await finalEsDirecto())){
-    const d=await enviarUno(payload); d.via='sheet'; return d;
-  }
   const cuerpo=await payloadSB(payload);
   let res;
   try{
     res=await fetch(SB_BASE+'/rest/v1/rpc/final_guardar_directo',{method:'POST',
       headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({payload:cuerpo})});
   }catch(e){ ULTIMO_ERROR='Sin conexión con la base de datos'; throw errTipo(ULTIMO_ERROR,'red'); }
-  if(!res.ok){
-    ULTIMO_ERROR='La base de datos no respondió ('+res.status+')';
-    throw errTipo(ULTIMO_ERROR,'red');
-  }
+  if(!res.ok){ ULTIMO_ERROR='La base de datos no respondió ('+res.status+')'; throw errTipo(ULTIMO_ERROR,'red'); }
   const data=await res.json();
-  if(data && data.noDirecto){ _finalDirecto=false; const d=await enviarUno(payload); d.via='sheet'; return d; }
   if(!data || !data.ok){
-    if(data && data.reintentar){ ULTIMO_ERROR=data.error||'Reintentar'; throw errTipo(ULTIMO_ERROR,'red'); }
+    if(data && (data.reintentar || data.noDirecto)){ ULTIMO_ERROR=data.error||'Reintentar'; throw errTipo(ULTIMO_ERROR,'red'); }
     ULTIMO_ERROR=(data&&(data.mensaje||data.error))||'La base de datos rechazó la auditoría';
     throw errTipo(ULTIMO_ERROR,'rechazo');
   }
   ULTIMO_ERROR=''; data.via='supabase';
-  return data;
-}
-
-async function enviarUno(payload){
-  if(MODO_DEMO){ const er=new Error('Modo demostración: no se envía nada'); er.tipo='demo'; throw er; }
-  let res;
-  try{
-    res = await fetch(APP_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
-  }catch(e){
-    ULTIMO_ERROR = 'Sin conexión con el servidor';
-    const er=new Error(ULTIMO_ERROR); er.tipo='red'; throw er;
-  }
-  const txt = await res.text();
-  let data;
-  try{ data = JSON.parse(txt); }
-  catch(e){
-    /* El servidor respondió algo que no es JSON: casi siempre una página de error
-       o de inicio de sesión de Google. Se muestran los primeros caracteres, que es
-       lo que permite reconocerlo. */
-    ULTIMO_ERROR = 'Respuesta inesperada del servidor ('+res.status+'): '+txt.slice(0,120);
-    /* Suele ser una caída momentánea de Google: se trata como falta de conexión y se reintenta. */
-    const er=new Error(ULTIMO_ERROR); er.tipo='red'; throw er;
-  }
-  if(!data.ok){
-    ULTIMO_ERROR = data.error || 'El servidor rechazó la auditoría';
-    const er=new Error(ULTIMO_ERROR); er.tipo='rechazo'; throw er;
-  }
-  ULTIMO_ERROR='';
   return data;
 }
 /* Candado: nunca dos envíos de la cola a la vez (al abrir, al volver la señal y el
@@ -3165,7 +3092,6 @@ async function enviarPendientes(auto){
         /* 24/09: lo que salió por la cola (sin señal o respuesta lenta) también manda su copia
            al paralelo. Antes solo la mandaba el guardado inmediato y 1 de cada 3 quedaba sin
            comparar. Mismo token: si la copia ya existía, Supabase no la duplica. */
-        if (it.payload && it.payload.modo !== 'actualizar' && dataCola && dataCola.via==='sheet') compararParalelo(it.payload, dataCola && dataCola.id);
       }
       catch(e){
         failN++; motivo=e.message||String(e);
@@ -3419,7 +3345,6 @@ $('save').onclick=async()=>{
       const data=await enviar(payload);
       borrarBorrador();
       confirmarGuardado('enviado', data.id||S.editId);
-      if(data.via==='sheet') compararParaleloActualizar(S.editId, payload);
     }catch(err){
       toast('No se pudo guardar la corrección: '+(err.message||err),'err');
       btn.disabled=false; btn.textContent='Guardar';
@@ -3438,7 +3363,6 @@ $('save').onclick=async()=>{
     anotarEco(data.id);
     borrarBorrador();
     confirmarGuardado('enviado', data.id, data.resultado);
-    if(data.via==='sheet') compararParalelo(payload, data.id);
   }catch(err){
     if(err && err.tipo==='rechazo'){
       // El sistema respondió y dijo que no: NO se encola (se rechazaría para siempre).
@@ -3677,11 +3601,7 @@ async function aprobarMedidaRapido(id, btnEl){
     let j;
     const r1=await fetch(SB_BASE+'/rest/v1/rpc/final_aprobar_medida',{method:'POST',
       headers:{'Content-Type':'application/json',apikey:SB_PUB},body:JSON.stringify({p_id:id,p_usuario:quienSoy()})});
-    j = r1.ok ? await r1.json() : {noDirecto:true};
-    if(j && j.noDirecto){
-      const res=await fetch(APP_URL,{method:'POST',body:JSON.stringify({modo:'aprobar_medida',edit_id:id}),headers:{'Content-Type':'text/plain;charset=utf-8'}});
-      j=await res.json();
-    }
+    j = r1.ok ? await r1.json() : {ok:false, error:'La base de datos no respondió ('+r1.status+')'};
     if(j.ok){ toast('Medida de '+id+' marcada como Aprobado ✓','ok'); await cargarAud(); buscarMisAud(); }
     else { toast('No se pudo actualizar: '+(j.error||''),'err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
   }catch(e){ toast('Sin señal — inténtalo de nuevo con internet','err'); btnEl.disabled=false; btnEl.textContent=txtOrig; }
@@ -3788,20 +3708,13 @@ function pedirAnular(id){
   }
   const quien = quienSoy();
   toast('Anulando…','ok');
-  /* 28/09: primero Supabase. Si Final todavía no es directo, responde noDirecto y se
-     anula por el Apps Script como siempre. */
-  const anularSheet=()=>fetch(APP_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({accion:'anular', clave:'livessac', id:id,
-                         motivo:String(motivo).trim(), usuario:quien})}).then(r=>r.json());
   fetch(SB_BASE+'/rest/v1/rpc/registro_anular_directo',{method:'POST',
       headers:{'Content-Type':'application/json',apikey:SB_PUB},
       body:JSON.stringify({p_id:id, p_motivo:String(motivo).trim(), p_usuario:quien})})
-    .then(r=>r.ok ? r.json() : {noDirecto:true})
-    .then(r=>(r && r.noDirecto) ? anularSheet() : r)
+    .then(r=>r.ok ? r.json() : {ok:false, error:'La base de datos no respondió ('+r.status+')'})
     .then(r=>{
       if(r&&r.ok){
         toast('Auditoría anulada.','ok');
-        compararParaleloAnular(id, String(motivo).trim(), quien);
         /* Se quita de la lista en pantalla y de la memoria: si no, sigue
            bloqueando el parcial y ofreciéndose para reprocesar. */
         AUD_CACHE=(AUD_CACHE||[]).filter(x=>String(x[0]).trim()!==String(id).trim());
@@ -4129,16 +4042,15 @@ setInterval(()=>{ if(!document.hidden) guardarBorradorAhora(); }, 15000);
 window.addEventListener('pagehide', guardarBorradorAhora);
 
 async function cargarOPS(){
-  /* Base de OP: primero Supabase (rápido). Si no responde, el Apps Script de siempre. */
+  /* Base de OP: Supabase, con un reintento. Si no, la última copia guardada en el celular. */
   try{
     OPS_DB=await sbrOpsPiloto();
     cacheGuardar('ops', OPS_DB);
     return;
   }catch(e){ console.warn('Supabase no respondió para la base de OP, se usa el Apps Script:', e); }
   try{
-    const r=await fetch(APP_URL+'?accion=ops');
-    const j=await r.json();
-    OPS_DB=(j&&j.rows)?j.rows:[];
+    await new Promise(r=>setTimeout(r,2000));
+    OPS_DB=await sbrOpsPiloto();                 /* un reintento; sin Apps Script (archivado) */
     cacheGuardar('ops', OPS_DB);
   }catch(e){
     const c=cacheLeer('ops'); OPS_DB=(c&&c.length)?c:[];
