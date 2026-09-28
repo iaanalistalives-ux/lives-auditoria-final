@@ -395,7 +395,6 @@ tr:hover td{background:#f6f9fb}
 </div>
 
 <script>
-const SHEET_ID='1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
 /* Ya no se guardan las auditorías en el navegador: las trae el servidor
    filtradas en cada búsqueda. */
 // índices de columnas en AUDITORÍAS
@@ -442,53 +441,8 @@ function parseCSV(txt){
 }
 /* URL del backend del formulario. Se usa para leer las hojas por Apps Script en vez de
    por gviz — ver el comentario de leerHoja(). */
-const APP_URL='https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
+/* 28/09/2026: sin Apps Script (archivado). */
 
-/* Lectura por Apps Script con getDisplayValues().
-   POR QUÉ: gviz le asigna UN tipo a cada columna y devuelve vacías las celdas que no calzan.
-   La columna PO tiene mayoría de números, así que los PO con letras o espacios
-   ("505221 USA", "LIVES-S-117-2") llegaban vacíos y el reporte los mostraba como "—".
-   getDisplayValues() entrega el texto exacto que se ve en la celda, sin tipado ni
-   conversiones: es la única lectura que no puede perder un dato.
-   Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
-function leerHojaScript(tab,id){
-  return new Promise(function(resolve,reject){
-    const fn='cbHoja'+Math.random().toString(36).slice(2);
-    const t=setTimeout(function(){ limpiar(); reject(new Error('tiempo agotado')); }, 20000);
-    function limpiar(){ clearTimeout(t); try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
-    window[fn]=function(res){
-      limpiar();
-      if(res && res.ok && res.rows) resolve(res.rows.map(f=>f.map(c=>String(c==null?'':c))));
-      else reject(new Error((res&&res.error)||'respuesta inválida'));
-    };
-    const sc=document.createElement('script');
-    sc.src=APP_URL+'?accion=hoja&nombre='+encodeURIComponent(tab)+(id?('&id='+encodeURIComponent(id)):'')
-            +'&callback='+fn+'&_='+Date.now();
-    sc.onerror=function(){ limpiar(); reject(new Error('no se pudo conectar')); };
-    document.body.appendChild(sc);
-  });
-}
-async function gvizCSV(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'});
-  if(!r.ok) throw new Error('No se pudo leer la hoja '+tab+' (HTTP '+r.status+')');
-  const t=await r.text();
-  if(/^\s*</.test(t)) throw new Error('El Sheet respondió una página en vez del CSV');
-  const filas=parseCSV(t);
-  if(!filas.length) throw new Error('La hoja '+tab+' volvió vacía');
-  return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));   // slice(1) descarta el encabezado
-}
-
-/* Enrutador: primero Apps Script (no puede perder datos), y si falla se cae a gviz CSV
-   para no dejar la pantalla en blanco. */
-async function gviz(tab,id){
-  /* Ya no hay respaldo por gviz. Ese respaldo leía el Sheet del piloto, que quedó
-     CONGELADO como copia cuando las auditorías pasaron al Sheet maestro: devolvería
-     datos viejos sin avisar y la auditora vería su auditoría de hoy como si no
-     existiera, o una corrección como si no se hubiera guardado. Es mejor fallar a
-     la vista que mostrar algo desactualizado como si fuera lo actual. */
-  return await leerHojaScript(tab,id);
-}
 function norm(s){return String(s||'').trim().toLowerCase();}
 // Convierte fechas de gviz "Date(2026,5,15)" a "2026-06-15". Si ya es texto normal, lo deja.
 function fechaTxt(v){
@@ -833,32 +787,13 @@ function sbaConsultar(p){
 /* ================= fin de la lectura de auditorías ================= */
 
 
-/* Búsqueda, desplegables y lotes de una OP: primero Supabase. Si no responde, el
-   Apps Script de siempre, con sus reintentos. */
+/* Búsqueda, desplegables y lotes de una OP: Supabase, con los reintentos de pedir().
+   Ya no hay respaldo al Apps Script (archivado el 28/09). */
 var SBA_ACCIONES={ consultar: sbaConsultar, opcionesconsulta: sbaOpcionesConsulta, lotesdeop: sbaLotesDeOp };
 function pedirUnaVez(params){
   var local=SBA_ACCIONES[params && params.accion];
-  if(!local) return pedirUnaVezGAS(params);
-  return local(params).catch(function(e){
-    console.warn('Supabase no respondió para '+params.accion+', se usa el Apps Script:', e);
-    return pedirUnaVezGAS(params);
-  });
-}
-function pedirUnaVezGAS(params){
-  return new Promise((ok,fail)=>{
-    const fn='cb'+Math.random().toString(36).slice(2);
-    const sc=document.createElement('script');
-    let listo=false;
-    const limpiar=()=>{ try{ delete window[fn]; }catch(e){} if(sc.parentNode) sc.remove(); };
-    window[fn]=r=>{ listo=true; limpiar(); ok(r); };
-    const qs=Object.keys(params)
-      .filter(k=>params[k]!==''&&params[k]!==null&&params[k]!==undefined)
-      .map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
-    sc.src=APP_URL+'?'+qs+'&callback='+fn+'&_='+Date.now();
-    sc.onerror=()=>{ if(!listo){ limpiar(); fail(new Error('se cortó la descarga')); } };
-    document.body.appendChild(sc);
-    setTimeout(()=>{ if(!listo){ limpiar(); fail(new Error('no respondió a tiempo')); } }, PLAZO_MS);
-  });
+  if(!local) return Promise.reject(new Error('Acción no disponible: '+(params && params.accion)));
+  return local(params);
 }
 
 const esperar = ms => new Promise(r=>setTimeout(r,ms));
