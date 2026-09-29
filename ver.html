@@ -823,8 +823,10 @@ async function prepararFotos(refs){
     refs.forEach(r=>{ if(!/^https?:/i.test(r)) rutaDe[r]=r; });
     const ids=[...new Set(refs.map(driveIdDe).filter(Boolean))];
     if(ids.length){
+      const ctl0=(typeof AbortController!=='undefined')?new AbortController():null;
+      const r0=setTimeout(()=>{ if(ctl0) ctl0.abort(); },10000);
       const res=await fetch(SBF_BASE+'/rest/v1/fotos_auditoria?select=drive_id,ruta&drive_id=in.('+ids.join(',')+')',
-                            {headers:{apikey:SBF_PUB}});
+                            {headers:{apikey:SBF_PUB}, signal: ctl0?ctl0.signal:undefined}).finally(()=>clearTimeout(r0));
       if(res.ok){
         const filas=await res.json();
         const porId={}; filas.forEach(x=>{ porId[x.drive_id]=x.ruta; });
@@ -867,6 +869,24 @@ function fotosDe(celda){
   return String(celda).split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
 }
 
+/* Si algo del reporte fallara, se dice en pantalla en vez de quedarse cargando. */
+function pintarSeguro(r,defs,ders){
+  try{ render(r,defs,ders); }
+  catch(e){
+    console.error(e);
+    const est=document.getElementById('estado');
+    if(est){ est.style.display=''; est.style.color='#B91C1C';
+      est.textContent='No se pudo mostrar la auditoría '+ID+': '+(e&&e.message||e)+'. Avisa a Christian con este mensaje.'; }
+  }
+}
+/* Red de seguridad: si a los 20 s sigue en "Cargando", se avisa y se ofrece reintentar. */
+setTimeout(function(){
+  const est=document.getElementById('estado');
+  if(est && /Cargando/.test(est.textContent||'') && est.offsetParent!==null){
+    est.innerHTML='Está tardando más de lo normal. Revisa la señal y <a href="#" onclick="location.reload();return false;">vuelve a intentar</a>.';
+  }
+}, 20000);
+
 async function cargar(){
   if(!ID){ document.getElementById('estado').textContent='Falta el ID de la auditoría.'; return; }
   let rows, defs, ders;
@@ -899,9 +919,14 @@ async function cargar(){
   }
   const misDef=defs.filter(d=>String(d[0]).trim()===ID.trim());
   const misDer=ders.filter(d=>String(d[0]).trim()===ID.trim());
-  await prepararFotos([].concat(fotosDe(r[C.fotosMed]), fotosDe(r[C.fotosPro]),
-                                misDef.map(d=>d[6]), misDer.map(d=>d[6])));
-  render(r,misDef,misDer);
+  /* 29/09: el reporte se muestra DE INMEDIATO con los datos. Las fotos se preparan
+     después y, cuando están, se vuelve a pintar con ellas. Así ninguna demora de las
+     fotos (señal, almacén, sesión) deja la pantalla en "Cargando auditoría…". */
+  pintarSeguro(r,misDef,misDer);
+  prepararFotos([].concat(fotosDe(r[C.fotosMed]), fotosDe(r[C.fotosPro]),
+                          misDef.map(d=>d[6]), misDer.map(d=>d[6])))
+    .then(function(){ if(Object.keys(FOTO_URLS).length) pintarSeguro(r,misDef,misDer); })
+    .catch(function(e){ console.warn('Fotos:', e); });
 }
 
 function render(r,defs,ders){
