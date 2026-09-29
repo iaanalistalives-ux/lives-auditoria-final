@@ -773,6 +773,10 @@ function leerHojaScript(tab,id){
     return new Promise(function(r){ setTimeout(r, 2000); }).then(pedirSB);
   });
 }
+/* Quedaba de la lectura por el Sheet (retirada el 28/09). Se declara para que la
+   pantalla no se detenga en 'Cargando auditoría…'. */
+var LECTURA_DEGRADADA=false;
+
 async function gviz(tab,id){
   /* Ya no hay respaldo por gviz: leía el Sheet del piloto, que quedó CONGELADO como
      copia cuando las auditorías pasaron al maestro. Devolvería datos viejos sin
@@ -831,9 +835,13 @@ async function prepararFotos(refs){
     if(!rutas.length || !window.LIVES_SESION) return;
     const tk=await window.LIVES_SESION.llave();
     if(!tk) return;
+    /* 10 s como máximo: si el almacén no responde, el reporte se muestra igual. */
+    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    const reloj=setTimeout(()=>{ if(ctl) ctl.abort(); },10000);
     const res2=await fetch(SBF_BASE+'/storage/v1/object/sign/auditorias-fotos',{method:'POST',
       headers:{apikey:SBF_PUB,Authorization:'Bearer '+tk,'Content-Type':'application/json'},
-      body:JSON.stringify({expiresIn:3600,paths:rutas})});
+      body:JSON.stringify({expiresIn:3600,paths:rutas}), signal: ctl?ctl.signal:undefined})
+      .finally(()=>clearTimeout(reloj));
     if(!res2.ok) return;
     const url={};
     (await res2.json()).forEach(f=>{ if(f && f.signedURL) url[f.path]=SBF_BASE+'/storage/v1'+f.signedURL; });
