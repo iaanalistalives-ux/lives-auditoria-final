@@ -504,9 +504,13 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <div class="hint" id="opHint">Obligatoria. Escríbela y los datos del pedido salen solos de la base de OPs: grupo, estilo, PO, color, destino y pedido no se escriben a mano.</div>
     </div>
     <div id="opSelector" style="display:none;margin:-6px 0 10px;padding:10px 12px;background:#fff4e0;border:1px solid #F59E0B;border-radius:10px">
-      <div style="font-size:12px;font-weight:700;color:#7a5a12;margin-bottom:8px">Esta OP tiene varias opciones — toca la que corresponde:</div>
+      <div id="opSelectorTitulo" style="font-size:12px;font-weight:700;color:#7a5a12;margin-bottom:8px">Esta OP tiene varias opciones — toca la que corresponde:</div>
       <div id="opSelectorList" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
+    <!-- 30/09: si el número escrito también es un ESTILO, se avisa y se ofrecen sus OPs.
+         Pasó con 25216: es el estilo de EFI-120 y a la vez una OP de PAKA; la auditora
+         veía los colores de PAKA y no encontraba el suyo. -->
+    <div id="opEstiloAviso" style="display:none;margin:-6px 0 10px;padding:10px 12px;background:#eef6ff;border:1px solid #93c5fd;border-radius:10px"></div>
     <!-- Aviso de lotes rechazados esperando reproceso. Va aquí, pegado a la OP, porque es donde
          la auditora realmente está mirando: nadie entra a "Ver auditorías" a buscar su reproceso. -->
     <div id="opRechazos" style="display:none;margin:-6px 0 10px;padding:11px 13px;background:#fdeceb;border:1px solid #e6a4a0;border-radius:10px">
@@ -698,7 +702,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-28b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-30 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -2245,7 +2249,7 @@ function buscarOP(){
   const op=($('opInput').value||'').trim();
   const h=$('opHint');
   if(!op){
-    ocultarSelectorOP(); liberarCamposOP();
+    ocultarSelectorOP(); liberarCamposOP(); avisoEsEstilo('');
     if(h){ h.className='hint'; h.textContent='Obligatoria. Escríbela y los datos del pedido salen solos de la base de OPs.'; }
     refrescarAvisoRechazos(); validate(); return;
   }
@@ -2275,6 +2279,9 @@ function buscarOP(){
     liberarCamposOP();   // no dejar a la vista los datos de la OP anterior mientras elige
     if(h){ h.className='hint'; h.textContent='Esta OP tiene varias opciones — elige abajo.'; }
     const sel=$('opSelector'), list=$('opSelectorList');
+    /* Se dice de quién es la OP, para que salte a la vista si no es la que se buscaba. */
+    const m0=matches[0]||{};
+    $('opSelectorTitulo').textContent='OP '+op+' · '+[m0.grupo, m0.estilo?('estilo '+m0.estilo):''].filter(Boolean).join(' · ')+' — toca la que corresponde:';
     list.innerHTML=''; list.dataset.op=op;
     matches.forEach(m=>{
       const b=document.createElement('button'); b.type='button';
@@ -2295,7 +2302,34 @@ function buscarOP(){
     });
     sel.style.display='block';
   }
+  avisoEsEstilo(op);
   refrescarAvisoRechazos();
+}
+
+/* Si lo escrito en "OP" también es un estilo, se ofrecen las OPs de ese estilo con un
+   toque. No cambia nada por su cuenta: la auditora decide. */
+function avisoEsEstilo(op){
+  const box=$('opEstiloAviso'); if(!box) return;
+  const v=String(op||'').trim();
+  const delEstilo=v ? OPS_DB.filter(r=>String(r.estilo||'').trim()===v && String(r.op)!==v) : [];
+  if(!delEstilo.length){ box.style.display='none'; box.innerHTML=''; return; }
+  const porOp={};
+  delEstilo.forEach(r=>{ const k=String(r.op); (porOp[k]=porOp[k]||{grupo:r.grupo, colores:new Set(), destinos:new Set()});
+                         if(r.color) porOp[k].colores.add(r.color); if(r.destino) porOp[k].destinos.add(r.destino); });
+  const grupos=[...new Set(delEstilo.map(r=>r.grupo).filter(Boolean))].join(', ');
+  box.innerHTML='<div style="font-size:12.5px;font-weight:700;color:#1e3a8a;margin-bottom:6px">¿Escribiste el ESTILO? '+esc(v)+
+    ' también es un estilo ('+esc(grupos)+'). Estas son sus OPs — toca la tuya:</div>'+
+    '<div style="display:flex;flex-direction:column;gap:6px" id="opEstiloLista"></div>';
+  const lista=$('opEstiloLista');
+  Object.keys(porOp).sort().forEach(k=>{
+    const o=porOp[k];
+    const b=document.createElement('button'); b.type='button';
+    b.style.cssText='text-align:left;padding:8px 12px;border-radius:8px;border:1px solid #93c5fd;background:#fff;font-size:13px;cursor:pointer';
+    b.textContent='OP '+k+' · '+(o.grupo||'')+' · '+[...o.colores].join(', ')+' · '+o.destinos.size+' destino(s)';
+    b.onclick=()=>{ $('opInput').value=k; S.opResuelta=''; box.style.display='none'; buscarOP(); };
+    lista.appendChild(b);
+  });
+  box.style.display='block';
 }
 let opTimer=null;
 $('opInput').addEventListener('input',()=>{ clearTimeout(opTimer); opTimer=setTimeout(buscarOP,350); });
