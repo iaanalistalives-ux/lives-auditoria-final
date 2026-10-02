@@ -702,7 +702,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-09-30 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-01 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -1795,10 +1795,10 @@ function rechazoPendiente(r, todas){
   if(!/RECH/.test(norm(r[27]))) return false;
   const id=String(r[0]).trim();
   if(todas.some(x=>String(x[49]||'').trim()===id)) return false;
-  const k=llaveLaxaFila(r), f=fechaDe(r);
+  const k=llaveEstrictaFila(r), f=fechaDe(r);
   return !todas.some(x=>String(x[0]).trim()!==id
                      && esSi(x[39])
-                     && llaveLaxaFila(x)===k
+                     && llaveEstrictaFila(x)===k
                      && fechaDe(x)>=f);
 }
 // Rechazos pendientes de una OP. Se busca por dos vías porque la columna OP solo se guarda desde
@@ -1811,10 +1811,30 @@ function rechazoPendiente(r, todas){
    nada que ver con las otras: lo hace quien hizo esa auditoría, en su proceso.
    Sin este filtro se ofrecía reprocesar el rechazo de costura al registrar una
    auditoría de acabados. */
-function mismoProcesoQueAhora(r){
-  if(!S.proceso) return true;               /* aún no eligió: no se filtra */
-  return norm(r[3]) === norm(S.proceso);    /* col 4 = PROCESO */
+/* 01/10: un rechazo solo se ofrece para reprocesar dentro del MISMO proceso. Si todavía
+   no se eligió el proceso, no se ofrece ninguno: antes se mostraban todos, y una auditora
+   de Acabados Final veía rechazos de Costura o Acabados en taller (p. ej. de Sharon Vega),
+   que reprocesa quien auditó en el taller. Se compara la familia del proceso, no el texto. */
+function procesoFamilia(v){
+  const t=norm(v);
+  if(!t) return '';
+  if(t.indexOf('COSTURA')>=0) return 'COSTURA';
+  if(t.indexOf('ACABADOS')>=0) return t.indexOf('INTERN')>=0 ? 'ACABADOS_INT' : 'ACABADOS_EXT';
+  return t;
 }
+function mismoProcesoQueAhora(r){
+  if(!S.proceso) return false;
+  return procesoFamilia(r[3]) === procesoFamilia(S.proceso);   /* col 4 = PROCESO */
+}
+/* 01/10: una OP trae varias PO/destinos del mismo color. Un rechazo es de SU PO y SU
+   destino: no debe aparecer como pendiente al auditar otra PO/destino aprobada del mismo
+   color. Si el formulario todavía no tiene PO o destino, no se filtra por ellos. */
+function mismoPedidoQueAhora(r){
+  const po=norm($('po') ? $('po').value : ''), de=$('destino') ? $('destino').value : '';
+  if(!po || !de) return true;
+  return norm(r[10])===po && destinoCorto(r[12])===destinoCorto(de);
+}
+function llaveEstrictaFila(r){ return llaveLaxaFila(r)+'|'+norm(r[10])+'|'+destinoCorto(r[12]); }
 
 function rechazosPendientesDeOP(op){
   const opN=norm(op); if(!opN) return [];
@@ -1828,7 +1848,8 @@ function rechazosPendientesDeOP(op){
 function rechazosPendientesDeLote(){
   if(!$('grupo').value || !$('estiloL').value || !$('color').value) return [];
   const todas=filasValidas(), k=llaveLaxaActual();
-  return todas.filter(r=>llaveLaxaFila(r)===k && mismoProcesoQueAhora(r) && rechazoPendiente(r,todas));
+  return todas.filter(r=>llaveLaxaFila(r)===k && mismoProcesoQueAhora(r) && mismoPedidoQueAhora(r)
+                         && rechazoPendiente(r,todas));
 }
 // Cuando la auditora dice que viene a auditar otro parcial, el aviso se guarda para esta
 // OP y no vuelve a molestar mientras siga en ella. El rechazo NO se marca como atendido:
@@ -2188,6 +2209,8 @@ $('proceso').onchange=()=>{
   fillTaller(S.proceso);
   actualizarCardProceso();
   pedirOrdinal(); validate();
+  /* 01/10: los rechazos que se ofrecen dependen del proceso: al cambiarlo se recalculan. */
+  if(typeof refrescarAvisoRechazos==='function') refrescarAvisoRechazos();
 };
 $('taller').onchange=validate;
 
@@ -2290,7 +2313,9 @@ function buscarOP(){
       // Marca la variante que tiene un rechazo esperando reproceso, para que se vea ANTES de elegir.
       const todasFV=filasValidas();
       const kv=llaveLaxa(m.grupo,m.estilo,m.color);
-      const pend=todasFV.filter(r=>llaveLaxaFila(r)===kv && rechazoPendiente(r,todasFV)).length;
+      const pend=todasFV.filter(r=>llaveLaxaFila(r)===kv && norm(r[10])===norm(m.po)
+                                    && destinoCorto(r[12])===destinoCorto(m.destino)
+                                    && mismoProcesoQueAhora(r) && rechazoPendiente(r,todasFV)).length;
       if(pend){
         b.style.borderColor='#e6a4a0'; b.style.background='#fdeceb'; b.style.color='#7a2318';
         b.innerHTML=esc(desc)+'<br><span style="font-size:11.5px;font-weight:700">⚠️ '+pend+' rechazo(s) sin reprocesar</span>';
