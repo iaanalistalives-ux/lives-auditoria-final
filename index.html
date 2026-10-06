@@ -796,7 +796,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-07 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-07b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -853,6 +853,29 @@ const MODO_DEMO = (function(){
   return !!q && USUARIOS_DEMO.indexOf(q)>=0;
 })();
 function avisoDemo(){ toast('Modo demostración: esta acción no se aplica al sistema.','err'); }
+/* 07/10: desde el 06/10 el personal usa el NOMBRE DE SISTEMAS (p. ej. ARACELY SOSA →
+   ARACELI SOSA, ZULLY FARRO → MARIA FARRO, JESSICA → JESICA CHAVARRIA): así está el
+   catálogo y así quedaron sus auditorías. El portal todavía puede traer el nombre
+   antiguo, así que se pregunta a Supabase (nombre_sistemas) cuál es el oficial y se usa
+   ese para firmar, validar y ver "Mis auditorías". Si la consulta falla, queda el del portal. */
+let NOMBRE_OFICIAL='';
+function nombreAuditora(){ return NOMBRE_OFICIAL || NOMBRE_PORTAL; }
+async function resolverNombreOficial(){
+  if(!NOMBRE_PORTAL) return;
+  try{
+    const r=await fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/nombre_sistemas',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ'},
+      body:JSON.stringify({p:NOMBRE_PORTAL})});
+    if(!r.ok) return;
+    const n=String(await r.json()||'').trim().toUpperCase();
+    if(n && n!==NOMBRE_PORTAL){
+      NOMBRE_OFICIAL=n;
+      fijarAuditor();
+      if($('miNombre') && ($('miNombre').value===NOMBRE_PORTAL || !$('miNombre').value)) $('miNombre').value=n;
+      if(typeof validate==='function') validate();
+    }
+  }catch(e){ console.warn('Nombre de Sistemas:', e); }
+}
 /* Fija el campo Auditor: nadie lo edita. En una corrección se conserva la autora original. */
 function fijarAuditor(){
   const el=document.getElementById('auditor'); if(!el) return;
@@ -860,7 +883,7 @@ function fijarAuditor(){
   el.removeAttribute('list');
   el.style.background='#eef3f1'; el.style.fontWeight='600'; el.style.color='#0F7A5A';
   if(S && S.editId) return;
-  el.value = NOMBRE_PORTAL || '';
+  el.value = nombreAuditora() || '';
   el.placeholder = NOMBRE_PORTAL ? '' : 'Entra desde el portal para registrar';
 }
 
@@ -4226,8 +4249,9 @@ crearBuscadorChecklist({inputId:'buscarDer',resultsId:'resultadosDer',activoId:'
 (function aplicarNombreDesdePortal(){
   fijarAuditor();
   if(MODO_DEMO){ const d=document.getElementById('avisoDemo'); if(d) d.style.display='block'; }
+  resolverNombreOficial();
   if(NOMBRE_PORTAL){
-    if($('miNombre')&&!$('miNombre').value) $('miNombre').value=NOMBRE_PORTAL;
+    if($('miNombre')&&!$('miNombre').value) $('miNombre').value=nombreAuditora();
   } else {
     /* Abierto fuera del portal (enlace guardado, marcador): no se sabe quién es.
        Se puede mirar, pero no guardar: así ninguna auditoría queda a nombre de otra persona. */
