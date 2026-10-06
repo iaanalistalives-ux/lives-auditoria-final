@@ -796,7 +796,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-01 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-07 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -2027,12 +2027,19 @@ function detectarConflictoParcial(){
   // (a) DUPLICADO: mismo lote, mismo día, misma cantidad recibida
   const dup=previas.find(r=>fechaDe(r)===hoy && (parseInt(r[14])||0)===rec);
   if(dup) return {tipo:'duplicado', id:String(dup[0]).trim(), aud:dup[31]||'', rec:rec};
-  // (b) EXCESO: lo ya auditado más este lote pasa del pedido
+  // (b) EXCESO: lo ya auditado más este lote pasa del pedido.
+  /* 07/10: el candado salía casi siempre y sin motivo:
+     · En COSTURA las visitas revisan el avance de la misma producción, así que sumar
+       sus lotes no tiene sentido: no se revisa exceso (1 de cada 2 lo disparaba).
+     · En Acabados la planta suele producir más que el pedido (hasta ~22 % en lo
+       registrado desde el 29/09). Solo se traba cuando se pasa en más de 25 %, que ya
+       es casi seguro un error de tipeo (p. ej. 4414 en un pedido de 400). */
+  if(procesoFamilia(S.proceso)==='COSTURA') return null;
   const ya=sumaLotesPrevios(previas);
   let pedRef=0;
   previas.forEach(r=>{ const p=Number(r[13])||0; if(p>pedRef) pedRef=p; });
   const pedido = pedRef || (parseInt(v('pedido'))||0);
-  if(pedido && (ya+rec) > pedido) return {tipo:'exceso', ya:ya, rec:rec, pedido:pedido, total:ya+rec};
+  if(pedido && (ya+rec) > pedido*1.25) return {tipo:'exceso', ya:ya, rec:rec, pedido:pedido, total:ya+rec};
   return null;
 }
 /* Cuántas prendas de este pedido se auditaron REALMENTE hasta ahora.
@@ -2071,8 +2078,8 @@ function refrescarCandadoParcial(){
   }else{
     caja.style.background='#fff4e0'; caja.style.border='1px solid #F59E0B';
     tit.style.color='#7a5a12'; txt.style.color='#7a5a12';
-    tit.textContent='🔒 Con este lote se pasa del pedido';
-    txt.innerHTML='El pedido es de <b>'+c.pedido+' prendas</b>. Ya se auditaron <b>'+c.ya+'</b> y con tu lote de <b>'+c.rec+'</b> sumarían <b>'+c.total+'</b>.<br><br>Revisa que el total recibido sea solo <b>lo que llegó ahora</b>, no el pedido completo.';
+    tit.textContent='🔒 Con este lote se pasa del pedido en más de 25 %';
+    txt.innerHTML='El pedido es de <b>'+c.pedido+' prendas</b>. Ya se auditaron <b>'+c.ya+'</b> y con tu lote de <b>'+c.rec+'</b> sumarían <b>'+c.total+'</b> ('+Math.round(100*c.total/c.pedido)+' % del pedido).<br><br>Revisa que el total recibido esté bien escrito y que sea solo <b>lo que llegó ahora</b>, no el pedido completo.';
     btn.textContent = ok ? '✓ Confirmado: el pedido creció' : 'Está bien, confirmo el número — desbloquear';
   }
   btn.style.background = ok ? '#eef7f4' : '#fff';
@@ -2986,7 +2993,7 @@ function calcularFaltantes(){
   if(conflicto && !parcialConfirmado()){
     faltan.push(conflicto.tipo==='duplicado'
       ? 'Confirmar que este lote es distinto al ya auditado hoy'
-      : 'Confirmar el total recibido (se pasa del pedido)');
+      : 'Confirmar el total recibido (se pasa del pedido en más de 25 %)');
   }
   return faltan;
 }
