@@ -955,9 +955,8 @@ async function prepararFotos(refs){
       }
     }
     const rutas=[...new Set(Object.values(rutaDe))];
-    if(!rutas.length || !window.LIVES_SESION) return;
-    const tk=await window.LIVES_SESION.llave();
-    if(!tk) return;
+    if(!rutas.length) return;
+    const tk=(window.LIVES_SESION ? await window.LIVES_SESION.llave() : null) || SBF_PUB;   /* sin sesión: llave pública (lectura abierta) */
     /* 10 s como máximo: si el almacén no responde, el reporte se muestra igual. */
     const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
     const reloj=setTimeout(()=>{ if(ctl) ctl.abort(); },10000);
