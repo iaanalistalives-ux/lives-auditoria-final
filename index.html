@@ -928,7 +928,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-07b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-12 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -3361,7 +3361,7 @@ async function payloadSB(p){
     muestraMedidas:(p.muestra_medidas===''?null:p.muestra_medidas),
     defMedidas:(p.def_medidas===''?null:p.def_medidas), resultadoMedidas:p.resultado_medidas||'',
     fotosMedidas: await fotos(p.fotos_medidas,'medidas'), fotosProceso: await fotos(p.fotos_proceso,'proceso'),
-    observacion:p.comentario||''
+    observacion:p.comentario||'', otroLoteDe:p.otro_lote_de||''
   };
 }
 
@@ -3480,6 +3480,11 @@ function anotarEco(idAsignado){
   }catch(e){}
 }
 
+function otroLoteDeclarado(){
+  if(S.reprocesaDe || S.editId || !S.otroLoteDe) return '';
+  const pend=pendientesParaPreguntar();
+  return (pend.length && REPRO_DECIDIDO===firmaRepro(pend)) ? S.otroLoteDe : '';
+}
 function armarPayload(){
   const nom=$('cliente').value; const cod=(v('grupo').substring(0,3)||'AUD').toUpperCase();
   const interno=S.proceso==='Acabados Final (interno)';
@@ -3498,6 +3503,8 @@ function armarPayload(){
     // La auditora confirmó a propósito que este lote es distinto (candado del parcial). El backend
     // lo respeta y no lo marca como REPETIDO, aunque coincida fecha y cantidad con otro.
     parcial_confirmado: parcialConfirmado(),
+    // 12/10: rechazos frente a los que la auditora eligió "Es otro lote de este pedido".
+    otro_lote_de: otroLoteDeclarado(),
     override:S.override?'SÍ':'NO',override_autoriza:v('ovWho'),override_motivo:v('ovWhy'),
     muestra_medidas:parseInt(v('medMuestra'))||'',def_medidas:parseInt(v('medDef'))||'',resultado_medidas:v('medRes'),
     auditor:v('auditor'),
@@ -3575,6 +3582,9 @@ function preguntarReproceso(pend){
       marcarComoReproceso(eleccion.id, mot);
     } else {
       REPRO_DECIDIDO = firmaRepro(pend);
+      /* 12/10: se anota a qué rechazos se refiere "es otro lote", para que el control de
+         datos no lo cuente como reproceso sin marcar. El rechazo sigue pendiente. */
+      S.otroLoteDe = pend.map(r=>String(r[0]).trim()).join(',');
       AVISO_OMITIDO = ($('opInput') ? ($('opInput').value||'').trim() : '') + '|' + llaveLaxaActual();
       const c=$('opRechazos'); if(c) c.style.display='none';
     }
@@ -3590,7 +3600,7 @@ function preguntarReproceso(pend){
 /* Convierte la auditoría llenada en reproceso del rechazo elegido, sin borrar nada
    de lo que la auditora ya escribió. */
 function marcarComoReproceso(id, motivo){
-  S.reprocesaDe=id; S.reproceso=true;
+  S.reprocesaDe=id; S.reproceso=true; S.otroLoteDe='';
   S.nAud='Reproceso'; const out=$('ordinal'); if(out) out.value='Reproceso';
   const oh=$('ordHint'); if(oh){ oh.className='hint'; oh.textContent='No cuenta como un parcial nuevo: es el reproceso de '+id+'.'; }
   if(typeof fijarReproWrap==='function') fijarReproWrap(true);
@@ -3604,7 +3614,7 @@ function marcarComoReproceso(id, motivo){
 }
 /* Quitar la marca sin perder lo escrito (antes "Cancelar reproceso" recargaba la página). */
 function desmarcarReproceso(){
-  S.reprocesaDe=null; S.reproceso=false; REPRO_DECIDIDO='';
+  S.reprocesaDe=null; S.reproceso=false; REPRO_DECIDIDO=''; S.otroLoteDe='';
   $('modoReproceso').style.display='none';
   if($('reproSwitch')){ $('reproSwitch').checked=false; $('reproSwitch').disabled=true; }
   if(typeof fijarReproWrap==='function') fijarReproWrap(false);
