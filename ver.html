@@ -611,6 +611,8 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 <title>Reporte de auditoría · LIVES</title>
 <style>
 :root{
+  /* 14/10: los grises azulados (#e9edf2, #f0f3f7, #f6f8fb…) pasan a los de la paleta LIVES: en
+     modo oscuro se traducen al tono Petróleo y ya no a un azul que empañaba la vista. */
   --petrol:#0E3B36; --petrol-2:#12463F; --emer:#10B981;
   --sage:#0F7A5A; --sage-dark:#0B815E; --slate:#4E6B78;
   --taupe:#B45309; --rose:#DC2626; --tan:#F59E0B;
@@ -621,7 +623,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
   --navy:#0E3B36; --azul:#0E3B36; --amber:#F59E0B;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#e9edf2;color:var(--ink)}
+body{margin:0;font-family:'Barlow',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--warm-light);color:var(--ink)}
 .toolbar{position:sticky;top:0;background:var(--navy);color:#fff;padding:8px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;z-index:10;border-bottom:3px solid var(--emer);}
 .toolbar h1{font-size:14px;margin:0;font-weight:700}
 .toolbar .acts{display:flex;flex-wrap:wrap;gap:6px}
@@ -651,22 +653,22 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--navy)
 .f .v{font-size:14px;font-weight:600}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
 .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-th{background:#f0f3f7;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;color:#556;border-bottom:1px solid var(--line)}
-td{padding:7px 9px;border-bottom:1px solid #eef1f4}
+th{background:var(--warm-light);text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;color:var(--stone);border-bottom:1px solid var(--line)}
+td{padding:7px 9px;border-bottom:1px solid #E6EEEB}
 .deffotoWrap{display:flex;flex-direction:column;gap:3px}
 .deflab{font-size:10px;font-weight:700;color:var(--navy)}
 .deffoto{width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;display:block}
 .aqlbox{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
-.aqlbox .b{background:#f6f8fb;border-radius:8px;padding:10px;text-align:center}
+.aqlbox .b{background:var(--warm-light);border-radius:8px;padding:10px;text-align:center}
 .aqlbox .b .k{font-size:10px;text-transform:uppercase;color:#889}
 .aqlbox .b .v{font-size:18px;font-weight:800;color:var(--navy)}
 .ovbox{background:#fcf3df;border:1px solid #F59E0B;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13px}
-.coment{background:#f6f8fb;border-radius:8px;padding:12px;font-size:14px;white-space:pre-wrap;min-height:20px}
+.coment{background:var(--warm-light);border-radius:8px;padding:12px;font-size:14px;white-space:pre-wrap;min-height:20px}
 .fotos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
 .fotos figure{margin:0}
-.fotos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;background:#f3f5f8}
+.fotos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;background:var(--warm-light)}
 .fotoblock{margin-top:14px}
-.fotoblock .lab{font-weight:700;font-size:12px;color:var(--navy);background:#eef2f7;padding:5px 10px;border-radius:6px;display:inline-block;margin-bottom:6px}
+.fotoblock .lab{font-weight:700;font-size:12px;color:var(--navy);background:var(--warm-light);padding:5px 10px;border-radius:6px;display:inline-block;margin-bottom:6px}
 /* lightbox */
 #lb{display:none;position:fixed;inset:0;background:rgba(15,20,30,.92);z-index:100;align-items:center;justify-content:center;flex-direction:column}
 #lb.show{display:flex}
