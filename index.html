@@ -787,7 +787,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <div id="misAudList" style="margin-top:10px;max-height:55vh;overflow-y:auto;border:1px solid #d8e0ea;border-radius:12px;padding:8px"></div>
     <div id="modoEdicion" style="display:none;margin-top:10px;padding:10px 12px;background:#fff4e0;border:1px solid #F59E0B;border-radius:10px;font-size:13px;color:#7a5a12">
       ✏️ <b>Estás corrigiendo la auditoría <span id="editId"></span>.</b> Cambia lo que necesites abajo y guarda.
-      <button class="addbtn" id="btnCancelEdit" style="margin-top:8px;background:#fff;color:#c32030;border:1px solid #DC2626">Cancelar corrección</button>
+      <div id="cambioOpAviso" style="display:none;margin-top:8px;padding:8px 10px;background:#fff;border:1px dashed #F59E0B;border-radius:8px;font-size:12.5px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="addbtn" id="btnCambiarOP" type="button" style="margin-top:8px;flex:1;min-width:140px;background:#fff;color:#7a5a12;border:1px solid #F59E0B">🔄 Cambiar OP</button>
+        <button class="addbtn" id="btnCancelEdit" style="margin-top:8px;flex:1;min-width:140px;background:#fff;color:#c32030;border:1px solid #DC2626">Cancelar corrección</button>
+      </div>
     </div>
     <!-- Aviso cuando NO se pudieron leer los defectos ya guardados de la auditoría que se corrige.
          Mientras esto esté visible, el botón Guardar queda trabado: guardar con el checklist vacío
@@ -1027,7 +1031,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-12 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-14 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -2602,7 +2606,7 @@ function ocultarSelectorOP(){ const sel=$('opSelector'); if(sel){ sel.style.disp
    vienen de la auditoría original y no se tocan. */
 function bloquearCamposOP(){ CAMPOS_OP.forEach(id=>{ const el=$(id); if(el) lockField(id, el.value); }); }
 function liberarCamposOP(){
-  if(S.editId || S.reprocesaDe){ S.opResuelta=''; return; }
+  if((S.editId && !S.cambioPedido) || S.reprocesaDe){ S.opResuelta=''; return; }
   CAMPOS_OP.forEach(id=>lockField(id,'')); S.codTela=''; S.descTela=''; S.pedidoDeOP=false; S.opResuelta='';
   const cl=$('cliente'); if(cl) cl.value='';
 }
@@ -3201,7 +3205,7 @@ function calcularFaltantes(){
   const faltan=[];
   /* 22/09: toda auditoría nueva sale de una OP de la base. Corrección y reproceso heredan
      los datos de la auditoría original, que ya está en el sistema. */
-  if(!S.editId && !S.reprocesaDe){
+  if((!S.editId || S.cambioPedido) && !S.reprocesaDe){
     const opEscrita=(($('opInput')&&$('opInput').value)||'').trim();
     if(!opEscrita || S.opResuelta!==opEscrita) faltan.push('OP de la base de OPs (escríbela y elige su variante)');
   }
@@ -3460,7 +3464,7 @@ async function payloadSB(p){
     muestraMedidas:(p.muestra_medidas===''?null:p.muestra_medidas),
     defMedidas:(p.def_medidas===''?null:p.def_medidas), resultadoMedidas:p.resultado_medidas||'',
     fotosMedidas: await fotos(p.fotos_medidas,'medidas'), fotosProceso: await fotos(p.fotos_proceso,'proceso'),
-    observacion:p.comentario||'', otroLoteDe:p.otro_lote_de||''
+    observacion:p.comentario||'', otroLoteDe:p.otro_lote_de||'', cambioPedido:!!p.cambio_pedido
   };
 }
 
@@ -3612,6 +3616,7 @@ function armarPayload(){
     fotos_medidas:S.fotosMed, fotos_proceso:S.fotosPro, comentario:v('comentario'),
     modo: S.editId ? 'actualizar' : 'nuevo',
     edit_id: S.editId || '',
+    cambio_pedido: !!(S.editId && S.cambioPedido),
     id_envio: 'E'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)
   };
 }
@@ -3760,6 +3765,12 @@ $('save').onclick=async()=>{
   const btn=$('save');btn.disabled=true;btn.textContent='Guardando…';
   const payload=armarPayload();
   // CORRECCIÓN: requiere conexión (no se encola, para no duplicar)
+  if(S.editId && S.cambioPedido && S.pedidoAntes){
+    const nuevo='OP '+(v('opInput')||'—')+' · '+v('color')+' · '+v('destino')+' · PO '+v('po');
+    if(!confirm('¿Cambiar el pedido de esta auditoría?\n\nAntes: '+S.pedidoAntes+'\nAhora: '+nuevo)){
+      btn.disabled=false; btn.textContent='Guardar'; return;
+    }
+  }
   if(S.editId){
     if(navigator.onLine===false){
       toast('Para corregir necesitas señal. Inténtalo con internet.','err');
@@ -4161,6 +4172,10 @@ async function cargarParaEditar(id){
   // "corrija" a mano y se desincronicen del pedido real).
   lockField('grupo',r[7]); lockField('estiloL',r[8]); lockField('estiloC',r[9]);
   lockField('po',r[10]); lockField('color',r[11]); lockField('destino',r[12]); lockField('pedido',r[13]);
+  /* 14/10: la OP también se muestra (antes quedaba vacía y la corrección la borraba). */
+  lockField('opInput',r[50]||''); S.opResuelta=String(r[50]||'').trim(); S.cambioPedido=false;
+  const coa=$('cambioOpAviso'); if(coa){ coa.style.display='none'; coa.innerHTML=''; }
+  const bco=$('btnCambiarOP'); if(bco) bco.style.display='';
   $('recibido').value=r[14]||'';
   S.codTela=r[45]||''; S.descTela=r[46]||''; // AT/AU: se conservan tal cual, no se piden de nuevo al corregir
   $('auditor').value=r[31]||''; $('auditor').readOnly=true; $('fecha').value=fechaTxtForm(r[1]);
@@ -4295,6 +4310,41 @@ function toggleMisAud(){
 }
 $('btnMisAud').onclick=toggleMisAud;
 $('btnCancelEdit').onclick=cancelarEdicion;
+
+/* 14/10: Cambiar OP dentro de una corrección. Para cuando se eligió mal la OP o su color.
+   Freno 1: si la auditoría es un reproceso o tiene un reproceso que la corrige, no se
+   cambia (rompería el vínculo); la base también lo rechaza. Freno 2: antes de guardar se
+   confirma "Antes → Ahora". El N° de auditoría se recalcula solo en la base al guardar. */
+function vinculadaAReproceso(id){
+  const r=(AUD_CACHE||[]).find(x=>String(x[0]).trim()===String(id).trim());
+  if(!r) return false;
+  if(esSi(r[39]) || String(r[IDX_REPROCESA_DE]||'').trim()) return true;
+  const filas=(typeof filasValidas==='function')?filasValidas():(AUD_CACHE||[]);
+  return filas.some(x=>String(x[IDX_REPROCESA_DE]||'').trim()===String(id).trim());
+}
+function mostrarAvisoCambioOP(){
+  const a=$('cambioOpAviso'); if(!a) return;
+  a.style.display='block';
+  a.innerHTML='🔄 <b>Cambiando el pedido.</b> Antes: '+esc(S.pedidoAntes||'—')+'. Escribe la OP correcta abajo y elige su color.';
+  const b=$('btnCambiarOP'); if(b) b.style.display='none';
+}
+function iniciarCambioOP(){
+  if(!S.editId) return;
+  if(vinculadaAReproceso(S.editId)){
+    toast('Esta auditoría está vinculada a un reproceso: no se puede cambiar su OP. Avisa a Christian.','err');
+    return;
+  }
+  S.pedidoAntes='OP '+(v('opInput')||'—')+' · '+v('color')+' · '+v('destino')+' · PO '+v('po');
+  S.cambioPedido=true;
+  unlockField('opInput'); $('opInput').value=''; S.opResuelta='';
+  liberarCamposOP();
+  const h=$('opHint'); if(h){ h.className='hint'; h.textContent='Escribe la OP correcta y elige su color: los datos del pedido salen solos.'; }
+  const ordH2=$('ordHint'); if(ordH2) ordH2.textContent='Con el pedido nuevo, el N° se recalcula solo al guardar.';
+  mostrarAvisoCambioOP();
+  validate();
+  setTimeout(()=>{ const el=$('opInput'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); } },50);
+}
+$('btnCambiarOP').onclick=iniciarCambioOP;
 $('btnCancelRepro').onclick=desmarcarReproceso;
 
 /* =================== BORRADOR AUTOMÁTICO (no perder el trabajo al cambiar de app) =================== */
@@ -4312,6 +4362,7 @@ function recolectarBorrador(){
     ts: Date.now(), campos, checks,
     proceso:S.proceso, nAud:S.nAud, int_ext:S.int_ext, nivel:S.nivel,
     override:S.override, licencia:S.licencia, reproceso:S.reproceso, liquidado:S.liquidado, editId:S.editId||null,
+    cambioPedido:!!S.cambioPedido, pedidoAntes:S.pedidoAntes||'', opTxt:(($('opInput')||{}).value||''),
     /* El vínculo al rechazo que se corrige. Sin esto, quien toca "Reprocesar" y
        continúa la auditoría más tarde —al volver de otra app o al día siguiente—
        la guardaba marcada como reproceso pero SIN decir a cuál corrige: el
@@ -4422,7 +4473,10 @@ function restaurarBorrador(){
   S.override=!!b.override; S.licencia=!!b.licencia; S.reproceso=!!b.reproceso; S.liquidado=!!b.liquidado;
   if($('liquidadoSwitch')) $('liquidadoSwitch').checked=S.liquidado;
   fijarReproWrap(false);
-  if(b.editId){ S.editId=b.editId; const ei=$('editId'); if(ei) ei.textContent=b.editId; const me=$('modoEdicion'); if(me) me.style.display='block'; }
+  if(b.editId){ S.editId=b.editId; const ei=$('editId'); if(ei) ei.textContent=b.editId; const me=$('modoEdicion'); if(me) me.style.display='block';
+    if($('opInput')) lockField('opInput', b.opTxt||'');
+    S.opResuelta=String(b.opTxt||'').trim(); S.cambioPedido=!!b.cambioPedido; S.pedidoAntes=b.pedidoAntes||'';
+    if(S.cambioPedido) mostrarAvisoCambioOP(); }
 
   document.querySelectorAll('#segA button').forEach(x=>{ x.classList.toggle('on', x.dataset.v===S.nivel); });
   if($('ovFields')) $('ovFields').classList.toggle('show', S.override);
