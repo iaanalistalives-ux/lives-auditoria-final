@@ -1031,7 +1031,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-14 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-15 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -4184,7 +4184,8 @@ async function cargarParaEditar(id){
   // N° de auditoría: conservar el mismo de la auditoría original (col C = idx 2)
   // r[2] puede venir como '2da' (histórico) o como 2 (Paso 14). Se muestra siempre en
   // el formato que la auditora reconoce, sin importar cómo esté guardado.
-  S.nAud = esSi(r[39]) ? 'Reproceso' : (numParcial(r[2]) ? ordinalTexto(numParcial(r[2])) : (r[2] || ''));
+  /* 15/10: sin parcial (Costura) se muestra su vuelta (n_auditoria, col 52), nunca "—". */
+  S.nAud = esSi(r[39]) ? 'Reproceso' : (numParcial(r[2]) ? ordinalTexto(numParcial(r[2])) : (numParcial(r[52]) ? ordinalTexto(numParcial(r[52])) : (r[2] || '')));
   const outOrd=$('ordinal'); if(outOrd) outOrd.value = S.nAud || '—';
   const ordH=$('ordHint'); if(ordH) ordH.textContent='N° original de esta auditoría (no cambia al corregir).';
   S.int_ext = (norm(proc).indexOf('INTERNO')>=0) ? 'INTERNA' : (proc?'EXTERNA':'');
