@@ -1031,7 +1031,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-15 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-15b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -1122,13 +1122,6 @@ function fijarAuditor(){
   el.placeholder = NOMBRE_PORTAL ? '' : 'Entra desde el portal para registrar';
 }
 
-/* ===== CONFIG: reemplaza ambos al desplegar ===== */
-/* Backend ÚNICO: el del Sheet maestro. El piloto ya no tiene script propio.
-   Las auditorías, el detalle y los catálogos salen todos de ahí. */
-/* 28/09/2026: el Apps Script del Sheet maestro quedó archivado. Todo lee y guarda en
-   Supabase; su dirección y su clave ya no están en este código. */
-const SHEET_ID = '1zM-ajBkOs_PgyzEaXh_gVJ1seXvjRJSVO1ZRql7KnVQ';
-
 /* ===== AQL ===== */
 const AQL=[{min:2,max:8,n:2,a:{'1.0':0,'1.5':0,'2.5':0}},{min:9,max:15,n:3,a:{'1.0':0,'1.5':0,'2.5':0}},
 {min:16,max:25,n:5,a:{'1.0':0,'1.5':0,'2.5':0}},{min:26,max:50,n:8,a:{'1.0':0,'1.5':0,'2.5':0}},
@@ -1170,59 +1163,6 @@ async function conReintentos(fn, veces){
   }
   throw ultimo;
 }
-/* ===== Lector del Sheet =====
-   Se lee en formato CSV, no JSON, a propósito.
-   Motivo (verificado sobre el Sheet real): gviz en formato JSON le asigna UN SOLO tipo a cada
-   columna, decidido por la mayoría de sus celdas. La columna PO tiene 206 celdas numéricas y 83
-   de texto, así que queda tipada como "número" — y toda celda de texto ("505342 USA",
-   "LIVES-S-117-2", "PO-2438") vuelve VACÍA. No es un problema de formato: el dato se pierde en
-   la descarga y no hay forma de recuperarlo en JSON. Lo mismo pasa al revés en ESTILO_CLIENTE,
-   que es mayoría texto y tiene 11 celdas numéricas.
-   Consecuencia real: 83 auditorías se leían "SIN PO", y como el PO forma parte de la llave del
-   lote, además rompía el N° de auditoría, el bloqueo del pedido y el panel de previas.
-   El formato CSV devuelve todo como texto, tal como se ve en la hoja, sin tipado. */
-function parseCSV(txt){
-  const filas=[]; let campo='', fila=[], enComillas=false;
-  for(let i=0;i<txt.length;i++){
-    const ch=txt[i];
-    if(enComillas){
-      if(ch==='"'){ if(txt[i+1]==='"'){ campo+='"'; i++; } else enComillas=false; }
-      else campo+=ch;
-    }else{
-      if(ch==='"') enComillas=true;
-      else if(ch===','){ fila.push(campo); campo=''; }
-      else if(ch==='\n'){ fila.push(campo); campo=''; filas.push(fila); fila=[]; }
-      else if(ch!=='\r') campo+=ch;
-    }
-  }
-  if(campo!=='' || fila.length){ fila.push(campo); filas.push(fila); }
-  return filas;
-}
-async function gvizCSV(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const t=await r.text();
-  // Si el Sheet responde una página de error/login en vez del CSV, hay que fallar de verdad.
-  if(/^\s*</.test(t)) throw new Error('respuesta no es CSV');
-  const filas=parseCSV(t);
-  if(!filas.length) throw new Error('hoja vacía');
-  // La primera línea es SIEMPRE el encabezado de la hoja: se descarta.
-  return filas.slice(1).map(f=>f.map(c=>String(c==null?'':c)));
-}
-// Lectura antigua (JSON). Se conserva SOLO como respaldo: pierde el texto de las columnas
-// mixtas (ver arriba), pero es preferible a quedarse sin datos si el CSV falla.
-async function gvizJSON(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}&_cb=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
-  const j=JSON.parse(t.substring(t.indexOf('{'),t.lastIndexOf('}')+1));
-  return (j.table.rows||[]).map(row=>(row.c||[]).map(c=>{
-    if(!c) return '';
-    if(c.v!=null) return String(c.v);
-    if(c.f!=null) return String(c.f);   // rescata algo cuando el tipo de columna no calza
-    return '';
-  }));
-}
 // Origen real de los datos que se están usando ahora mismo. Se muestra en el sello del pie.
 let ORIGEN_DATOS='';
 function marcarOrigen(txt){
@@ -1230,15 +1170,6 @@ function marcarOrigen(txt){
   const el=document.getElementById('selloOrigen');
   if(el) el.textContent=txt;
 }
-/* Lectura por Apps Script con getDisplayValues().
-   POR QUÉ: gviz le asigna UN tipo a cada columna según la mayoría de sus celdas y devuelve
-   VACÍAS las que no calzan. La columna PO tiene mayoría de números, así que los PO con
-   letras o espacios ("505221 USA", "LIVES-S-117-2") llegaban vacíos: medido, 107 de 316.
-   Por eso el panel de auditorías previas mostraba "SIN PO" en lotes que sí tienen PO, y las
-   auditoras creían que no lo habían escrito.
-   El CSV no lo resuelve: tipa igual que el JSON. getDisplayValues() entrega el texto exacto
-   de la celda, sin tipado ni conversiones — es la única lectura que no puede perder un dato.
-   Va por JSONP porque Apps Script no manda cabeceras CORS en GET. */
 /* =====================================================================
    CATÁLOGOS Y BASE DE OP DESDE SUPABASE (desde el 16/09/2026)
    ---------------------------------------------------------------------
@@ -3344,54 +3275,6 @@ async function refrescarPend(){
    que el problema se buscaba en el celular y en el wifi durante un día entero. */
 var ULTIMO_ERROR = '';
 
-/* ===== PARALELO — solo comparación, NUNCA afecta lo que ve la auditora (21/09) =====
-   Cada guardado real (Apps Script) manda además, en segundo plano, los mismos datos
-   a sync_guardar_auditoria_paralelo en Supabase, que escribe en tablas APARTE
-   (auditorias_paralelo), nunca en la tabla real que ya alimenta los dashboards.
-   Usa el mismo id_envio como token, para poder comparar más tarde con SQL.
-   Va por XMLHttpRequest a propósito, no por window.fetch: así nunca dispara el
-   aviso de "sin sesión" del bloque de sesión si algo falla — esto es invisible
-   siempre, incluso si falla. */
-function compararParalelo(payload, idReal){
-  try{
-    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
-    window.LIVES_SESION.llave().then(function(tk){
-      if (!tk) return;
-      try{
-        var defs = [];
-        try{ defs = (payload.defectos||[]).map(function(d){
-          return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad };
-        }); }catch(e){ defs = []; }
-        var body = {
-          tipo: 'FINAL', fecha: payload.fecha, grupo: payload.grupo, estilo: payload.estilo_lives,
-          nivelAql: String(payload.nivel_aql || '1.5'), lote: payload.total_recibido,
-          captura: 'EN VIVO',
-          licencia: payload.licencia === 'SÍ', override: payload.override === 'SÍ',
-          reproceso: !!payload.reprocesa_de, esReauditoria: payload.reprocesa_de ? 'SI' : '',
-          reprocesaDe: payload.reprocesa_de || '', motivoReproceso: payload.motivo_reproceso || '',
-          pedido: payload.cant_pedido || 0, op: payload.op || '',
-          proceso: payload.proceso || '', intExt: payload.int_ext || '', servicio: payload.servicio || '',
-          auditores: [payload.auditor], digitador: payload.auditor,
-          colores: [{ color: payload.color, po: payload.po, eCliente: payload.estilo_cliente }],
-          destinos: [{ codigo: payload.destino }],
-          defectos: defs,
-          observacion: payload.comentario || '', liquidado: payload.liquidado === 'SÍ',
-          token: payload.id_envio,
-          idReal: idReal || ''   /* 24/09 (SQL 44): enlaza la copia con la auditoría real */
-        };
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
-        xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-        /* sin manejo de respuesta a propósito: esto es solo para comparar después con
-           SQL. Ni un error aquí debe tocar lo que la auditora ve o hace. */
-        xhr.send(JSON.stringify({ payload: body }));
-      }catch(e){}
-    }).catch(function(){});
-  }catch(e){}
-}
-
 /* ===== 28/09 · Auditoría Final directo en Supabase =====
    Mientras Supabase diga que Final todavía no es directo (antes del corte), todo
    sigue por el Apps Script como siempre. Desde el corte:
@@ -4086,51 +3969,6 @@ function quienSoy(){
 
 /* Anular una auditoría propia. Pide el motivo: sin él, dentro de tres meses
    nadie sabe por qué falta esa auditoría en el lote. */
-/* ===== PARALELO — anular/corregir, invisible, nunca afecta a la auditora (22/09) =====
-   Mismo patrón que el guardado nuevo: XHR directo (no window.fetch), nunca
-   pide sesión, nunca lanza error hacia el flujo real de la auditora. */
-function paraleloXhr(fnNombre, body){
-  try{
-    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
-    window.LIVES_SESION.llave().then(function(tk){
-      if (!tk) return;
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/' + fnNombre, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
-      xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-      xhr.send(JSON.stringify(body));
-    }).catch(function(){});
-  }catch(e){}
-}
-function compararParaleloAnular(id, motivo, usuario){
-  paraleloXhr('sync_anular_auditoria_paralelo', { p_id: id, p_motivo: motivo, p_usuario: usuario });
-}
-function compararParaleloActualizar(id, payload){
-  try{
-    var defs = [];
-    try{ defs = (payload.defectos||[]).map(function(d){
-      return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad };
-    }); }catch(e){ defs = []; }
-    var body = {
-      tipo: 'FINAL', fecha: payload.fecha, grupo: payload.grupo, estilo: payload.estilo_lives,
-      nivelAql: String(payload.nivel_aql || '1.5'), lote: payload.total_recibido,
-      captura: 'EN VIVO',
-      licencia: payload.licencia === 'SÍ', override: payload.override === 'SÍ',
-      reproceso: !!payload.reprocesa_de, esReauditoria: payload.reprocesa_de ? 'SI' : '',
-      reprocesaDe: payload.reprocesa_de || '', motivoReproceso: payload.motivo_reproceso || '',
-      pedido: payload.cant_pedido || 0, op: payload.op || '',
-      proceso: payload.proceso || '', intExt: payload.int_ext || '', servicio: payload.servicio || '',
-      auditores: [payload.auditor], digitador: payload.auditor,
-      colores: [{ color: payload.color, po: payload.po, eCliente: payload.estilo_cliente }],
-      destinos: [{ codigo: payload.destino }],
-      defectos: defs,
-      observacion: payload.comentario || '', liquidado: payload.liquidado === 'SÍ'
-    };
-    paraleloXhr('sync_actualizar_auditoria_paralelo', { p_id: id, payload: body });
-  }catch(e){}
-}
-
 function pedirAnular(id){
   if(MODO_DEMO){ avisoDemo(); return; }
   const motivo = prompt('¿Por qué se anula la auditoría '+id+'?\n\n'+
