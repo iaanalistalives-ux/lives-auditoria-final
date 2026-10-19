@@ -667,11 +667,32 @@ tr:hover td{background:#f6f9fb}
 .estado{padding:24px;text-align:center;color:#889}
 .count{font-size:13px;color:#667;margin-bottom:10px}
 .lsTope500{font-size:12px;color:#5F726C;text-align:center;padding:8px 0}
-/* En el celular caben pocas columnas: se ocultan Estilo/PO y Color, y se deja
-   visible el AUDITOR, que es lo que se busca cuando se pregunta "quién auditó". */
-@media(max-width:560px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}
-  th,td{padding:8px 7px}
-  .colorcel{font-size:12px}}
+/* Hora debajo de la fecha */
+.hora{display:block;font-size:11.5px;color:#5F726C;margin-top:2px}
+.cOp b{font-size:14px}
+/* Celular (19/10/2026): cada auditoría es una tarjeta con sus datos uno debajo de otro.
+   Arriba la OP con el ícono de fotos y el resultado; abajo Ver / PDF a todo el ancho. */
+@media(max-width:640px){
+  .tablewrap{max-height:none;overflow:visible}
+  #tbody,#tbody tr,#tbody td{display:block}
+  table thead{display:none}
+  table{min-width:0!important}
+  #tbody tr{position:relative;background:#fff;border:1px solid #e3eae7;border-radius:12px;
+    box-shadow:0 1px 3px rgba(14,59,54,.06);padding:12px 14px 12px;margin:0 0 10px}
+  #tbody tr:hover td{background:transparent}
+  #tbody td{border:none;padding:3px 0;display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+  #tbody td[data-l]::before{content:attr(data-l);flex:0 0 74px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px;color:#5F726C}
+  #tbody td.cOp{padding-right:110px}
+  #tbody td.cOp b{font-size:16px}
+  #tbody td.cRe{position:absolute;top:12px;right:14px;padding:0}
+  #tbody td.cRe::before{display:none}
+  #tbody td.cFe .hora{display:inline;margin:0 0 0 8px;font-size:13px}
+  #tbody td.cAu br{display:none}
+  #tbody td.cAu span span{margin:0 0 0 6px!important}
+  #tbody td.cVe{margin-top:8px}
+  #tbody td.cVe .ver{display:block;width:100%;text-align:center;padding:11px;font-size:14px}
+}
 .fotoic{display:inline-block;margin-left:5px;font-size:12px;color:#4A5A57;background:#EEF2F1;border-radius:9px;padding:1px 6px;white-space:nowrap;cursor:help}
 .tlogo{height:32px;display:block;flex-shrink:0}
 @media(max-width:600px){.tlogo{height:26px}}
@@ -719,7 +740,7 @@ tr:hover td{background:#f6f9fb}
     <div class="count" id="count"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>ID</th><th>Fecha</th><th>Cliente / Grupo</th><th>Estilo / PO</th><th>Color</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
+        <thead><tr><th>OP</th><th>Fecha</th><th>Grupo</th><th>Estilo</th><th>PO</th><th>Color</th><th>Auditor</th><th>Resultado</th><th></th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -997,7 +1018,7 @@ function sbaVistaBusqueda(){
   return sbaUna('busqueda', function(){
     return sbaLeer('publico_vista_piloto',
       'fila_hoja,id_auditoria,fecha,proceso,grupo,op,estilo_lives,color,po,cliente,auditor,' +
-      'resultado_final,reproceso,licencia,liquidado,servicio,captura',
+      'resultado_final,reproceso,licencia,liquidado,servicio,captura,hora_envio',
       'fila_hoja.asc.nullslast');
   }, 60);
 }
@@ -1115,7 +1136,7 @@ function sbaConsultar(p){
         encontradas.push([sbaT(f.id_auditoria), fecha, sbaT(f.cliente), sbaT(f.grupo),
                           sbaT(f.estilo_lives), sbaT(f.po), sbaT(f.auditor),
                           sbaT(f.resultado_final), (sbaU(f.captura) === 'DIGITADO' ? 1 : 0),
-                          sbaT(f.color)]);
+                          sbaT(f.color), sbaT(f.op), sbaT(f.hora_envio)]);
       }
       return { ok: true, rows: encontradas, total: total, pagina: pagina, limite: limite,
                hayMas: hayMasSeguro || total > fin, totalExacto: !hayMasSeguro };
@@ -1268,7 +1289,8 @@ function pintar(res, total, hayMas){
 
   /* Cada fila llega como arreglo, en este orden fijo:
      0 id · 1 fecha · 2 cliente · 3 grupo · 4 estilo · 5 po · 6 auditor
-     7 resultado · 8 digitado (1/0) · 9 color
+     7 resultado · 8 digitado (1/0) · 9 color · 10 op · 11 hora de envío
+     (19/10: la lista muestra OP en vez del ID; el ID sigue en el enlace Ver / PDF y en el Excel.)
      Se manda así, y no como objeto, para que la respuesta quepa en la conexión
      de la planta: repetir el nombre de cada campo en cada fila multiplicaba el
      tamaño y la descarga no llegaba a completarse. */
@@ -1283,14 +1305,16 @@ function pintar(res, total, hayMas){
       ? '<br><span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;'+
         'background:#EEF2F1;color:#4A5A57;font-size:11px;white-space:nowrap">Digitado en Planta</span>'
       : '';
-    tr.innerHTML=`<td data-id="${esc(r[0]||'')}"><b>${r[0]||''}</b>${iconoFotos(r[0])}</td>
-      <td>${fechaTxt(r[1])}</td>
-      <td>${r[2]||''}<br><span style="color:#889">${r[3]||''}</span></td>
-      <td>${r[4]||''}<br><span style="color:#889">${r[5]||''}</span></td>
-      <td class="colorcel">${r[9]||''}</td>
-      <td>${r[6]||''}${marca}</td>
-      <td>${badge(r[7])}</td>
-      <td><a class="ver" href="ver.html?id=${encodeURIComponent(r[0])}">Ver / PDF</a></td>`;
+    const hora = horaTxt(r[11]);
+    tr.innerHTML=`<td class="cOp" data-l="OP" data-id="${esc(r[0]||'')}"><b>${esc(r[10]||'—')}</b>${iconoFotos(r[0])}</td>
+      <td class="cFe" data-l="Fecha">${fechaTxt(r[1])}${hora?'<span class="hora">'+hora+'</span>':''}</td>
+      <td data-l="Grupo">${esc(r[3]||'')}</td>
+      <td data-l="Estilo">${esc(r[4]||'')}</td>
+      <td data-l="PO">${esc(r[5]||'')}</td>
+      <td class="colorcel" data-l="Color">${esc(r[9]||'')}</td>
+      <td class="cAu" data-l="Auditor"><span>${esc(r[6]||'')}${marca}</span></td>
+      <td class="cRe" data-l="Resultado">${badge(r[7])}</td>
+      <td class="cVe"><a class="ver" href="ver.html?id=${encodeURIComponent(r[0])}">Ver / PDF</a></td>`;
     tb.appendChild(tr);
   });
 }
@@ -1313,6 +1337,15 @@ function notaTope500(n){
   d.textContent='Se muestran los 500 registros más recientes de '+Number(n).toLocaleString('es-PE')+'. Usa los filtros para ver los demás.';
 }
 /* Ícono de fotos. Vacío mientras la lista de fotos no haya llegado. */
+/* Hora en que se envió (auditoras) o se digitó (Athina) la auditoría. "0:00:00" es un
+   registro sin hora real: no se muestra. */
+function horaTxt(v){
+  const m=String(v||'').match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*$/);
+  if(!m) return '';
+  const h=parseInt(m[1],10), mi=m[2];
+  if(h===0 && mi==='00') return '';
+  return (h<10?'0':'')+h+':'+mi;
+}
 function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function iconoFotos(id){
   if(!FOTOS_POR_ID) return '';
@@ -1421,9 +1454,9 @@ function restaurarFiltros(){
 /* Los desplegables sí buscan al cambiar: ahí se elige de una lista, no se teclea. */
 ['fProceso','fCliente','fAuditor','fResultado','fTaller'].forEach(id=>document.getElementById(id).addEventListener('change',buscar));
 
-/* Al salir del campo OP se traen los lotes de esa orden y se completan los demás
-   filtros. Si la OP tiene un solo grupo y un solo estilo, se rellenan solos; si
-   tiene varios, quedan como sugerencias al escribir. */
+/* Al salir del campo OP se traen los lotes de esa orden y quedan como sugerencias
+   en Grupo, Estilo, Color y PO. 19/10/2026: ya no se rellenan solos; cada quien
+   filtra por lo que necesita. */
 document.getElementById('fOp').addEventListener('change', cargarLotesDeOp);
 
 async function cargarLotesDeOp(){
@@ -1451,7 +1484,7 @@ async function cargarLotesDeOp(){
   }
 }
 
-/* Deja la lista como sugerencias del campo, y lo completa si solo hay un valor. */
+/* Deja la lista como sugerencias del campo. No escribe nada en el campo. */
 function sugerir(id, valores){
   const inp=document.getElementById(id);
   if(!inp || !valores) return;
@@ -1463,7 +1496,6 @@ function sugerir(id, valores){
     inp.setAttribute('list', d.id);
   }
   d.innerHTML = valores.map(v=>'<option value="'+String(v).replace(/"/g,'&quot;')+'">').join('');
-  if(valores.length===1 && !inp.value) inp.value=valores[0];
 }
 
 /* Si se vuelve de un reporte, se reponen los filtros antes de buscar. */

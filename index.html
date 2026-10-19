@@ -699,6 +699,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);ba
 .qty button:first-child{border-radius:9px 0 0 9px}.qty button:last-child{border-radius:0 9px 9px 0}
 .qty input{text-align:center;border-radius:0;border-left:none;border-right:none}
 .photo{display:flex;align-items:center;gap:10px;margin-top:8px}
+.fotoBtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.fotoBtn{flex:1 1 150px;display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;
+  border:1.5px solid #0F7A5A;background:#fff;color:#0F7A5A;border-radius:10px;padding:10px 12px;
+  font-size:14px;font-weight:700;cursor:pointer;text-align:center;text-transform:none;letter-spacing:0;
+  -webkit-tap-highlight-color:transparent;margin:0}
+.fotoBtn:active{background:#E7F4EF}
+.fotoElegir{position:fixed;inset:0;z-index:9000;background:rgba(14,59,54,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.fotoElegirCaja{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:440px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.fotoElegirTit{font-weight:700;font-size:15px;color:#0E3B36;margin-bottom:10px}
+.fotoElegirNo{display:block;width:100%;margin-top:10px;min-height:44px;border:none;background:transparent;color:#5F726C;font-size:14px;font-weight:700;cursor:pointer}
+@media(min-width:700px){.fotoElegir{align-items:center}}
 .photo .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer}
 .photo img{width:46px;height:46px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .addbtn{width:100%;border:1px solid var(--navy);background:#fff;color:var(--navy);border-radius:10px;padding:13px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Barlow Condensed';letter-spacing:.5px;text-transform:uppercase}
@@ -990,8 +1001,12 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <div class="sec"><span class="dot"></span>Fotos de hojas de medidas</div>
     <div class="hint" style="margin:-6px 0 10px" id="medOblHint">Obligatorio en la 1ra auditoría del lote. En las repetidas es opcional (ya se midió antes).</div>
     <div class="fotos" id="fotosMed"></div>
-    <label class="btn" style="display:inline-block;margin-top:6px">📷 Tomar / agregar foto
-      <input type="file" accept="image/*" capture="environment" id="inMed" multiple hidden></label>
+    <div class="fotoBtns">
+      <label class="fotoBtn">📷 Tomar foto
+        <input type="file" accept="image/*" capture="environment" id="inMed" multiple hidden></label>
+      <label class="fotoBtn">🖼️ Elegir de galería
+        <input type="file" accept="image/*" id="inMedGal" multiple hidden></label>
+    </div>
     <div class="hint" id="medCount">0 fotos · máximo 10</div>
   </div>
 
@@ -1000,8 +1015,12 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     <div class="sec"><span class="dot"></span>Fotos de medidas de proceso</div>
     <div class="hint" style="margin:-6px 0 10px">Solo para Costura (taller). Opcional.</div>
     <div class="fotos" id="fotosPro"></div>
-    <label class="btn" style="display:inline-block;margin-top:6px">📷 Tomar / agregar foto
-      <input type="file" accept="image/*" capture="environment" id="inPro" multiple hidden></label>
+    <div class="fotoBtns">
+      <label class="fotoBtn">📷 Tomar foto
+        <input type="file" accept="image/*" capture="environment" id="inPro" multiple hidden></label>
+      <label class="fotoBtn">🖼️ Elegir de galería
+        <input type="file" accept="image/*" id="inProGal" multiple hidden></label>
+    </div>
     <div class="hint" id="proCount">0 fotos · máximo 10</div>
   </div>
 
@@ -1031,7 +1050,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-15b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-19 · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -1061,6 +1080,18 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 </div>
 <input type="file" accept="image/*" capture="environment" id="camGlobal" hidden>
+<input type="file" accept="image/*" id="galGlobal" hidden>
+<!-- 19/10/2026: al tocar 📷 en un defecto o derivado se elige cámara o galería -->
+<div id="fotoElegir" class="fotoElegir" style="display:none">
+  <div class="fotoElegirCaja">
+    <div class="fotoElegirTit">Foto del defecto</div>
+    <div class="fotoBtns">
+      <button type="button" class="fotoBtn" id="feCam">📷 Tomar foto</button>
+      <button type="button" class="fotoBtn" id="feGal">🖼️ Elegir de galería</button>
+    </div>
+    <button type="button" class="fotoElegirNo" id="feNo">Cancelar</button>
+  </div>
+</div>
 
 <script>
 /* ===== QUIÉN AUDITA: siempre el usuario que inició sesión en el portal =====
@@ -2664,6 +2695,10 @@ $('reproSwitch').onchange=()=>{S.reproceso=$('reproSwitch').checked;pedirOrdinal
 
 $('inMed').onchange=e=>{agregarFotos(e.target.files,'med');e.target.value='';};
 $('inPro').onchange=e=>{agregarFotos(e.target.files,'pro');e.target.value='';};
+/* 19/10/2026: además de tomar la foto, se puede subir una que ya está en el celular
+   (galería). Pasa por el mismo arreglo de la foto: escáner, tamaño y máximo de 10. */
+$('inMedGal').onchange=e=>{agregarFotos(e.target.files,'med');e.target.value='';};
+$('inProGal').onchange=e=>{agregarFotos(e.target.files,'pro');e.target.value='';};
 
 /* ===== licencia ===== */
 $('licSwitch').onchange=()=>{S.licencia=$('licSwitch').checked; pedirOrdinal();
@@ -2803,8 +2838,13 @@ function subOptsModo(modo,madre,sel){
 let _camTarget=null;
 function abrirCamaraPara(target,btnEl){
   _camTarget={target,btnEl};
-  $('camGlobal').click();
+  $('fotoElegir').style.display='flex';
 }
+function cerrarElegirFoto(){ $('fotoElegir').style.display='none'; }
+$('feCam').onclick=()=>{ cerrarElegirFoto(); $('camGlobal').click(); };
+$('feGal').onclick=()=>{ cerrarElegirFoto(); $('galGlobal').click(); };
+$('feNo').onclick=cerrarElegirFoto;
+$('fotoElegir').addEventListener('click',e=>{ if(e.target.id==='fotoElegir') cerrarElegirFoto(); });
 /* Una foto ya guardada (Drive o almacén) no se puede mostrar como miniatura sin
    pedir permiso aparte: se marca con 📷✓ y se conserva tal cual al guardar. */
 function fotoMini(v){ return /^data:image\//.test(String(v||'')) ? `<img src="${v}">` : '📷✓'; }
@@ -3010,7 +3050,7 @@ function crearFilaSeccion(nombre,bloques){
 }
 
 /* ===== cámara compartida (defectos/derivados) ===== */
-$('camGlobal').onchange=e=>{
+$('camGlobal').onchange=$('galGlobal').onchange=e=>{
   const f=e.target.files[0]; e.target.value='';
   if(!f||!_camTarget) return;
   const {target,btnEl}=_camTarget;
