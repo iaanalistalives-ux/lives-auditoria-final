@@ -646,6 +646,16 @@ input,select{width:100%;border:1px solid #dce1e7;border-radius:9px;padding:10px;
 .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 .btn{border:none;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:14px}
 .btn.prim{background:var(--navy);color:#fff}
+/* 19/10/2026: Buscar se ve como la acción principal y muestra que está trabajando */
+#btnBuscar{background:#0F7A5A;color:#fff;min-width:120px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+#btnBuscar:hover{background:#0B815E}
+#btnBuscar.buscando{opacity:.85;cursor:progress}
+#tbody{transition:opacity .2s}
+#btnBuscar .giro{width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:lsGiro .7s linear infinite}
+@keyframes lsGiro{to{transform:rotate(360deg)}}
+.count.listo{animation:lsListo 1.6s ease}
+@keyframes lsListo{0%{background:#D7F0E6;color:#0B5F46}100%{background:transparent}}
+.count{border-radius:8px;padding:4px 8px;margin-left:-8px;font-weight:700}
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
 .btn.toggle{background:#fff;color:var(--navy);border:1px solid #dce1e7}
 .btn.toggle.active{background:var(--amber);color:#5c4400;border-color:var(--amber)}
@@ -1409,7 +1419,37 @@ document.getElementById('btnLiquidados').onclick=()=>{
    teclear un grupo salían resultados del filtro anterior mientras llegaba el
    nuevo: parecía que el filtro no funcionaba cuando la respuesta iba en camino.
    Ahora se busca al pulsar el botón o Enter, y se sabe exactamente qué se pidió. */
-document.getElementById('btnBuscar').onclick = buscar;
+/* 19/10/2026: el botón muestra que está buscando (gira y dice "Buscando…"), dura al menos
+   medio segundo aunque la respuesta ya esté guardada, y al terminar se resalta cuántas se
+   encontraron. En celular la pantalla baja sola hasta los resultados. Si se lanza otra
+   búsqueda antes de terminar, el botón sigue girando hasta la última. */
+(function(){
+  const btn=document.getElementById('btnBuscar');
+  const original=buscar; let turno=0;
+  buscar=async function(){
+    const mio=++turno, t0=Date.now();
+    btn.classList.add('buscando'); btn.disabled=true;
+    btn.innerHTML='<span class="giro"></span>Buscando…';
+    const tb=document.getElementById('tbody'); if(tb) tb.style.opacity='.35';   /* la lista anterior se atenúa mientras busca */
+    try{ await original.apply(this, arguments); }
+    finally{
+      const espera=Math.max(0, 500-(Date.now()-t0));
+      setTimeout(function(){
+        if(mio!==turno) return;
+        btn.classList.remove('buscando'); btn.disabled=false; btn.textContent='Buscar';
+        const tb2=document.getElementById('tbody'); if(tb2) tb2.style.opacity='';
+        const c=document.getElementById('count');
+        if(c){ c.classList.remove('listo'); void c.offsetWidth; c.classList.add('listo'); }
+        if(window.matchMedia('(max-width:640px)').matches && window.__lsBuscoConBoton){
+          const card=(c||document.getElementById('estado')).closest('.card')||c;
+          if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+        }
+        window.__lsBuscoConBoton=false;
+      }, espera);
+    }
+  };
+})();
+document.getElementById('btnBuscar').onclick = function(){ window.__lsBuscoConBoton=true; buscar(); };
 
 /* Los filtros se recuerdan al ir a un reporte y volver.
 
