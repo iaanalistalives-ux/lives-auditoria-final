@@ -1050,7 +1050,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-19 · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-19b · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -1113,7 +1113,13 @@ const PORTAL_URL = 'https://iaanalistalives-ux.github.io/lives-portal/';
    Pueden recorrer y "guardar", pero nada llega al sistema y la pantalla lo dice.
    Es una lista cerrada a propósito: una auditora con el nombre mal escrito NO debe
    caer aquí, porque perdería auditorías reales sin darse cuenta. */
-const USUARIOS_DEMO = ['CHRISTIAN TALEPCIO','RODRIGO CAMOGLIANO'];
+/* 19/10/2026 (Christian): se quita el modo demostración para Christian y Rodrigo; necesitan
+   ver y probar todo como una auditora. Lo que guarden ES REAL y cuenta en los indicadores
+   hasta que se anule. Rodrigo sigue en supervisión: la base rechaza sus guardados. */
+const USUARIOS_DEMO = [];
+/* Christian no está en el catálogo de auditoras: se le deja guardar igual para probar
+   (el Control de datos lo marcará como "Auditora fuera del catálogo" hasta que se anule). */
+const USUARIOS_PRUEBA = ['CHRISTIAN TALEPCIO'];
 const MODO_DEMO = (function(){
   const q=NOMBRE_PORTAL.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
   return !!q && USUARIOS_DEMO.indexOf(q)>=0;
@@ -3201,7 +3207,7 @@ function calcularFaltantes(){
 
      Si el catálogo no cargó no se bloquea: dejar a una auditora sin poder
      registrar por una lista que no llegó sería peor. */
-  else if(!MODO_DEMO && AUDITORAS && AUDITORAS.length){
+  else if(!MODO_DEMO && AUDITORAS && AUDITORAS.length && USUARIOS_PRUEBA.map(nombreNorm).indexOf(nombreNorm(v('auditor')))<0){
     const q = nombreNorm(v('auditor'));
     if(!AUDITORAS.some(a => nombreNorm(a) === q)){
       faltan.push('Auditor: "'+v('auditor')+'" no está en la lista de personal — avisa a Christian');
