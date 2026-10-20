@@ -1050,7 +1050,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
      QUÉ versión del formulario tiene cargada y CÓMO leyó el historial (csv / json / respaldo del
      celular). Sin esto no hay forma de distinguir "el arreglo no funciona" de "el celular sigue
      con la versión vieja en caché". -->
-<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-19b · <span id="selloOrigen">leyendo…</span></div>
+<div id="selloVersion" style="text-align:center;font-size:11px;color:#9aa5b1;padding:10px 8px 22px;font-family:inherit">v2026-10-20a · <span id="selloOrigen">leyendo…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- Confirmación de guardado/envío: se queda visible hasta que la auditora la cierra a propósito -->
@@ -3900,25 +3900,36 @@ async function buscarMisAud(){
 
 // Aplica filas reales de la hoja DEFECTOS/DERIVADOS (formato plano: id,seccion,categoria,subtipo,cantidad,detalle,foto_url)
 // sobre los bloques ya generados (S.defs o S.ders), emparejando por sección+categoría(+subtipo).
-function aplicarDetalleDesdeSheet(bloques, filas){
+function aplicarDetalleDesdeSheet(bloques, filas, seccionFija){
+  /* 20/10: la base guarda la sección en MAYÚSCULAS (COSTURA, DERIVADOS) y el checklist la tiene
+     como "Costura"/"Derivados". Se comparaba texto exacto, nunca coincidía y al corregir el
+     checklist quedaba en cero: guardar borraba los defectos y derivados ya registrados.
+     Ahora se compara sin importar mayúsculas, se suman filas repetidas y, si una fila guardada
+     no tiene lugar en el checklist (categoría retirada, otra sección), se conserva igual. */
+  const U=v=>String(v==null?'':v).trim().toUpperCase();
   filas.forEach(f=>{
     /* El detalle tiene dos formatos según de dónde venga:
          7 columnas (hojas viejas del piloto):  ID | SECCION | CATEGORIA | SUBTIPO | CANT | DETALLE | FOTO
-         8 columnas (formato del maestro):      ID | COD | SECCION | CATEGORIA | SUBTIPO | CANT | NOTA | FOTO
-       Se detecta por el ancho de la fila. Leerlo con la posición equivocada no da
-       ningún error: simplemente ningún bloque del checklist coincide y todo queda
-       en cero, que es justo el caso en que guardar borra los defectos guardados. */
+         8 columnas (formato de la base):       ID | COD | SECCION | CATEGORIA | SUBTIPO | CANT | NOTA | FOTO */
     const k = (f.length >= 8) ? 1 : 0;
-    const seccion=f[1+k], categoria=f[2+k], subtipo=f[3+k], cant=parseInt(f[4+k])||0,
-          detalle=f[5+k]||'', foto=f[6+k]||'';
-    const b=bloques.find(x=>x.categoria===categoria && x.seccion===seccion);
-    if(!b) return;
-    if(detalle) b.detalle=detalle;
-    if(subtipo && b.subs && b.subs.length){
-      const s=b.subs.find(x=>x.subtipo===subtipo);
-      if(s){ s.cant=cant; s.foto=foto; }
+    const seccion=f[1+k], categoria=String(f[2+k]||'').trim(), subtipo=String(f[3+k]||'').trim(),
+          cant=parseInt(f[4+k])||0, detalle=f[5+k]||'', foto=f[6+k]||'';
+    if(!categoria || cant<=0) return;
+    const sec=seccionFija||normSec(seccion);
+    let b=bloques.find(x=>x.seccion===sec && U(x.categoria)===U(categoria))
+       || bloques.find(x=>U(x.categoria)===U(categoria));
+    if(!b){
+      b={ categoria, seccion:(seccionFija||String(seccion||'').trim()||sec), detalle:'', cant:0, foto:'', subs:[] };
+      bloques.push(b);
+    }
+    if(detalle && !b.detalle) b.detalle=detalle;
+    if(subtipo || (b.subs && b.subs.length)){
+      b.subs=b.subs||[];
+      let s=b.subs.find(x=>U(x.subtipo)===U(subtipo));
+      if(!s){ s={subtipo, cant:0, foto:''}; b.subs.push(s); }
+      s.cant=(parseInt(s.cant)||0)+cant; if(foto && !s.foto) s.foto=foto;
     } else {
-      b.cant=cant; b.foto=foto;
+      b.cant=(parseInt(b.cant)||0)+cant; if(foto && !b.foto) b.foto=foto;
     }
   });
 }
@@ -3931,7 +3942,7 @@ async function cargarDetalleParaEditar(id){
     const [defRows,derRows]=await Promise.all([gviz('DEFECTOS',id),gviz('DERIVADOS',id)]);
     const idTxt=String(id).trim();
     aplicarDetalleDesdeSheet(S.defs, defRows.filter(r=>String(r[0]).trim()===idTxt));
-    aplicarDetalleDesdeSheet(S.ders, derRows.filter(r=>String(r[0]).trim()===idTxt));
+    aplicarDetalleDesdeSheet(S.ders, derRows.filter(r=>String(r[0]).trim()===idTxt), 'Derivados');
     repintarChecklistDefectos();
     pintarChecklistConSecciones($('derChecklist'), [['Derivados',S.ders]]);
     S.detalleCargado=true;
