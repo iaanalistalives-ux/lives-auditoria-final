@@ -706,6 +706,22 @@ tr:hover td{background:#f6f9fb}
 .fotoic{display:inline-block;margin-left:5px;font-size:12px;color:#4A5A57;background:#EEF2F1;border-radius:9px;padding:1px 6px;white-space:nowrap;cursor:help}
 .tlogo{height:32px;display:block;flex-shrink:0}
 @media(max-width:600px){.tlogo{height:26px}}
+
+/* ===== Registrar, Dashboard y Ver PDF dentro de una ventana (como Artes y Tintorería, 28/10/2026) ===== */
+.btn.prim:disabled,.btn.prim[disabled]{opacity:.55;cursor:not-allowed}
+button.ver{background:#fff;font-family:inherit;cursor:pointer}
+button.ver:hover{background:var(--navy);color:#fff}
+#tbody tr[data-fila]{cursor:pointer}
+.fmodal{display:none;position:fixed;inset:0;z-index:2000;background:rgba(14,59,54,.5);align-items:center;justify-content:center;padding:2vh 2vw}
+.fmodal.show{display:flex}
+.fmcaja{background:#F1F6F4;width:100%;height:100%;max-width:1300px;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.fmbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border-bottom:1px solid #DCE5E2}
+.fmbar b{flex:1;font-size:15px;color:#0E3B36}
+.fmbar button{font-family:inherit;font-weight:700;font-size:14px;border:1px solid #DCE5E2;background:#fff;color:#DC2626;border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer}
+.fmcaja iframe{flex:1;border:0;width:100%;background:#F1F6F4}
+body.fmAbierta{overflow:hidden}
+@media(max-width:700px){.fmodal{padding:0}.fmcaja{border-radius:0;max-width:none}}
+@media print{.fmodal{display:none!important}}
 </style>
 <style id="lsLimp2Css">/* lives-limpieza v2 · sin notas, veredictos ni paneles de título arriba */.card>.hint:not([id]){display:none!important}</style>
 </head>
@@ -737,13 +753,14 @@ tr:hover td{background:#f6f9fb}
       <div><label>Hasta</label><input id="fHasta" type="date"></div>
     </div>
     <div class="btns">
+      <button class="btn prim" id="btnRegistrar" type="button" disabled title="Comprobando permiso…">Registrar</button>
+      <button class="btn sec" id="btnDash" type="button" title="Dashboard de Auditoría Final">Dashboard</button>
       <button class="btn" id="btnBuscar" type="button">Buscar</button>
       <button class="btn sec" id="btnLimpiar">Limpiar</button>
       <button class="btn toggle" id="btnReprocesos" type="button">Reprocesos</button>
       <button class="btn toggle" id="btnLicencias" type="button">Licencias</button>
       <button class="btn toggle" id="btnLiquidados" type="button">Liquidados</button>
     </div>
-    <div class="hint">Aquí se ven las auditorías <b>capturadas en planta con el formulario</b>; las transcritas por digitación no aparecen. Empieza por la <b>OP</b>: al buscarla se completan el grupo, el estilo, el color y el PO de esa orden. Si no la tienes, puedes filtrar por cualquier otro campo. Pulsa <b>Buscar</b> o la tecla Enter. Toca Reprocesos / Licencias / Liquidados una vez para ver solo esas, dos veces para excluirlas, y una tercera para quitar el filtro.</div>
   </div>
 
   <div class="card">
@@ -1324,7 +1341,8 @@ function pintar(res, total, hayMas){
       <td class="colorcel" data-l="Color">${esc(r[9]||'')}</td>
       <td class="cAu" data-l="Auditor"><span>${esc(r[6]||'')}${marca}</span></td>
       <td class="cRe" data-l="Resultado">${badge(r[7])}</td>
-      <td class="cVe"><a class="ver" href="ver.html?id=${encodeURIComponent(r[0])}">Ver / PDF</a></td>`;
+      <td class="cVe"><button type="button" class="ver" data-ver="${esc(r[0]||'')}" title="Ver el reporte y compartirlo en PDF">Ver PDF</button></td>`;
+    tr.setAttribute('data-fila',r[0]||'');
     tb.appendChild(tr);
   });
 }
@@ -1556,6 +1574,87 @@ cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
      Cómo pinta: traduce los colores propios de cada pantalla a la paleta oscura LIVES (fondos, tarjetas, textos, bordes,
      sombras, etiquetas y gráficos), con los colores de marca y de semáforo ajustados a mano para que se lean bien.
      Imprimir, PDF, imágenes de gráficos y Excel salen siempre en claro. No cambia datos, cálculos ni guardados. ===== -->
+
+<div class="fmodal" id="fmodal"><div class="fmcaja">
+  <div class="fmbar"><b id="fmTit"></b><button type="button" id="fmCerrar">✕ Cerrar</button></div>
+  <iframe id="fmFrame" title="Auditoría Final"></iframe>
+</div></div>
+<script id="finModalJs">
+(function(){
+  var SB='https://xxfufpddgoyhbotjmaiy.supabase.co', KEY='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+  var DASH='https://iaanalistalives-ux.github.io/lives-dashboards-calidad/final/dashboard-final.html';
+  function $(i){ return document.getElementById(i); }
+  function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
+  function usuarioLink(){
+    var n=''; try{ var q=new URLSearchParams(location.search); n=(q.get('usuario')||q.get('nombre')||'').trim(); }catch(e){}
+    if(!n){ try{ n=(sessionStorage.getItem('lives_nombre_portal')||'').trim(); }catch(e){} }
+    return n;
+  }
+  var NOMBRE=usuarioLink();
+  function url(tipo,id){
+    var u=new URL({ver:'ver.html',form:'index.html',dash:DASH}[tipo],location.href);
+    u.searchParams.set('modal','1'); if(NOMBRE) u.searchParams.set('usuario',NOMBRE); if(id) u.searchParams.set('id',id);
+    return u.toString();
+  }
+  var TIT={ver:'Reporte de auditoría',form:'Registrar auditoría',dash:'Dashboard de Auditoría Final'};
+  var REFRESCAR=false;
+  function abrir(tipo,id){
+    $('fmTit').textContent=TIT[tipo]; $('fmFrame').src=url(tipo,id);
+    $('fmodal').classList.add('show'); document.body.classList.add('fmAbierta');
+  }
+  function cerrar(){
+    if(window.__finSucio && !confirm('¿Salir sin guardar? Lo escrito queda como borrador en este equipo.')) return;
+    try{ $('fmFrame').contentWindow.postMessage({lsFin:1,tipo:'guardarBorrador'},'*'); }catch(e){}
+    setTimeout(function(){
+      $('fmodal').classList.remove('show'); document.body.classList.remove('fmAbierta'); $('fmFrame').src='about:blank'; window.__finSucio=false;
+      if(REFRESCAR){ REFRESCAR=false; var b=$('btnBuscar'); if(b) b.click(); }
+    },80);
+  }
+  $('btnRegistrar').addEventListener('click',function(){ if(!this.disabled) abrir('form'); });
+  $('btnDash').addEventListener('click',function(){ abrir('dash'); });
+  $('fmCerrar').addEventListener('click',cerrar);
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && $('fmodal').classList.contains('show')) cerrar(); });
+  $('tbody').addEventListener('click',function(e){
+    var b=e.target.closest('button[data-ver]'); if(b){ abrir('ver',b.getAttribute('data-ver')); return; }
+    if(e.target.closest('a,button,.fotoic')) return;
+    var tr=e.target.closest('tr[data-fila]'); if(tr) abrir('ver',tr.getAttribute('data-fila'));
+  });
+  window.addEventListener('message',function(e){
+    var m=e.data||{}; if(!m.lsFin) return;
+    if(m.tipo==='sucio') window.__finSucio=!!m.v;
+    else if(m.tipo==='guardado'){ REFRESCAR=true; window.__finSucio=false; }
+    else if(m.tipo==='cerrar'){ window.__finSucio=false; cerrar(); }
+  });
+
+  /* Quién puede registrar: auditoras activas del catálogo de personal (rol AUDITORA o AUDITORA E INSPECTORA).
+     Christian siempre; Rodrigo (supervisión) nunca. Otros usuarios: botón gris. La base sigue decidiendo al guardar. */
+  function sesion(){ try{ return window.LIVES_SESION && window.LIVES_SESION.actual && window.LIVES_SESION.actual(); }catch(e){ return null; } }
+  function leer(path,body){
+    return fetch(SB+path,{method:body?'POST':'GET',headers:{apikey:KEY,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+  }
+  function poner(si,txt){
+    var b=$('btnRegistrar'); b.disabled=!si; b.textContent=si?'Registrar':'Solo para auditoras';
+    b.title=si?'Registrar una auditoría':(txt||'Solo para las auditoras de Calidad Manufactura');
+  }
+  async function comprobar(){
+    var s=sesion(), login=String((s&&s.usuario)||'').trim().toLowerCase(), nombre=String((s&&s.nombre)||NOMBRE||'').trim();
+    if(login==='rcamogliano'){ poner(false,'Modo supervisión: ves todo, no se guarda nada'); return; }
+    if(login==='ctalepcio' || norm(NOMBRE)==='CTALEPCIO'){ poner(true); return; }
+    if(!nombre){ poner(false,'Entra desde el portal para registrar'); return; }
+    try{
+      var oficial=norm(nombre);
+      try{ var o=await leer('/rest/v1/rpc/nombre_sistemas',{p:nombre.toUpperCase()}); if(o) oficial=norm(o); }catch(e){}
+      var lista=await leer('/rest/v1/publico_ref_personal?select=nombre,rol,activo&activo=eq.SI&limit=1000');
+      var ok=lista.some(function(x){ return norm(x.nombre)===oficial && /AUDITORA/.test(norm(x.rol)); });
+      poner(ok);
+    }catch(e){ poner(false,'No se pudo comprobar el permiso. Recarga la página.'); }
+  }
+  /* la sesión del portal puede tardar unos segundos en llegar */
+  var intentos=0;
+  (function esperar(){ if(sesion()||usuarioLink()||++intentos>25){ comprobar(); } else setTimeout(esperar,400); })();
+})();
+</script>
 <style id="lsTemaCss">
 html[data-tema="oscuro"]{color-scheme:dark;background:#0A1C19}
 html[data-tema="oscuro"] ::selection{background:#0F7A5A;color:#fff}
