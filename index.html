@@ -734,6 +734,34 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);ba
    position:sticky se ancla al contenedor con scroll, que es lo que se ve. Funciona igual
    abierta directa y embebida en el portal.
    El padding con env(safe-area-inset-bottom) evita que los botones del teléfono la tapen. */
+/* ===== Formulario por pestañas (28/10/2026): lo fijo arriba y el resto por sección ===== */
+#panelBuscarAud.colapsado{padding:8px 12px}
+#panelBuscarAud.colapsado>.sec{margin:0;cursor:pointer}
+#panelBuscarAud.colapsado>.sec::after{content:"▾";margin-left:auto;color:var(--muted)}
+#panelBuscarAud:not(.colapsado)>.sec{cursor:pointer}
+#panelBuscarAud.colapsado>.hint,#panelBuscarAud.colapsado>.grid,#panelBuscarAud.colapsado>#btnMisAud,#panelBuscarAud.colapsado>#misAudList{display:none}
+.fijoLinea{display:none;align-items:center;gap:10px;font-size:14px;font-weight:700;color:var(--navy)}
+.fijoLinea span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fijoLinea .addbtn{margin:0;flex:none;width:auto;padding:8px 14px;min-height:38px}
+#cardFijo.fijoColapsado{padding:8px 12px}
+#cardFijo.fijoColapsado .fijoLinea{display:flex}
+#cardFijo.fijoColapsado .fijoCampo{display:none!important}
+#cardFijo.conFalta{border-color:var(--red);box-shadow:0 0 0 2px rgba(220,38,38,.18)}
+#tabsSticky{position:sticky;top:0;z-index:40;background:var(--bg);margin:0 -14px 12px;padding:6px 14px 0;border-bottom:1px solid var(--line)}
+.resFijo{font-size:12.5px;font-weight:700;color:var(--navy);padding:2px 2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.resFijo:empty{display:none}
+#pestanas{display:flex;gap:4px}
+#pestanas .pest{flex:1 1 0;min-width:0;position:relative;border:1px solid var(--line);border-bottom:none;background:#fbfcfd;color:var(--muted);border-radius:10px 10px 0 0;
+  padding:10px 2px;min-height:44px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+#pestanas .pest.on{background:#fff;color:var(--navy);box-shadow:inset 0 3px 0 var(--green)}
+#pestanas .pest.tabFalta::after{content:"";position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--red)}
+.card.tabOculta{display:none!important}
+.tabnav{display:flex;gap:10px;margin:2px 0 8px}
+.tabnav .addbtn{flex:1;margin:0;min-height:44px}
+.tabnav .addbtn:disabled{opacity:.4}
+html.enModal header,html.enModal #selloVersion{display:none}
+html.enModal .wrap{max-width:900px}
+@media(max-width:380px){#pestanas .pest{font-size:12px}}
 .bar{position:sticky;bottom:0;left:0;right:0;background:#fff;
      border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(14,59,54,.10);z-index:30;
      padding-bottom:env(safe-area-inset-bottom,0px);margin-top:18px}
@@ -786,7 +814,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
 
 <div class="wrap">
   <!-- MIS AUDITORÍAS (corregir) -->
-  <div class="card" id="panelBuscarAud" style="border:2px dashed #d4e0ee;background:#f7fafc">
+  <div class="card colapsado" id="panelBuscarAud" style="border:2px dashed #d4e0ee;background:#f7fafc">
     <div class="sec"><span class="dot"></span>¿Necesitas corregir una auditoría que ya hiciste?</div>
     <div class="hint" style="margin:-6px 0 10px">Escribe la OP y verás aquí mismo tus auditorías de esa OP, con todos sus detalles, para elegir cuál corregir.</div>
     <div class="grid">
@@ -818,16 +846,10 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
     </div>
   </div>
 
-  <!-- CABECERA -->
-  <div class="card">
-    <div class="sec"><span class="dot"></span>Datos de la auditoría</div>
-    <div class="grid">
-      <div><label>N° de auditoría (automático)</label>
-        <input id="ordinal" readonly placeholder="—" style="background:#eef3f1;font-weight:700;color:var(--navy);text-align:center">
-        <div class="hint" id="ordHint">Se calcula según las auditorías previas del mismo tipo.</div>
-      </div>
-    </div>
-    <div class="field"><label>Proceso *</label>
+  <!-- LO QUE IDENTIFICA EL REGISTRO: siempre arriba; se reduce a una línea cuando ya se eligió -->
+  <div class="card" id="cardFijo">
+    <div class="fijoLinea" id="fijoLinea"><span id="fijoTxt"></span><button type="button" class="addbtn" id="btnCambiarFijo">Cambiar</button></div>
+    <div class="field fijoCampo"><label>Proceso *</label>
       <select id="proceso">
         <option value="">— Seleccionar —</option>
         <option>Costura (taller)</option>
@@ -835,11 +857,11 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <option>Acabados Final (interno)</option>
       </select>
     </div>
-    <div class="field" id="tallerWrap" style="display:none"><label>Taller *</label>
+    <div class="field fijoCampo" id="tallerWrap" style="display:none"><label>Taller *</label>
       <select id="taller"><option value="">— Seleccionar —</option></select>
       <div class="hint">Solo se muestran los talleres del proceso elegido.</div>
     </div>
-    <div class="field"><label>OP (Orden de Producción) *</label>
+    <div class="field fijoCampo"><label>OP (Orden de Producción) *</label>
       <input id="opInput" inputmode="numeric" autocomplete="off" placeholder="70085">
       <div class="hint" id="opHint">Obligatoria. Escríbela y los datos del pedido salen solos de la base de OPs: grupo, estilo, PO, color, destino y pedido no se escriben a mano.</div>
     </div>
@@ -863,6 +885,22 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
       <button type="button" id="btnOtroParcial" style="display:none;margin-top:9px;width:100%;padding:11px 12px;border-radius:9px;border:1px solid #bfe3da;background:#eef7f4;color:#1c7a6e;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer">
         📦 No, vengo a auditar otro lote de este pedido
       </button>
+    </div>
+  </div>
+  <div id="tabsAncla"></div>
+  <div id="tabsSticky">
+    <div class="resFijo" id="resFijo"></div>
+    <nav id="pestanas" aria-label="Secciones de la auditoría"></nav>
+  </div>
+
+  <!-- CABECERA -->
+  <div class="card" data-tab="lote">
+    <div class="sec"><span class="dot"></span>Datos de la auditoría</div>
+    <div class="grid">
+      <div><label>N° de auditoría (automático)</label>
+        <input id="ordinal" readonly placeholder="—" style="background:#eef3f1;font-weight:700;color:var(--navy);text-align:center">
+        <div class="hint" id="ordHint">Se calcula según las auditorías previas del mismo tipo.</div>
+      </div>
     </div>
     <div class="grid">
       <div><label>Grupo *</label><input id="grupo" list="grupos" autocomplete="off" placeholder="Sale de la OP">
@@ -912,7 +950,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- AQL -->
-  <div class="card">
+  <div class="card" data-tab="lote">
     <div class="sec"><span class="dot"></span>Nivel AQL · muestreo</div>
     <div class="toggle lic" id="licWrap" style="display:none">
       <div><div style="font-weight:600;font-size:14px">¿Es licencia? (inspección 100%)</div>
@@ -941,7 +979,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- DEFECTOS -->
-  <div class="card">
+  <div class="card" data-tab="defectos">
     <div class="sec"><span class="dot"></span>Defectos de calidad</div>
     <div class="hint" style="margin:-6px 0 10px">Busca el defecto que encontraste, o toca una sección para ver todas sus categorías.</div>
     <input id="buscarDef" type="text" autocomplete="off" placeholder="🔍 Busca el defecto (ej. mancha, basta, hilo...)" style="margin-bottom:8px">
@@ -952,7 +990,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- DERIVADOS (solo aplica a Costura (taller)) -->
-  <div class="card" id="derivadosCard" style="display:none">
+  <div class="card" data-tab="defectos" id="derivadosCard" style="display:none">
     <div class="sec"><span class="dot"></span>Derivados</div>
     <div class="hint" style="margin:-6px 0 10px">Sobre el lote recibido. NO cuentan para el AQL. Opcional. Busca la categoría que aplique.</div>
     <input id="buscarDer" type="text" autocomplete="off" placeholder="🔍 Busca el derivado..." style="margin-bottom:8px">
@@ -963,14 +1001,14 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- RESUMEN DE LO REGISTRADO (defectos + derivados, solo lo que tiene cantidad>0) -->
-  <div class="card" id="resumenCard" style="display:none">
+  <div class="card" data-tab="defectos" id="resumenCard" style="display:none">
     <div class="sec"><span class="dot"></span>Resumen de lo registrado</div>
     <div class="hint" style="margin:-6px 0 10px">Revisa, corrige o borra rápido antes de guardar.</div>
     <div id="resumenList"></div>
   </div>
 
   <!-- MEDIDAS (informativo) -->
-  <div class="card">
+  <div class="card" data-tab="medidas">
     <div class="sec"><span class="dot"></span>Medidas (informativo)</div>
     <div class="grid">
       <div><label>Muestra medidas</label><input id="medMuestra" inputmode="numeric" placeholder="—"></div>
@@ -983,7 +1021,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- OVERRIDE -->
-  <div class="card ov-card" id="ovCard">
+  <div class="card ov-card" data-tab="cierre" id="ovCard">
     <div class="sec" style="color:#b7791f"><span class="dot" style="background:#b7791f"></span>Pase al rechazo (override)</div>
     <div class="toggle ovr">
       <div><div style="font-weight:600;font-size:14px">Dar pase a un lote rechazado</div>
@@ -997,7 +1035,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- FOTOS DE MEDIDAS -->
-  <div class="card">
+  <div class="card" data-tab="fotos">
     <div class="sec"><span class="dot"></span>Fotos de hojas de medidas</div>
     <div class="hint" style="margin:-6px 0 10px" id="medOblHint">Obligatorio en la 1ra auditoría del lote. En las repetidas es opcional (ya se midió antes).</div>
     <div class="fotos" id="fotosMed"></div>
@@ -1011,7 +1049,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- FOTOS DE MEDIDAS DE PROCESO (solo Costura taller) -->
-  <div class="card" id="cardProceso" style="display:none">
+  <div class="card" data-tab="fotos" id="cardProceso" style="display:none">
     <div class="sec"><span class="dot"></span>Fotos de medidas de proceso</div>
     <div class="hint" style="margin:-6px 0 10px">Solo para Costura (taller). Opcional.</div>
     <div class="fotos" id="fotosPro"></div>
@@ -1025,19 +1063,20 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- COMENTARIO -->
-  <div class="card">
+  <div class="card" data-tab="cierre">
     <div class="sec"><span class="dot"></span>Comentario final</div>
     <textarea id="comentario" rows="3" placeholder="Observaciones generales de la auditoría (opcional)"></textarea>
   </div>
 
   <!-- LIQUIDADO (los tres procesos) -->
-  <div class="card" id="liquidadoCard" style="display:none">
+  <div class="card" data-tab="cierre" id="liquidadoCard" style="display:none">
     <div class="toggle" id="liquidadoWrap">
       <div><div style="font-weight:600;font-size:14px">¿Liquidado?</div>
         <div class="hint" style="margin-top:2px">Marca esto cuando esta sea la <b>última auditoría de esta OP en este proceso</b> — ya no se vuelve a auditar aquí.</div></div>
       <label class="switch"><input type="checkbox" id="liquidadoSwitch"><span class="slider"></span></label>
     </div>
   </div>
+  <div class="tabnav" id="tabnav"><button type="button" class="addbtn" id="tabAnt">‹ Anterior</button><button type="button" class="addbtn" id="tabSig">Siguiente ›</button></div>
 </div>
 
 <div class="bar" id="barraFinal"><div class="inner">
@@ -4520,6 +4559,135 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
 <script id="lsSbJs">(function(){try{var h=document.querySelector("header");if(!h)return;h.setAttribute("data-ls-sin-barra","");var m=[];[].forEach(function(i){var e=document.getElementById(i);if(e&&h.contains(e))m.push(e);});Array.prototype.forEach.call(h.querySelectorAll("a,button,select,input"),function(e){if(!m.some(function(x){return x===e||x.contains(e);}))m.push(e);});m=m.filter(function(e){return !m.some(function(x){return x!==e&&x.contains(e);});});if(!m.length)return;m.sort(function(a,b){return a.compareDocumentPosition(b)&4?-1:1;});var b=document.createElement("div");b.className="lsSinBarra";m.forEach(function(e){b.appendChild(e);});h.parentNode.insertBefore(b,h);}catch(e){}})();</script>
 <!-- ===== fin lives-sin-barra v1 ===== -->
 
+<script id="finTabsJs">
+(function(){
+  var TABS=[['lote','Lote'],['defectos','Defectos'],['medidas','Medidas'],['fotos','Fotos'],['cierre','Cierre']];
+  var cur='lote', fijoAbierto=false, faltas={};
+  var $$=function(id){ return document.getElementById(id); };
+  var vv=function(id){ var e=$$(id); return e?String(e.value||'').trim():''; };
+  var MODAL=false; try{ MODAL=new URLSearchParams(location.search).get('modal')==='1'; }catch(e){}
+  if(MODAL) document.documentElement.classList.add('enModal');
+  function post(m){ if(!MODAL) return; m.lsFin=1; try{ parent.postMessage(m,'*'); }catch(e){} }
+
+  /* --- panel "Corregir": se abre al tocar su título --- */
+  var panel=$$('panelBuscarAud');
+  panel.querySelector('.sec').addEventListener('click',function(){ panel.classList.toggle('colapsado'); });
+
+  /* --- pestañas --- */
+  var nav=$$('pestanas');
+  nav.innerHTML=TABS.map(function(x){ return '<button type="button" class="pest" data-t="'+x[0]+'">'+x[1]+'</button>'; }).join('');
+  function pintarTabs(){
+    [].forEach.call(document.querySelectorAll('.card[data-tab]'),function(c){ c.classList.toggle('tabOculta',c.getAttribute('data-tab')!==cur); });
+    [].forEach.call(nav.querySelectorAll('.pest'),function(b){
+      var k=b.getAttribute('data-t'); b.classList.toggle('on',k===cur); b.classList.toggle('tabFalta',!!faltas[k]); b.setAttribute('aria-selected',k===cur?'true':'false'); });
+    var i=TABS.map(function(x){ return x[0]; }).indexOf(cur);
+    $$('tabAnt').disabled=i<=0; $$('tabSig').disabled=i>=TABS.length-1;
+  }
+  function irA(k,subir){
+    cur=k; pintarTabs();
+    if(subir!==false){ var a=$$('tabsAncla'); try{ window.scrollTo({top:a.getBoundingClientRect().top+window.pageYOffset-2,behavior:'auto'}); }catch(e){} }
+  }
+  nav.addEventListener('click',function(e){ var b=e.target.closest('.pest'); if(b) irA(b.getAttribute('data-t')); });
+  $$('tabAnt').addEventListener('click',function(){ var i=TABS.map(function(x){return x[0];}).indexOf(cur); if(i>0) irA(TABS[i-1][0]); });
+  $$('tabSig').addEventListener('click',function(){ var i=TABS.map(function(x){return x[0];}).indexOf(cur); if(i<TABS.length-1) irA(TABS[i+1][0]); });
+
+  /* --- lo fijo de arriba: proceso, taller y OP; una línea cuando ya se eligió --- */
+  function elegido(){
+    try{
+      if(!S.proceso || !vv('grupo')) return false;
+      if(S.int_ext==='EXTERNA' && !vv('taller')) return false;
+      if(S.editId || S.reprocesaDe) return true;
+      var op=vv('opInput'); return !!op && S.opResuelta===op;
+    }catch(e){ return false; }
+  }
+  function textoFijo(){
+    var p=[]; try{ if(S.proceso) p.push(S.proceso); }catch(e){}
+    var op=vv('opInput'); if(op) p.push('OP '+op);
+    if(vv('grupo')) p.push(vv('grupo'));
+    if(vv('color')) p.push(vv('color'));
+    return p.join(' · ');
+  }
+  var fijo=$$('cardFijo');
+  function refrescar(){
+    var activo=document.activeElement, dentro=activo && fijo.contains(activo);
+    var col=elegido() && !fijoAbierto && !dentro;
+    fijo.classList.toggle('fijoColapsado',col);
+    var tx=textoFijo(); $$('fijoTxt').textContent=tx;
+    $$('resFijo').textContent=elegido()?tx:'';
+    if(fijoAbierto && elegido() && !dentro && !fijo.matches(':hover')){ /* sigue abierto hasta que se toque Cambiar de nuevo o se cambie de pestaña */ }
+  }
+  $$('btnCambiarFijo').addEventListener('click',function(){
+    fijoAbierto=true; refrescar();
+    var e=$$('opInput'); if(e){ try{ fijo.scrollIntoView({block:'start'}); }catch(x){} e.focus(); }
+  });
+  /* al cambiar de pestaña, lo fijo vuelve a reducirse */
+  nav.addEventListener('click',function(){ fijoAbierto=false; refrescar(); });
+  setInterval(refrescar,500);
+  document.addEventListener('input',refrescar,true); document.addEventListener('change',refrescar,true);
+
+  /* --- al guardar con faltantes: salta a la primera pestaña con error y marca las demás --- */
+  function tabDe(txt){
+    var t=String(txt).toLowerCase();
+    if(/^op de la base|^proceso|^taller/.test(t)) return 'fijo';
+    if(/defectos ya guardados/.test(t)) return 'defectos';
+    if(/foto/.test(t)) return 'fotos';
+    if(/override/.test(t)) return 'cierre';
+    return 'lote';
+  }
+  function marcar(lista){
+    faltas={}; var fijoFalta=false;
+    lista.forEach(function(x){ var k=tabDe(x); if(k==='fijo') fijoFalta=true; else faltas[k]=true; });
+    fijo.classList.toggle('conFalta',fijoFalta);
+    return fijoFalta;
+  }
+  function revisarMarcas(){
+    if(!Object.keys(faltas).length && !fijo.classList.contains('conFalta')) return;
+    var l=[]; try{ l=calcularFaltantes(); }catch(e){ return; }
+    marcar(l); pintarTabs();
+  }
+  var _t=null; function luego(){ clearTimeout(_t); _t=setTimeout(revisarMarcas,350); }
+  document.addEventListener('input',luego,true); document.addEventListener('change',luego,true); document.addEventListener('click',luego,true);
+  var sv=$$('save'), orig=sv.onclick;
+  sv.onclick=function(){
+    var l=[]; try{ l=calcularFaltantes(); }catch(e){}
+    if(l.length){
+      var fijoFalta=marcar(l), orden=TABS.map(function(x){ return x[0]; }), primera=null;
+      for(var i=0;i<orden.length;i++){ if(faltas[orden[i]]){ primera=orden[i]; break; } }
+      if(fijoFalta){ fijoAbierto=true; refrescar(); pintarTabs(); try{ window.scrollTo({top:0}); }catch(e){} }
+      else if(primera){ irA(primera); }
+      pintarTabs();
+    } else { marcar([]); pintarTabs(); }
+    return orig.apply(this,arguments);
+  };
+
+  /* --- ventana dentro del buscador (?modal=1) --- */
+  if(MODAL){
+    var avisado=false;
+    document.addEventListener('input',function(){ if(!avisado){ avisado=true; post({tipo:'sucio',v:true}); } },true);
+    window.addEventListener('message',function(e){
+      var m=e.data||{}; if(!m.lsFin) return;
+      if(m.tipo==='guardarBorrador'){ try{ if(typeof guardarBorradorAhora==='function') guardarBorradorAhora(); }catch(x){} }
+    });
+    var cg=window.confirmarGuardado;
+    if(typeof cg==='function'){
+      window.confirmarGuardado=function(tipo){
+        var r=cg.apply(this,arguments);
+        if(tipo==='enviado'||tipo==='cola'){
+          post({tipo:'guardado'}); post({tipo:'sucio',v:false}); avisado=false;
+          var b=$$('confirmBtn'); if(b){ b.textContent='Registrar otra';
+            var c=$$('confirmCerrar');
+            if(!c){ c=document.createElement('button'); c.id='confirmCerrar'; c.type='button'; c.textContent='Cerrar';
+              c.style.cssText='width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;font-size:15px;cursor:pointer';
+              b.parentNode.appendChild(c); c.addEventListener('click',function(){ post({tipo:'cerrar'}); }); }
+            c.style.display=''; }
+        } else { var c2=$$('confirmCerrar'); if(c2) c2.style.display='none'; }
+        return r;
+      };
+    }
+  }
+  pintarTabs(); refrescar();
+})();
+</script>
 <!-- ===== lives-tema v1 (final) · 2026-10-14 (paleta Petróleo v1.1) · modo oscuro opcional para quien lo quiera. Va antes de </body>.
      Cómo decide: si la persona eligió con el botón 🌙/☀️ (en la barra de filtros; en pantallas sin barra, al pie), manda su elección, guardada en ese equipo
      y válida para todas las herramientas; si nunca eligió, sigue la configuración de su celular o computadora.
