@@ -812,6 +812,15 @@ html[data-tema="oscuro"] .foenc img{filter:invert(1)}
 }
 /* Dentro de la ventana del buscador (?modal=1) no se vuelve atrás: se cierra la ventana */
 html.enModal .tbtn.back{display:none!important}
+table.fopq{border-collapse:collapse;width:100%;font-size:12.5px;margin-bottom:10px}
+table.fopq th,table.fopq td{border:1px solid #DCE5E2;padding:3px 6px;text-align:center}
+table.fopq th{background:#F1F6F4;color:#0E3B36;font-weight:700;font-size:11px;line-height:1.15;vertical-align:bottom}
+table.fopq td.l{text-align:left}
+table.fopq td.def{color:#DC2626;font-weight:700}
+table.fopq tfoot td{font-weight:700;background:#F1F6F4}
+table.fopq .ra{font-weight:800}
+table.fopq .ra.A{color:#0B815E}table.fopq .ra.R{color:#DC2626}
+@media print{table.fopq{font-size:10px} table.fopq th,table.fopq td{padding:1px 4px}}
 .tblogo{height:30px;display:block;flex-shrink:0;margin-right:12px}
 @media(max-width:600px){.tblogo{height:24px;margin-right:8px}}
 @media print{.tblogo{display:none}}
@@ -828,6 +837,8 @@ html.enModal .tbtn.back{display:none!important}
     <button class="tbtn back" onclick="volverAtras()">← Volver a buscar</button>
     <button class="tbtn medbtn" id="btnFotos" onclick="abrirVerFotos()" style="display:none">🖼 Ver fotos</button>
     <button class="tbtn share" id="btnShare" onclick="compartirReporte()">📤 Compartir</button>
+    <button class="tbtn medbtn" id="btnCorrP" style="display:none">✏️ Corregir</button>
+    <button class="tbtn" id="btnAnuP" style="display:none;background:#DC2626;color:#fff">Anular</button>
     <button class="tbtn print" onclick="window.print()">🖨 Imprimir datos</button>
   </div>
 </div>
@@ -1307,6 +1318,7 @@ setTimeout(function(){
 }, 20000);
 
 async function cargar(){
+  if(/^P\d/.test(ID||'')) return cargarProceso();
   if(!ID){ document.getElementById('estado').textContent='Falta el ID de la auditoría.'; return; }
   let rows, defs, ders;
   try{
@@ -1429,6 +1441,76 @@ function render(r,defs,ders){
      '</tbody></table></div><div class="com"><div class="fosec">Comentarios en general</div><div class="foobs">'+(String(r[C.coment]||'').trim()?esc(r[C.coment]):'<span style="color:#5F726C">Sin comentarios.</span>')+'</div></div></div>';
   h+='<div class="fopie"><span>LIVES · Calidad Manufactura · Generado '+new Date().toLocaleDateString('es-PE')+'</span><span>'+fo+'</span></div></div>';
   document.getElementById('page').innerHTML=h;
+}
+
+
+/* ===== Auditoría en proceso (FO-263): una tabla a todo el ancho con solo lo registrado ===== */
+const FO_AQLP=[[2,8,2,'0-1','0-1','0-1','0-1'],[9,15,3,'0-1','0-1','0-1','0-1'],[16,25,5,'0-1','0-1','0-1','0-1'],[26,50,8,'0-1','0-1','0-1','0-1'],[51,90,13,'0-1','0-1','1-2','1-2']];
+let PROC_PUEDE=false;
+function usuarioVer(){
+  try{ var s=window.LIVES_SESION&&window.LIVES_SESION.actual&&window.LIVES_SESION.actual(); if(s&&s.usuario) return String(s.usuario); }catch(e){}
+  try{ var q=new URLSearchParams(location.search); var n=(q.get('usuario')||q.get('nombre')||'').trim(); if(n) return n; return (sessionStorage.getItem('lives_nombre_portal')||'').trim(); }catch(e){ return ''; }
+}
+async function procApi(accion,p){
+  const r=await fetch(SBF_BASE+'/rest/v1/rpc/fproc_api',{method:'POST',headers:{'Content-Type':'application/json',apikey:SBF_PUB},body:JSON.stringify({p_accion:accion,p:Object.assign({usuario:usuarioVer()},p||{})})});
+  if(!r.ok) throw new Error('HTTP '+r.status); return r.json();
+}
+async function cargarProceso(){
+  window.__esProc=true;
+  const st=document.createElement('style'); st.textContent='@media print{@page{size:A4 landscape;margin:8mm}}'; document.head.appendChild(st);
+  let d;
+  try{ d=await procApi('ver',{id:ID}); }catch(e){ document.getElementById('estado').textContent='No se pudo cargar.'; return; }
+  if(!d||!d.ok){ document.getElementById('estado').textContent=(d&&d.error)||'No se encontró la auditoría '+ID; return; }
+  const a=d.auditoria, paq=d.paquetes||[]; PROC_PUEDE=!!d.puede;
+  document.getElementById('ttl').textContent='Reporte · '+a.id;
+  ES_COSTURA=true; DEFS_DATA=[]; DERS_DATA=[];
+  const anul=String(a.estado||'').toUpperCase()==='ANULADA';
+  const rech=a.resultado==='RECHAZADO';
+  const est=anul?['re','ANULADA']:(rech?['re','RECHAZADO']:['ap','APROBADO']);
+  /* columnas: solo los defectos que se registraron, el más frecuente primero */
+  const tot={}; paq.forEach(q=>(q.defectos||[]).forEach(x=>{ tot[x.defecto]=(tot[x.defecto]||0)+(+x.cantidad||0); }));
+  const cols=Object.keys(tot).sort((x,y)=>tot[y]-tot[x]||(x<y?-1:1));
+  const ra=v=>v?'<span class="ra '+v+'">'+v+'</span>':'—';
+  let filas='', sIns=0, sPaq=0;
+  paq.forEach(q=>{
+    const m={}; (q.defectos||[]).forEach(x=>{ m[x.defecto]=(m[x.defecto]||0)+(+x.cantidad||0); });
+    sIns+=(+q.cant_inspec||0); sPaq+=(+q.cant_paquete||0);
+    filas+='<tr><td>'+foVal(q.n_paquete)+'</td><td>'+(q.cant_paquete!=null?foNum(q.cant_paquete):'—')+' / '+foNum(q.cant_inspec)+'</td><td>'+foVal(q.talla)+'</td><td class="l">'+foVal(q.operacion)+'</td>'+
+      cols.map(c=>'<td class="def">'+(m[c]||'')+'</td>').join('')+'<td><b>'+foNum(q.total_def)+'</b></td><td>'+ra(q.res1)+'</td><td>'+ra(q.res2)+'</td></tr>';
+  });
+  const pie='<tr><td colspan="2">TOTAL</td><td></td><td></td>'+cols.map(c=>'<td>'+tot[c]+'</td>').join('')+'<td>'+foNum(a.total_def)+'</td><td colspan="2">'+(a.paq_rechazados||0)+' rechazado'+((a.paq_rechazados||0)===1?'':'s')+'</td></tr>';
+  const tabla=paq.length?'<div class="foscroll"><table class="fopq"><thead><tr><th>N° paquete</th><th>Cant. paquete / inspeccionada</th><th>Talla</th><th>Operación</th>'+
+    cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Total defectos</th><th>1ra aud. A/R</th><th>2da aud. A/R</th></tr></thead><tbody>'+filas+'</tbody><tfoot>'+pie+'</tfoot></table></div>':'<div class="fosin">Sin paquetes.</div>';
+  const niv=String(a.nivel_aql||''), colN={'1.0':3,'2.0':4,'2.5':5,'4.0':6}[niv];
+  const dato=(k,v)=>'<div class="fodato"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  let h='<div class="fohoja"><span class="tira"></span><div class="foenc"><img src="'+FO_LOGO+'" alt="LIVES"><div class="tt"><h1>Reporte de Auditoría en Proceso de Costura</h1><div class="cod">AC-023-05 · FO-263 · '+esc(a.id)+'</div></div><span class="foest '+est[0]+'">'+est[1]+'</span></div>';
+  if(anul) h+='<div class="fopase" style="background:#FCEBEB;border-color:#DC2626;color:#DC2626">Anulada por '+esc(a.anulado_por||'')+(a.motivo_anulacion?' · motivo: '+esc(a.motivo_anulacion):'')+'</div>';
+  h+='<div class="fodatos">'+dato('Grupo',foVal(a.grupo))+dato('Color',foVal(a.color))+dato('Fecha',foVal(foFecha(a.fecha)))+
+    dato('Estilo LIVES',foVal(a.estilo))+dato('Estilo cliente',foVal(a.e_cliente))+dato('P.O',foVal(a.po))+
+    dato('Servicio / línea',foVal(a.servicio))+dato('Destino',foVal(a.destino))+dato('Auditor',foVal(a.auditor))+
+    dato('Cliente',foVal(a.cliente))+dato('OP',foVal(a.op))+dato('Nivel AQL',foVal(niv))+'</div>';
+  h+='<div class="focasillas"><span class="focasilla'+(!rech&&!anul?' si ap':'')+'">Aprobado: <i>'+(!rech&&!anul?'✓':'')+'</i></span><span class="focasilla'+(rech&&!anul?' si re':'')+'">Rechazado: <i>'+(rech&&!anul?'✓':'')+'</i></span></div>';
+  h+=tabla;
+  h+='<div class="foabajo"><div class="foscroll"><div class="fosec">Quality/Visual AQL</div><table class="foaql"><thead><tr><th rowspan="2">Lot size</th><th rowspan="2">Sample size</th><th>1.0</th><th>2.0</th><th>2.5</th><th>4.0</th></tr><tr><th>A/R</th><th>A/R</th><th>A/R</th><th>A/R</th></tr></thead><tbody>'+
+    FO_AQLP.map(x=>'<tr><td>'+x[0]+'-'+x[1]+'</td><td>'+x[2]+'</td>'+[3,4,5,6].map(i=>'<td'+(i===colN?' class="sel"':'')+'>'+x[i]+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div><div class="com"><div class="fosec">Comentarios</div><div class="foobs">'+(String(a.observacion||'').trim()?esc(a.observacion):'<span style="color:#5F726C">Sin comentarios.</span>')+'</div></div></div>';
+  h+='<div class="fopie"><span>Registrado por '+esc(a.registrado_por||a.auditor)+' · '+paq.length+' paquete'+(paq.length===1?'':'s')+' · '+foNum(sIns)+' prendas inspeccionadas'+(a.editado?' · corregido '+esc(a.editado):'')+'</span><span>FO-263</span></div></div>';
+  document.getElementById('page').innerHTML=h;
+  const bC=document.getElementById('btnCorrP'), bA=document.getElementById('btnAnuP');
+  if(PROC_PUEDE){ bC.style.display=''; bA.style.display=''; }
+  bC.onclick=function(){ const u=new URL('index.html',location.href); u.searchParams.set('proc',a.id); const n=usuarioVer(); if(n) u.searchParams.set('usuario',n);
+    if(document.documentElement.classList.contains('enModal')) u.searchParams.set('modal','1'); location.href=u.toString(); };
+  bA.onclick=async function(){
+    const m=prompt('¿Por qué se anula la auditoría '+a.id+'?',''); if(m===null) return; if(!m.trim()){ alert('Escribe el motivo de la anulación.'); return; }
+    bA.disabled=true; try{ const r=await procApi('anular',{id:a.id,motivo:m.trim()}); if(!r.ok) throw new Error(r.error||'No se pudo anular.');
+      try{ parent.postMessage({lsFin:1,tipo:'guardado'},'*'); }catch(e){} location.reload(); }catch(e){ alert('No se anuló: '+e.message); bA.disabled=false; } };
+  /* fotos: se preparan después, el reporte ya está en pantalla */
+  const hojas=fotosDe(a.fotos_hojas), proc=fotosDe(a.fotos_proceso);
+  if(hojas.length||proc.length){
+    document.getElementById('btnFotos').style.display='';
+    prepararFotos([].concat(hojas,proc)).then(function(){ FOTOS_MED=hojas.map(u=>driveImgFull(u)); FOTOS_PRO=proc.map(u=>driveImgFull(u)); }).catch(function(e){ console.warn('Fotos:',e); });
+    FOTOS_MED=hojas.map(u=>driveImgFull(u)); FOTOS_PRO=proc.map(u=>driveImgFull(u));
+  }
 }
 
 let lbScale=1, lbDeg=0;
@@ -1600,11 +1682,11 @@ async function compartirReporte(){
     const canvas=await html2canvas(hoja,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:980});
     const h=document.getElementById('hideFotos'); if(h) h.remove();
     const { jsPDF }=window.jspdf;
-    const pdf=new jsPDF('p','mm','a4');
-    const W=210,H=297,M=8, k=Math.min((W-2*M)/canvas.width,(H-2*M)/canvas.height);
+    const pdf=new jsPDF(window.__esProc?'l':'p','mm','a4');
+    const W=window.__esProc?297:210,H=window.__esProc?210:297,M=8, k=Math.min((W-2*M)/canvas.width,(H-2*M)/canvas.height);
     pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',(W-canvas.width*k)/2,M,canvas.width*k,canvas.height*k);
 
-    const nombre='Auditoria_'+(ID||'reporte')+'.pdf';
+    const nombre=(window.__esProc?'Auditoria_proceso_':'Auditoria_')+(ID||'reporte')+'.pdf';
     const blob=pdf.output('blob');
     const file=new File([blob],nombre,{type:'application/pdf'});
 

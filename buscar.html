@@ -737,7 +737,7 @@ body.fmAbierta{overflow:hidden}
 <div class="wrap">
   <div class="card">
     <div class="filtros">
-      <div><label>Proceso</label><select id="fProceso"><option value="">Todos</option><option>Costura (taller)</option><option>Acabados (taller)</option><option>Acabados Final (interno)</option></select></div>
+      <div><label>Proceso</label><select id="fProceso"><option value="">Todos</option><option>Costura (taller)</option><option>Acabados (taller)</option><option>Acabados Final (interno)</option><option>En proceso (costura)</option></select></div>
       <div><label>Grupo</label><input id="fGrupo" placeholder="EFI-102"></div>
       <div><label>OP</label><input id="fOp" placeholder="24978"></div>
       <div><label>Estilo LIVES</label><input id="fEstilo" placeholder="24647"></div>
@@ -1257,6 +1257,25 @@ function aCache(clave, dato){
   while(_cache.size > CACHE_MAX) _cache.delete(_cache.keys().next().value);
 }
 
+const PROC_NOMBRE='En proceso (costura)';
+async function filasProceso(params){
+  if(params.proceso && params.proceso!==PROC_NOMBRE) return [];
+  if(params.repro==='1'||params.lic==='1'||params.liq==='1') return [];
+  const res=await fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/fproc_api',{method:'POST',
+    headers:{'Content-Type':'application/json',apikey:'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ'},
+    body:JSON.stringify({p_accion:'datos',p:{desde:params.desde||''}})});
+  if(!res.ok) return [];
+  const d=await res.json(); if(!d||!d.ok) return [];
+  const U=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+  const inc=(c,b)=>!U(b)||U(c).indexOf(U(b))>=0;
+  const hasta=val('fHasta');
+  return (d.auditorias||[]).filter(f=>inc(f.grupo,params.grupo)&&inc(f.op,params.op)&&inc(f.estilo,params.estilo)&&inc(f.color,params.color)&&inc(f.po,params.po)&&
+      inc(f.servicio,params.taller)&&inc(f.cliente,params.cliente)&&(!U(params.auditor)||U(f.auditor)===U(params.auditor))&&
+      (!params.resultado||U(f.resultado).indexOf(U(params.resultado))===0)&&(!hasta||String(f.fecha).slice(0,10)<=hasta))
+    .map(f=>{ const hr=f.registrado_en?new Date(f.registrado_en):null;
+      const hora=hr?(hr.getFullYear()+'-'+String(hr.getMonth()+1).padStart(2,'0')+'-'+String(hr.getDate()).padStart(2,'0')+' '+hr.toTimeString().slice(0,8)):'';
+      return [f.id,String(f.fecha).slice(0,10),f.cliente||'',f.grupo||'',f.estilo||'',f.po||'',f.auditor||'',f.resultado||'',2,f.color||'',f.op||'',hora]; });
+}
 async function buscar(){
   const mio=++_idBusqueda;          /* si llegan dos respuestas, gana la última pedida */
   const est=document.getElementById('estado');
@@ -1288,6 +1307,14 @@ async function buscar(){
     const r=await pedir(params, msg => { est.textContent = msg; });
     if(mio!==_idBusqueda) return;
     if(!r||!r.ok) throw new Error((r&&r.error)||'respuesta inesperada');
+    /* Las auditorías en proceso (FO-263) viven en sus propias tablas: se suman a la lista */
+    let pr=[]; try{ pr=await filasProceso(params); }catch(e){ console.warn('Proceso:', e); }
+    if(mio!==_idBusqueda) return;
+    if(params.proceso===PROC_NOMBRE){ r.rows=[]; r.total=0; r.hayMas=false; }
+    if(pr.length){
+      r.rows=(r.rows||[]).concat(pr).sort((a,b)=>String(b[1]).localeCompare(String(a[1]))||String(b[11]||'').localeCompare(String(a[11]||'')));
+      r.total=(r.total||0)+pr.length;
+    }
     aCache(clave, r);
     pintar(r.rows||[], r.total||0, !!r.hayMas);
   }catch(e){
@@ -1330,7 +1357,7 @@ function pintar(res, total, hayMas){
     const tr=document.createElement('tr');
     const marca = r[8]
       ? '<br><span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;'+
-        'background:#EEF2F1;color:#4A5A57;font-size:11px;white-space:nowrap">Digitado en Planta</span>'
+        'background:#EEF2F1;color:#4A5A57;font-size:11px;white-space:nowrap">'+(r[8]===2?'En proceso':'Digitado en Planta')+'</span>'
       : '';
     const hora = horaTxt(r[11]);
     tr.innerHTML=`<td class="cOp" data-l="OP" data-id="${esc(r[0]||'')}"><b>${esc(r[10]||'—')}</b>${iconoFotos(r[0])}</td>
@@ -1583,6 +1610,8 @@ cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
 (function(){
   var SB='https://xxfufpddgoyhbotjmaiy.supabase.co', KEY='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
   var DASH='https://iaanalistalives-ux.github.io/lives-dashboards-calidad/final/dashboard-final.html';
+  var DASH_PROC='https://iaanalistalives-ux.github.io/lives-dashboards-calidad/proceso/dashboard-proceso.html';
+  function dashUrl(){ var f=$('fProceso'); return (f&&f.value==='En proceso (costura)')?DASH_PROC:DASH; }
   function $(i){ return document.getElementById(i); }
   function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
   function usuarioLink(){
@@ -1592,14 +1621,15 @@ cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
   }
   var NOMBRE=usuarioLink();
   function url(tipo,id){
-    var u=new URL({ver:'ver.html',form:'index.html',dash:DASH}[tipo],location.href);
+    var u=new URL({ver:'ver.html',form:'index.html',dash:dashUrl()}[tipo],location.href);
     u.searchParams.set('modal','1'); if(NOMBRE) u.searchParams.set('usuario',NOMBRE); if(id) u.searchParams.set('id',id);
     return u.toString();
   }
   var TIT={ver:'Reporte de auditoría',form:'Registrar auditoría',dash:'Dashboard de Auditoría Final'};
+  function titDash(){ return dashUrl()===DASH_PROC?'Dashboard de Auditoría en Proceso':TIT.dash; }
   var REFRESCAR=false;
   function abrir(tipo,id){
-    $('fmTit').textContent=TIT[tipo]; $('fmFrame').src=url(tipo,id);
+    $('fmTit').textContent=(tipo==='dash'?titDash():TIT[tipo]); $('fmFrame').src=url(tipo,id);
     $('fmodal').classList.add('show'); document.body.classList.add('fmAbierta');
   }
   function cerrar(){

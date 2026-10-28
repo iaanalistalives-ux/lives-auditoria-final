@@ -734,6 +734,28 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);ba
    position:sticky se ancla al contenedor con scroll, que es lo que se ve. Funciona igual
    abierta directa y embebida en el portal.
    El padding con env(safe-area-inset-bottom) evita que los botones del teléfono la tapen. */
+/* ===== Auditoría en proceso (FO-263) ===== */
+.modoProc .soloFinal{display:none!important}
+.pq{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 12px;background:#fbfcfd}
+.pqh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-weight:700;color:var(--navy)}
+.pqh button{border:1px solid var(--line);background:#fff;color:var(--red);border-radius:8px;padding:6px 12px;min-height:36px;font-family:inherit;font-weight:700;cursor:pointer}
+.pq .sug{font-size:11.5px;color:var(--muted);margin-top:3px}
+.pqdefs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.pqchip{display:inline-flex;align-items:center;gap:6px;background:#FCEBEB;color:#B42318;border-radius:16px;padding:4px 6px 4px 10px;font-size:12.5px;font-weight:700}
+.pqchip button{border:none;background:transparent;color:#B42318;font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
+.pqadd{display:flex;gap:6px;align-items:stretch;margin-bottom:10px}
+.pqadd input[data-f=defNom]{flex:1;min-width:0}
+.pqadd input[data-f=defCant]{width:72px;flex:none}
+.pqadd .addbtn{width:auto;margin:0;flex:none;padding:0 14px}
+.pqres{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.pqres .lab{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-right:6px}
+.pqseg{display:inline-flex;gap:4px}
+.pqseg button{min-width:48px;min-height:42px;border:1px solid var(--line);background:#fff;border-radius:9px;font-family:inherit;font-weight:800;font-size:15px;color:var(--muted);cursor:pointer}
+.pqseg button.on[data-v=A]{background:#E7F4EF;color:#0B815E;border-color:#0B815E}
+.pqseg button.on[data-v=R]{background:#FCEBEB;color:#DC2626;border-color:#DC2626}
+.pqtot{font-size:12.5px;color:var(--muted);margin-top:8px}
+#procPendBar{display:none;position:sticky;top:0;z-index:48;background:#0E3B36;color:#fff;padding:8px 14px;font-size:13px;align-items:center;justify-content:space-between;gap:10px}
+#procPendBar button{background:#F59E0B;color:#0E3B36;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;min-height:36px}
 /* ===== Formulario por pestañas (28/10/2026): lo fijo arriba y el resto por sección ===== */
 #panelBuscarAud.colapsado{padding:8px 12px}
 #panelBuscarAud.colapsado>.sec{margin:0;cursor:pointer}
@@ -855,6 +877,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
         <option>Costura (taller)</option>
         <option>Acabados (taller)</option>
         <option>Acabados Final (interno)</option>
+        <option>En proceso (costura)</option>
       </select>
     </div>
     <div class="field fijoCampo" id="tallerWrap" style="display:none"><label>Taller *</label>
@@ -950,7 +973,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- AQL -->
-  <div class="card" data-tab="lote">
+  <div class="card soloFinal" data-tab="lote">
     <div class="sec"><span class="dot"></span>Nivel AQL · muestreo</div>
     <div class="toggle lic" id="licWrap" style="display:none">
       <div><div style="font-weight:600;font-size:14px">¿Es licencia? (inspección 100%)</div>
@@ -979,7 +1002,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- DEFECTOS -->
-  <div class="card" data-tab="defectos">
+  <div class="card soloFinal" data-tab="defectos">
     <div class="sec"><span class="dot"></span>Defectos de calidad</div>
     <div class="hint" style="margin:-6px 0 10px">Busca el defecto que encontraste, o toca una sección para ver todas sus categorías.</div>
     <input id="buscarDef" type="text" autocomplete="off" placeholder="🔍 Busca el defecto (ej. mancha, basta, hilo...)" style="margin-bottom:8px">
@@ -990,7 +1013,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- DERIVADOS (solo aplica a Costura (taller)) -->
-  <div class="card" data-tab="defectos" id="derivadosCard" style="display:none">
+  <div class="card" data-tab="defectos" id="derivadosCard" data-sf="1" style="display:none">
     <div class="sec"><span class="dot"></span>Derivados</div>
     <div class="hint" style="margin:-6px 0 10px">Sobre el lote recibido. NO cuentan para el AQL. Opcional. Busca la categoría que aplique.</div>
     <input id="buscarDer" type="text" autocomplete="off" placeholder="🔍 Busca el derivado..." style="margin-bottom:8px">
@@ -1001,14 +1024,14 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- RESUMEN DE LO REGISTRADO (defectos + derivados, solo lo que tiene cantidad>0) -->
-  <div class="card" data-tab="defectos" id="resumenCard" style="display:none">
+  <div class="card" data-tab="defectos" id="resumenCard" data-sf="1" style="display:none">
     <div class="sec"><span class="dot"></span>Resumen de lo registrado</div>
     <div class="hint" style="margin:-6px 0 10px">Revisa, corrige o borra rápido antes de guardar.</div>
     <div id="resumenList"></div>
   </div>
 
   <!-- MEDIDAS (informativo) -->
-  <div class="card" data-tab="medidas">
+  <div class="card soloFinal" data-tab="medidas">
     <div class="sec"><span class="dot"></span>Medidas (informativo)</div>
     <div class="grid">
       <div><label>Muestra medidas</label><input id="medMuestra" inputmode="numeric" placeholder="—"></div>
@@ -1021,7 +1044,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- OVERRIDE -->
-  <div class="card ov-card" data-tab="cierre" id="ovCard">
+  <div class="card ov-card soloFinal" data-tab="cierre" id="ovCard">
     <div class="sec" style="color:#b7791f"><span class="dot" style="background:#b7791f"></span>Pase al rechazo (override)</div>
     <div class="toggle ovr">
       <div><div style="font-weight:600;font-size:14px">Dar pase a un lote rechazado</div>
@@ -1069,12 +1092,26 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   </div>
 
   <!-- LIQUIDADO (los tres procesos) -->
-  <div class="card" data-tab="cierre" id="liquidadoCard" style="display:none">
+  <div class="card" data-tab="cierre" id="liquidadoCard" data-sf="1" style="display:none">
     <div class="toggle" id="liquidadoWrap">
       <div><div style="font-weight:600;font-size:14px">¿Liquidado?</div>
         <div class="hint" style="margin-top:2px">Marca esto cuando esta sea la <b>última auditoría de esta OP en este proceso</b> — ya no se vuelve a auditar aquí.</div></div>
       <label class="switch"><input type="checkbox" id="liquidadoSwitch"><span class="slider"></span></label>
     </div>
+  </div>
+  <!-- EN PROCESO (FO-263): servicio/línea, nivel AQL y una fila por paquete -->
+  <div class="card" data-tab="paquetes" id="procCard">
+    <div class="sec"><span class="dot"></span>Paquetes auditados en proceso</div>
+    <div class="grid">
+      <div class="full"><label>Servicio / línea *</label><input id="procLinea" list="procLineas" autocomplete="off" placeholder="Ej. LÍNEA 3 o nombre del taller"><datalist id="procLineas"></datalist></div>
+    </div>
+    <div class="field"><label>Nivel AQL</label>
+      <div class="seg" id="procNivel"><button type="button" data-v="1.0">1.0</button><button type="button" data-v="2.0">2.0</button><button type="button" data-v="2.5" class="on">2.5</button><button type="button" data-v="4.0">4.0</button></div>
+    </div>
+    <div id="procPaquetes"></div>
+    <button type="button" class="addbtn" id="procAgregar">+ Agregar paquete</button>
+    <div class="total-def"><span id="procTotTxt">Sin paquetes</span><b id="procTotVer">—</b></div>
+    <datalist id="procDefList"></datalist>
   </div>
   <div class="tabnav" id="tabnav"><button type="button" class="addbtn" id="tabAnt">‹ Anterior</button><button type="button" class="addbtn" id="tabSig">Siguiente ›</button></div>
 </div>
@@ -4561,7 +4598,9 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
 
 <script id="finTabsJs">
 (function(){
-  var TABS=[['lote','Lote'],['defectos','Defectos'],['medidas','Medidas'],['fotos','Fotos'],['cierre','Cierre']];
+  var TABS_N=[['lote','Lote'],['defectos','Defectos'],['medidas','Medidas'],['fotos','Fotos'],['cierre','Cierre']];
+  var TABS_P=[['lote','Lote'],['paquetes','Paquetes'],['fotos','Fotos'],['cierre','Cierre']];
+  var TABS=TABS_N;
   var cur='lote', fijoAbierto=false, faltas={};
   var $$=function(id){ return document.getElementById(id); };
   var vv=function(id){ var e=$$(id); return e?String(e.value||'').trim():''; };
@@ -4575,7 +4614,11 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
 
   /* --- pestañas --- */
   var nav=$$('pestanas');
-  nav.innerHTML=TABS.map(function(x){ return '<button type="button" class="pest" data-t="'+x[0]+'">'+x[1]+'</button>'; }).join('');
+  function pintarNav(){ nav.innerHTML=TABS.map(function(x){ return '<button type="button" class="pest" data-t="'+x[0]+'">'+x[1]+'</button>'; }).join(''); }
+  pintarNav();
+  window.finSetTabs=function(proc){ TABS=proc?TABS_P:TABS_N; if(!TABS.some(function(x){ return x[0]===cur; })) cur='lote'; faltas={}; pintarNav(); pintarTabs(); };
+  var PROC='En proceso (costura)';
+  function enProc(){ return document.documentElement.classList.contains('modoProc'); }
   function pintarTabs(){
     [].forEach.call(document.querySelectorAll('.card[data-tab]'),function(c){ c.classList.toggle('tabOculta',c.getAttribute('data-tab')!==cur); });
     [].forEach.call(nav.querySelectorAll('.pest'),function(b){
@@ -4595,8 +4638,8 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
   function elegido(){
     try{
       if(!S.proceso || !vv('grupo')) return false;
-      if(S.int_ext==='EXTERNA' && !vv('taller')) return false;
-      if(S.editId || S.reprocesaDe) return true;
+      if(S.int_ext==='EXTERNA' && !vv('taller') && S.proceso!==PROC) return false;
+      if(S.editId || S.reprocesaDe || (window.finProcEditando && window.finProcEditando())) return true;
       var op=vv('opInput'); return !!op && S.opResuelta===op;
     }catch(e){ return false; }
   }
@@ -4630,6 +4673,7 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
     var t=String(txt).toLowerCase();
     if(/^op de la base|^proceso|^taller/.test(t)) return 'fijo';
     if(/defectos ya guardados/.test(t)) return 'defectos';
+    if(/^paquete|^servicio|^nivel/.test(t)) return 'paquetes';
     if(/foto/.test(t)) return 'fotos';
     if(/override/.test(t)) return 'cierre';
     return 'lote';
@@ -4642,14 +4686,14 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
   }
   function revisarMarcas(){
     if(!Object.keys(faltas).length && !fijo.classList.contains('conFalta')) return;
-    var l=[]; try{ l=calcularFaltantes(); }catch(e){ return; }
+    var l=[]; try{ l=enProc()?window.finProcFaltantes():calcularFaltantes(); }catch(e){ return; }
     marcar(l); pintarTabs();
   }
   var _t=null; function luego(){ clearTimeout(_t); _t=setTimeout(revisarMarcas,350); }
   document.addEventListener('input',luego,true); document.addEventListener('change',luego,true); document.addEventListener('click',luego,true);
   var sv=$$('save'), orig=sv.onclick;
   sv.onclick=function(){
-    var l=[]; try{ l=calcularFaltantes(); }catch(e){}
+    var l=[]; try{ l=enProc()?window.finProcFaltantes():calcularFaltantes(); }catch(e){}
     if(l.length){
       var fijoFalta=marcar(l), orden=TABS.map(function(x){ return x[0]; }), primera=null;
       for(var i=0;i<orden.length;i++){ if(faltas[orden[i]]){ primera=orden[i]; break; } }
@@ -4657,6 +4701,7 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
       else if(primera){ irA(primera); }
       pintarTabs();
     } else { marcar([]); pintarTabs(); }
+    if(enProc()){ if(!l.length) window.finProcGuardar(); return; }
     return orig.apply(this,arguments);
   };
 
@@ -4686,6 +4731,230 @@ refrescarPend().then(async()=>{ if(navigator.onLine){ const n=await colaCount();
     }
   }
   pintarTabs(); refrescar();
+})();
+</script>
+<script id="finProcesoJs">
+(function(){
+  var PROC='En proceso (costura)';
+  var $$=function(id){ return document.getElementById(id); };
+  var vv=function(id){ var e=$$(id); return e?String(e.value||'').trim():''; };
+  var esc=function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var SB=SB_BASE, KEY=SB_PUB;
+  var BORR='lives_fin_proc_borrador';
+  var P={nivel:'2.5',paquetes:[],token:null,editId:null};
+  var MUESTRA=[[2,8,2],[9,15,3],[16,25,5],[26,50,8],[51,90,13]];
+  var estado={on:false};
+  var tx={sec:null,hint:null};
+
+  /* soloFinal en tarjetas y campos que no aplican a la hoja de proceso */
+  ['derivadosCard','resumenCard','liquidadoCard'].forEach(function(i){ var e=$$(i); if(e) e.classList.add('soloFinal'); });
+  [$$('ordinal'),$$('recibido'),$$('avanceBox'),$$('candadoParcial'),$$('panelPrev'),$$('licWrap'),$$('reproWrap')].forEach(function(e){
+    if(!e) return; var n=(e.tagName==='INPUT')?e.parentNode:e; n.classList.add('soloFinal'); });
+
+  function usuario(){ try{ var s=window.LIVES_SESION&&window.LIVES_SESION.actual&&window.LIVES_SESION.actual(); if(s&&s.usuario) return String(s.usuario); }catch(e){} return NOMBRE_PORTAL||''; }
+  function muestraDe(n){ n=+n; for(var i=0;i<MUESTRA.length;i++){ if(n>=MUESTRA[i][0]&&n<=MUESTRA[i][1]) return MUESTRA[i][2]; } return null; }
+  function nuevoPaq(){ return {nPaquete:'',talla:'',cantPaquete:'',cantInspec:'',operacion:'',res1:'',res2:'',defectos:[]}; }
+  function sumDef(q){ return q.defectos.reduce(function(s,d){ return s+(+d.cantidad||0); },0); }
+  function finalDe(q){ return q.res2||q.res1; }
+  function catCostura(){
+    var c=(typeof CAT!=='undefined'&&CAT)?CAT:[];
+    return c.filter(function(x){ return /cost/i.test(String(x[1])); }).map(function(x){
+      return {cod:x[0],nombre:(String(x[2]||'')+(x[3]?' '+x[3]:'')).trim().toUpperCase()}; });
+  }
+  function llenarLista(){
+    var dl=$$('procDefList'); if(dl.children.length) return;
+    dl.innerHTML=catCostura().map(function(d){ return '<option value="'+esc(d.nombre)+'">'; }).join('');
+    try{ var tl=$$('procLineas'); if(tl && typeof TALLERES!=='undefined' && TALLERES.length && !tl.children.length){
+      tl.innerHTML=TALLERES.map(function(x){ return '<option value="'+esc(Array.isArray(x)?x[1]||x[0]:(x.nombre||x))+'">'; }).join(''); } }catch(e){}
+  }
+
+  /* ---------- dibujo ---------- */
+  function htmlPaq(q,i){
+    var sug=muestraDe(q.cantPaquete);
+    var chips=q.defectos.map(function(d,k){ return '<span class="pqchip">'+esc(d.defecto)+' · '+d.cantidad+'<button type="button" data-a="quitarDef" data-k="'+k+'" aria-label="Quitar">×</button></span>'; }).join('');
+    function seg(campo,vals){ return '<span class="pqseg">'+vals.map(function(v){ return '<button type="button" data-a="res" data-c="'+campo+'" data-v="'+v[0]+'"'+((q[campo]||'')===v[0]?' class="on"':'')+'>'+v[1]+'</button>'; }).join('')+'</span>'; }
+    return '<div class="pq" data-i="'+i+'"><div class="pqh"><span>Paquete '+(i+1)+'</span><button type="button" data-a="quitar">Quitar</button></div>'+
+      '<div class="grid">'+
+      '<div><label>N° paquete</label><input data-f="nPaquete" autocomplete="off" value="'+esc(q.nPaquete)+'"></div>'+
+      '<div><label>Talla</label><input data-f="talla" autocomplete="off" value="'+esc(q.talla)+'"></div>'+
+      '<div><label>Cant. paquete</label><input data-f="cantPaquete" inputmode="numeric" value="'+esc(q.cantPaquete)+'"></div>'+
+      '<div><label>Cant. inspeccionada *</label><input data-f="cantInspec" inputmode="numeric" value="'+esc(q.cantInspec)+'"><div class="sug">'+(sug?'Muestra sugerida: '+sug:'')+'</div></div>'+
+      '<div class="full"><label>Operación</label><input data-f="operacion" autocomplete="off" placeholder="Ej. Pegado de cuello" value="'+esc(q.operacion)+'"></div></div>'+
+      '<div class="pqdefs">'+chips+'</div>'+
+      '<div class="pqadd"><input data-f="defNom" list="procDefList" autocomplete="off" placeholder="🔍 Defecto (catálogo)"><input data-f="defCant" inputmode="numeric" placeholder="Cant."><button type="button" class="addbtn" data-a="agregarDef">Agregar</button></div>'+
+      '<div class="pqres"><span><span class="lab">1ra auditoría</span>'+seg('res1',[['A','A'],['R','R']])+'</span>'+
+      '<span><span class="lab">2da</span>'+seg('res2',[['','—'],['A','A'],['R','R']])+'</span></div>'+
+      '<div class="pqtot">Prendas con defecto en este paquete: <b>'+sumDef(q)+'</b></div></div>';
+  }
+  function dibujar(){
+    $$('procPaquetes').innerHTML=P.paquetes.map(htmlPaq).join('');
+    totales();
+  }
+  function totales(){
+    var n=P.paquetes.length, ins=0, def=0, rech=0;
+    P.paquetes.forEach(function(q){ ins+=(+q.cantInspec||0); def+=sumDef(q); if(q.res1 && finalDe(q)==='R') rech++; });
+    $$('procTotTxt').textContent=n?(n+' paquete'+(n===1?'':'s')+' · '+ins+' prendas inspeccionadas · '+def+' con defecto · '+rech+' rechazado'+(rech===1?'':'s')):'Sin paquetes';
+    var sinMarcar=P.paquetes.some(function(q){ return !q.res1; });
+    var v=!n||sinMarcar?'—':(rech?'RECHAZADO':'APROBADO');
+    $$('procTotVer').textContent=v; $$('procTotVer').style.color=v==='RECHAZADO'?'var(--red)':(v==='APROBADO'?'var(--green)':'');
+    if(estado.on){ var vt=$$('vText'); if(vt){ vt.textContent=v; vt.style.color=v==='RECHAZADO'?'var(--red)':(v==='APROBADO'?'var(--green)':''); } }
+  }
+  function guardarBorr(){ try{ localStorage.setItem(BORR,JSON.stringify({P:P,linea:vv('procLinea'),com:vv('comentario')})); }catch(e){} }
+  function quitarBorr(){ try{ localStorage.removeItem(BORR); }catch(e){} }
+
+  var cont=$$('procPaquetes');
+  cont.addEventListener('input',function(e){
+    var f=e.target.getAttribute('data-f'), pq=e.target.closest('.pq'); if(!f||!pq) return;
+    var q=P.paquetes[+pq.getAttribute('data-i')]; if(!q) return;
+    if(f==='defNom'||f==='defCant') return;
+    if(f==='cantPaquete'||f==='cantInspec') e.target.value=e.target.value.replace(/[^0-9]/g,'');
+    q[f]=e.target.value;
+    if(f==='cantPaquete'){ var s=muestraDe(q.cantPaquete); pq.querySelector('.sug').textContent=s?('Muestra sugerida: '+s):''; }
+    totales(); guardarBorr();
+  });
+  cont.addEventListener('click',function(e){
+    var b=e.target.closest('[data-a]'); if(!b) return;
+    var pq=b.closest('.pq'), i=+pq.getAttribute('data-i'), q=P.paquetes[i], a=b.getAttribute('data-a');
+    if(a==='quitar'){ if(confirm('¿Quitar el paquete '+(i+1)+'?')){ P.paquetes.splice(i,1); dibujar(); guardarBorr(); } }
+    else if(a==='res'){ var c=b.getAttribute('data-c'), v=b.getAttribute('data-v'); q[c]=v;
+      [].forEach.call(b.parentNode.querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); }); totales(); guardarBorr(); }
+    else if(a==='quitarDef'){ q.defectos.splice(+b.getAttribute('data-k'),1); var h=document.createElement('div'); h.innerHTML=htmlPaq(q,i); pq.replaceWith(h.firstChild); totales(); guardarBorr(); }
+    else if(a==='agregarDef'){
+      var nom=pq.querySelector('[data-f=defNom]').value.trim().toUpperCase(), cant=parseInt(pq.querySelector('[data-f=defCant]').value,10)||0;
+      if(!nom||cant<=0){ toast('Elige el defecto y escribe la cantidad.','err'); return; }
+      var ent=catCostura().filter(function(d){ return d.nombre===nom; })[0];
+      if(!ent){ toast('Elige un defecto de la lista del catálogo.','err'); return; }
+      var ya=q.defectos.filter(function(d){ return d.defecto===ent.nombre; })[0];
+      if(ya) ya.cantidad=(+ya.cantidad||0)+cant; else q.defectos.push({cod:ent.cod,defecto:ent.nombre,cantidad:cant});
+      var h2=document.createElement('div'); h2.innerHTML=htmlPaq(q,i); pq.replaceWith(h2.firstChild); totales(); guardarBorr();
+    }
+  });
+  $$('procAgregar').addEventListener('click',function(){ P.paquetes.push(nuevoPaq()); dibujar(); guardarBorr();
+    var q=cont.querySelectorAll('.pq'); if(q.length){ try{ q[q.length-1].scrollIntoView({block:'center'}); }catch(e){} } });
+  [].forEach.call($$('procNivel').querySelectorAll('button'),function(b){ b.addEventListener('click',function(){
+    P.nivel=b.getAttribute('data-v'); [].forEach.call($$('procNivel').querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); }); guardarBorr(); }); });
+  $$('procLinea').addEventListener('input',guardarBorr); $$('comentario').addEventListener('input',function(){ if(estado.on) guardarBorr(); });
+
+  /* ---------- modo ---------- */
+  function aplicarModo(){
+    var on=($$('proceso').value===PROC);
+    estado.on=on; document.documentElement.classList.toggle('modoProc',on);
+    if(window.finSetTabs) window.finSetTabs(on);
+    var sec=document.querySelector('.card[data-tab=fotos] .sec'), hint=$$('medOblHint');
+    if(on){
+      $$('tallerWrap').style.display='none';
+      var cp=$$('cardProceso'); if(cp) cp.style.display='block';
+      if(sec){ if(tx.sec===null) tx.sec=sec.lastChild.textContent; sec.lastChild.textContent='Fotos de la hoja de paquetes'; }
+      if(hint){ if(tx.hint===null) tx.hint=hint.textContent; hint.textContent='Opcional. Foto de la hoja con los paquetes revisados.'; }
+      llenarLista();
+      if(!P.paquetes.length && !P.editId){
+        try{ var b=JSON.parse(localStorage.getItem(BORR)||'null');
+          if(b&&b.P&&b.P.paquetes&&b.P.paquetes.length){ P=b.P; P.token=P.token||null; $$('procLinea').value=b.linea||''; if(b.com&&!$$('comentario').value) $$('comentario').value=b.com;
+            [].forEach.call($$('procNivel').querySelectorAll('button'),function(x){ x.classList.toggle('on',x.getAttribute('data-v')===P.nivel); });
+            toast('Continuando tu auditoría en proceso','ok'); } }catch(e){}
+        if(!P.paquetes.length) P.paquetes.push(nuevoPaq());
+      }
+      dibujar();
+    } else {
+      if(sec&&tx.sec!==null) sec.lastChild.textContent=tx.sec;
+      if(hint&&tx.hint!==null) hint.textContent=tx.hint;
+    }
+  }
+  var po=$$('proceso').onchange;
+  $$('proceso').onchange=function(){ var r=po.apply(this,arguments); aplicarModo(); return r; };
+
+  /* ---------- validación ---------- */
+  window.finProcEditando=function(){ return !!P.editId; };
+  window.finProcFaltantes=function(){
+    var f=[];
+    if(!P.editId){ var op=vv('opInput'); if(!op||S.opResuelta!==op) f.push('OP de la base de OPs (escríbela y elige su variante)'); }
+    if(!vv('grupo')) f.push('Grupo'); if(!vv('estiloL')) f.push('Estilo LIVES'); if(!vv('estiloC')) f.push('Estilo cliente');
+    if(!vv('po')) f.push('PO'); if(!vv('color')) f.push('Color'); if(!vv('destino')) f.push('Destino'); if(!vv('fecha')) f.push('Fecha');
+    if(!P.editId && !NOMBRE_PORTAL) f.push('Entrar desde el portal (tu nombre se toma de tu inicio de sesión)'); else if(!vv('auditor')) f.push('Auditor');
+    if(!vv('procLinea')) f.push('Servicio / línea');
+    if(!P.paquetes.length) f.push('Paquetes: agrega al menos uno');
+    P.paquetes.forEach(function(q,i){ var n=i+1;
+      if(!(+q.cantInspec>0)) f.push('Paquete '+n+': cantidad inspeccionada');
+      if(!q.res1) f.push('Paquete '+n+': A o R de la 1ra auditoría');
+      if(sumDef(q)>(+q.cantInspec||0)) f.push('Paquete '+n+': hay más prendas con defecto ('+sumDef(q)+') que inspeccionadas'); });
+    return f;
+  };
+
+  /* ---------- envío (con cola sin señal) ---------- */
+  function armar(){
+    if(!P.token) P.token='PR'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+    return {token:P.token, idExistente:P.editId||'', usuario:usuario(), auditor:vv('auditor'), fecha:vv('fecha'),
+      op:vv('opInput'), grupo:vv('grupo'), estilo:vv('estiloL'), eCliente:vv('estiloC'), po:vv('po'), color:vv('color'), destino:vv('destino'),
+      servicio:vv('procLinea'), nivel:P.nivel, observacion:vv('comentario'),
+      paquetes:P.paquetes.map(function(q){ return {nPaquete:q.nPaquete,talla:q.talla,cantPaquete:q.cantPaquete,cantInspec:q.cantInspec,operacion:q.operacion,res1:q.res1,res2:q.res2,
+        defectos:q.defectos.map(function(d){ return {cod:d.cod,defecto:d.defecto,cantidad:d.cantidad,seccion:'COSTURA'}; })}; }),
+      hojas:(S.fotosMed||[]).slice(), procFotos:(S.fotosPro||[]).slice()};
+  }
+  async function enviar1(pl){
+    var carpeta='nuevas/'+(pl.fecha||'sin-fecha')+'/'+pl.token, cuerpo=JSON.parse(JSON.stringify(pl));
+    async function subir(arr,pref){ var out=[],i=0; for(var k=0;k<arr.length;k++){ var s=String(arr[k]||''); if(!s) continue; i++;
+      if(/^data:image\//.test(s)){ var ext=((s.match(/^data:image\/(\w+)/)||[])[1]||'jpg').replace('jpeg','jpg'); out.push(await subirFotoSB(s,carpeta+'/'+pref+'-'+i+'.'+ext)); } else out.push(s); } return out; }
+    cuerpo.fotosHojas=await subir(pl.hojas||[],'hoja'); cuerpo.fotosProceso=await subir(pl.procFotos||[],'proceso'); delete cuerpo.hojas; delete cuerpo.procFotos;
+    var res;
+    try{ res=await fetch(SB+'/rest/v1/rpc/fproc_api',{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({p_accion:'guardar',p:cuerpo})}); }
+    catch(e){ throw errTipo('Sin conexión con la base de datos','red'); }
+    if(!res.ok) throw errTipo('La base de datos no respondió ('+res.status+')','red');
+    var d=await res.json(); if(!d||!d.ok) throw errTipo((d&&d.error)||'La base de datos rechazó la auditoría','rechazo');
+    return d;
+  }
+  var CDB='lives_proc_pend';
+  function cdb(){ return new Promise(function(ok,no){ var r=indexedDB.open(CDB,1); r.onupgradeneeded=function(){ r.result.createObjectStore('cola',{keyPath:'id',autoIncrement:true}); }; r.onsuccess=function(){ ok(r.result); }; r.onerror=function(){ no(r.error); }; }); }
+  async function cAdd(pl){ var d=await cdb(); return new Promise(function(ok,no){ var tx=d.transaction('cola','readwrite'); tx.objectStore('cola').add({payload:pl,ts:Date.now()}); tx.oncomplete=ok; tx.onerror=function(){ no(tx.error); }; }); }
+  async function cAll(){ var d=await cdb(); return new Promise(function(ok,no){ var rq=d.transaction('cola','readonly').objectStore('cola').getAll(); rq.onsuccess=function(){ ok(rq.result||[]); }; rq.onerror=function(){ no(rq.error); }; }); }
+  async function cDel(id){ var d=await cdb(); return new Promise(function(ok,no){ var tx=d.transaction('cola','readwrite'); tx.objectStore('cola').delete(id); tx.oncomplete=ok; tx.onerror=function(){ no(tx.error); }; }); }
+  var bar=document.createElement('div'); bar.id='procPendBar'; bar.innerHTML='<span id="procPendTxt"></span><button type="button" id="procPendBtn">Enviar ya</button>';
+  document.body.insertBefore(bar,document.body.firstChild);
+  var enviandoCola=false;
+  async function refrescarCola(){ var it=[]; try{ it=await cAll(); }catch(e){} bar.style.display=it.length?'flex':'none';
+    $$('procPendTxt').textContent='📥 '+it.length+' auditoría(s) en proceso guardada(s) en este celular, aún sin enviar'+(it.some(function(x){return x.err;})?' · último intento: '+it.filter(function(x){return x.err;})[0].err:''); }
+  async function enviarCola(){
+    if(enviandoCola) return; enviandoCola=true;
+    try{ var it=await cAll();
+      for(var k=0;k<it.length;k++){ try{ await enviar1(it[k].payload); await cDel(it[k].id); }
+        catch(e){ if(e.tipo==='rechazo'){ it[k].err=e.message; } else break; } }
+    }catch(e){} enviandoCola=false; refrescarCola();
+  }
+  $$('procPendBtn').addEventListener('click',enviarCola);
+  window.addEventListener('online',enviarCola); setInterval(function(){ if(navigator.onLine) enviarCola(); },60000); setTimeout(function(){ refrescarCola(); if(navigator.onLine) enviarCola(); },2500);
+
+  window.finProcGuardar=async function(){
+    var btn=$$('save'); btn.disabled=true; btn.textContent='Guardando…';
+    var pl=armar();
+    try{
+      var d=await enviar1(pl);
+      quitarBorr(); P.paquetes=[]; P.token=null; P.editId=null;
+      confirmarGuardado('enviado',d.id,String(d.resultado||'').charAt(0)+String(d.resultado||'').slice(1).toLowerCase());
+    }catch(e){
+      if(e.tipo==='red' && !P.editId){ try{ await cAdd(pl); quitarBorr(); P.paquetes=[]; P.token=null; refrescarCola(); confirmarGuardado('cola'); }catch(x){ confirmarGuardado('error',null,'No hay señal y no se pudo guardar en el equipo'); } }
+      else confirmarGuardado('error',null,e.message||String(e));
+    }finally{ btn.disabled=false; btn.textContent='Guardar'; }
+  };
+
+  /* ---------- corregir una auditoría de proceso (?proc=ID) ---------- */
+  (async function(){
+    var id=''; try{ id=new URLSearchParams(location.search).get('proc')||''; }catch(e){} if(!id) return;
+    try{
+      var r=await fetch(SB+'/rest/v1/rpc/fproc_api',{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({p_accion:'ver',p:{id:id,usuario:usuario()}})});
+      var d=await r.json(); if(!d||!d.ok){ toast((d&&d.error)||'No se pudo abrir la auditoría','err'); return; }
+      if(!d.puede){ toast('No puedes corregir esta auditoría (solo quien la registró).','err'); return; }
+      var a=d.auditoria; P.editId=a.id; P.token=null; P.nivel=a.nivel_aql||'2.5';
+      var sel=$$('proceso'); sel.value=PROC; S.proceso=PROC; sel.onchange();
+      $$('opInput').value=a.op||''; S.opResuelta=a.op||'';
+      var rellenar=function(){ ['grupo','estiloL','estiloC','po','color','destino','fecha','auditor'].forEach(function(k){ var m={grupo:a.grupo,estiloL:a.estilo,estiloC:a.e_cliente,po:a.po,color:a.color,destino:a.destino,fecha:String(a.fecha).slice(0,10),auditor:a.auditor}; var e=$$(k); if(e && !e.value){ e.value=m[k]||''; } });
+        if(!$$('opInput').value){ $$('opInput').value=a.op||''; S.opResuelta=a.op||''; } };
+      rellenar(); setTimeout(rellenar,1500); setTimeout(rellenar,4000); setTimeout(rellenar,8000);
+      $$('procLinea').value=a.servicio||''; $$('comentario').value=a.observacion||'';
+      [].forEach.call($$('procNivel').querySelectorAll('button'),function(x){ x.classList.toggle('on',x.getAttribute('data-v')===P.nivel); });
+      P.paquetes=(d.paquetes||[]).map(function(q){ return {nPaquete:q.n_paquete||'',talla:q.talla||'',cantPaquete:q.cant_paquete==null?'':String(q.cant_paquete),cantInspec:q.cant_inspec==null?'':String(q.cant_inspec),
+        operacion:q.operacion||'',res1:q.res1||'',res2:q.res2||'',defectos:(q.defectos||[]).map(function(x){ return {cod:x.cod,defecto:x.defecto,cantidad:+x.cantidad}; })}; });
+      dibujar(); toast('Corrigiendo la auditoría '+a.id+'. Las fotos que ya tenía se conservan.','ok');
+    }catch(e){ toast('No se pudo abrir la auditoría para corregir','err'); }
+  })();
 })();
 </script>
 <!-- ===== lives-tema v1 (final) · 2026-10-14 (paleta Petróleo v1.1) · modo oscuro opcional para quien lo quiera. Va antes de </body>.
