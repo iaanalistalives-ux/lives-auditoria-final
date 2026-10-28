@@ -872,7 +872,7 @@ textarea{width:100%;border:1px solid #dce1e7;border-radius:10px;padding:11px;fon
   <div class="card" id="cardFijo">
     <div class="fijoLinea" id="fijoLinea"><span id="fijoTxt"></span><button type="button" class="addbtn" id="btnCambiarFijo">Cambiar</button></div>
     <div class="field fijoCampo"><label>Proceso *</label>
-      <select id="proceso">
+      <select id="proceso" autocomplete="off">
         <option value="">— Seleccionar —</option>
         <option>Costura (taller)</option>
         <option>Acabados (taller)</option>
@@ -3734,7 +3734,18 @@ function desmarcarReproceso(){
   toast('Se quitó la marca de reproceso. Al guardar se volverá a preguntar.','ok');
 }
 
+/* 28/10: el celular puede devolver el desplegable de Proceso ya elegido (al volver a la app o
+   recargar) SIN avisar a la pantalla: se veía "Acabados (taller)" pero el sistema lo tenía
+   vacío, el N° de auditoría quedaba en "—" y al guardar decía "Falta completar: Proceso,
+   N° de auditoría". Se iguala el estado con lo que se ve y se calcula el N° antes de validar. */
+function sincronizarProceso(){
+  const sel=$('proceso');
+  if(sel && sel.value && sel.value!==S.proceso && typeof sel.onchange==='function') sel.onchange();
+}
+window.addEventListener('pageshow',()=>{ sincronizarProceso(); if(!S.nAud && !S.editId && loteCompleto()) calcOrdinal(); });
 $('save').onclick=async()=>{
+  sincronizarProceso();
+  if(!S.nAud && !S.editId && !S.reprocesaDe && loteCompleto()) await calcOrdinal();
   // Validar recién AHORA (al intentar guardar), no mientras se llena — así no se ve la lista de reglas mientras escriben.
   const faltan=calcularFaltantes();
   if(faltan.length>0){
