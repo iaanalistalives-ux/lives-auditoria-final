@@ -1673,6 +1673,7 @@ cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
     if(login==='ctalepcio' || norm(NOMBRE)==='CTALEPCIO'){ poner(true); return; }
     if(!nombre){ poner(false,'Entra desde el portal para registrar'); return; }
     try{
+      try{ var rl=await leer('/rest/v1/final_parametros?select=valor&clave=eq.registro_libre'); if(rl&&rl[0]&&Number(rl[0].valor)===1){ poner(true); return; } }catch(e){}
       var oficial=norm(nombre);
       try{ var o=await leer('/rest/v1/rpc/nombre_sistemas',{p:nombre.toUpperCase()}); if(o) oficial=norm(o); }catch(e){}
       var lista=await leer('/rest/v1/publico_ref_personal?select=nombre,rol,activo&activo=eq.SI&limit=1000');

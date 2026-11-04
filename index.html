@@ -1304,6 +1304,12 @@ var SBR_KEY = 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
 var SBR_PAGINA = 1000;
 var SBR_ESPERA = 15000;   // si en 15 s no responde, se usa el Apps Script
 
+/* Registro libre (04/11/2026): si final_parametros.registro_libre = 1, el nombre no tiene que estar en el catálogo de personal para guardar. */
+var REG_LIBRE = false;
+try{ fetch(SBR_URL + '/rest/v1/final_parametros?select=valor&clave=eq.registro_libre', { headers: { apikey: SBR_KEY }, cache: 'no-store' })
+  .then(function(r){ return r.ok ? r.json() : []; })
+  .then(function(f){ REG_LIBRE = !!(f && f[0] && Number(f[0].valor) === 1); }, function(){}); }catch(e){}
+
 function sbrT(v){ return String(v == null ? '' : v).trim(); }
 function sbrU(v){ return sbrT(v).toUpperCase(); }
 
@@ -3283,7 +3289,7 @@ function calcularFaltantes(){
 
      Si el catálogo no cargó no se bloquea: dejar a una auditora sin poder
      registrar por una lista que no llegó sería peor. */
-  else if(!MODO_DEMO && AUDITORAS && AUDITORAS.length && USUARIOS_PRUEBA.map(nombreNorm).indexOf(nombreNorm(v('auditor')))<0){
+  else if(!MODO_DEMO && !REG_LIBRE && AUDITORAS && AUDITORAS.length && USUARIOS_PRUEBA.map(nombreNorm).indexOf(nombreNorm(v('auditor')))<0){
     const q = nombreNorm(v('auditor'));
     if(!AUDITORAS.some(a => nombreNorm(a) === q)){
       faltan.push('Auditor: "'+v('auditor')+'" no está en la lista de personal — avisa a Christian');
