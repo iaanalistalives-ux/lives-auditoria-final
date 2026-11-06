@@ -1990,6 +1990,9 @@ async function calcOrdinal(){
 }
 function pedirOrdinal(){ clearTimeout(ordTimer); ordTimer=setTimeout(calcOrdinal,400); }
 
+/* 06/11: pedido que vino de la base de OPs (0 si no vino de ahí). Cuando existe, manda sobre
+   el pedido escrito en auditorías anteriores del mismo lote. */
+function pedidoBaseOP(){ return S.pedidoDeOP ? (parseInt(v('pedido'))||0) : 0; }
 /* ===== AVANCE DEL PEDIDO (% auditado del lote vs cant. pedido) ===== */
 function calcAvance(){
   const box=$('avanceBox');
@@ -2013,7 +2016,7 @@ function calcAvance(){
   });
   // pedido: usa el de las previas, o el que escribió el usuario ahora
   const pedidoActual = parseInt(v('pedido'))||0;
-  const pedido = pedidoRef || pedidoActual;
+  const pedido = pedidoBaseOP() || pedidoRef || pedidoActual;   // 06/11: manda la base de OPs
   if(!pedido){ box.style.display='none'; return; }
 
   const loteActual = parseInt(v('recibido'))||0;
@@ -2346,7 +2349,7 @@ function detectarConflictoParcial(){
   const ya=sumaLotesPrevios(previas);
   let pedRef=0;
   previas.forEach(r=>{ const p=Number(r[13])||0; if(p>pedRef) pedRef=p; });
-  const pedido = pedRef || (parseInt(v('pedido'))||0);
+  const pedido = pedidoBaseOP() || pedRef || (parseInt(v('pedido'))||0);   // 06/11: manda la base de OPs
   if(pedido && (ya+rec) > pedido*1.25) return {tipo:'exceso', ya:ya, rec:rec, pedido:pedido, total:ya+rec};
   return null;
 }
@@ -2424,7 +2427,7 @@ function mostrarPanelPrevias(){
     const marca=dup?' <span style="background:#fff4e0;color:#7a5a12;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">repetida — no suma</span>':'';
     return `<div style="padding:5px 0;border-bottom:1px solid #dfe7f1${dup?';opacity:.62':''}">${etq} <b>${esc(String(rec))} prendas</b> · ${esc(fec)}${marca}<br><span style="color:#778;font-size:12px">${esc(String(aud))} · ${esc(String(proc))} · <b>${esc(String(res))}</b> · PO ${esc(String(po))} · ${esc(String(dest))}</span></div>`;
   }).join('');
-  const ped=previas.reduce((m,r)=>Math.max(m,Number(r[13])||0),0) || (parseInt(v('pedido'))||0);
+  const ped=pedidoBaseOP() || previas.reduce((m,r)=>Math.max(m,Number(r[13])||0),0) || (parseInt(v('pedido'))||0);
   const resumen = '<div style="padding:7px 0 4px;font-size:13px"><b>Suma de los lotes ya auditados: '+acum+' prendas</b>'
     + (ped ? (' de '+ped+' del pedido') : '') + '</div>';
   body.innerHTML=items+resumen;
@@ -2485,7 +2488,10 @@ function aplicarPedido(){
       if(ped && String(ped).trim()!=='') prevPedido=String(ped).trim();
     }
   });
-  if(prevPedido){
+  /* 06/11: si el pedido vino de la base de OPs, manda la base. Antes lo pisaba el pedido
+     escrito en una auditoría anterior del mismo lote (OP 25250 WHITE: 952 en la base,
+     pero salía 380 porque así se digitó en una auditoría antigua). */
+  if(prevPedido && !(S.pedidoDeOP && inp.value)){
     inp.value=prevPedido; inp.readOnly=true; inp.style.background='#eef3f1';
     h.className='hint'; h.textContent='Pedido ya registrado para este lote. Bloqueado.';
   } else if(S.pedidoDeOP && inp.value){
