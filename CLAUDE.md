@@ -43,3 +43,8 @@ Según las entradas por el portal de los últimos 30 días al 21/10/2026: 27 per
 ## Cambio del 06/11/2026 (pedido de Christian)
 - **Cant. pedido: manda la base de OPs** (`index.html`, `pedidoBaseOP()`): cuando el pedido se llenó desde la OP, ya no lo reemplaza el pedido escrito en auditorías anteriores del mismo lote. Vale para el campo, el "Avance de este pedido", el candado de exceso (+25 %) y el panel de previas. Caso: OP 25250 WHITE salía 380 en vez de 952. En Corregir y sin OP sigue como antes.
 - Datos corregidos (registro `An14 final pedido op25250 white`): 3 auditorías antiguas de ese lote pasaron de 88/120/380 a 952.
+
+## Registro cerrado (09/11/2026, pedido de Christian; rama `registro-cerrado`, sin publicar en main)
+- Sistemas activa su propia pantalla de registro. Esta herramienta queda solo para consultar: `index.html` muestra el aviso "Registro cerrado" y no guarda; `buscar.html` deja el botón Registrar gris ("Registro en el sistema") para todos, también Christian; `ver.html` oculta Corregir y Anular de En proceso.
+- Bloque `lsRegCerrado` (al inicio del body de `index.html` y `ver.html`): interruptor `REGISTRO_CERRADO`; frena en el navegador los guardados (`final_guardar_directo`, `final_aprobar_medida`, `registro_anular_directo`, `fproc_api` guardar/anular y subida de fotos). Leer y ver fotos siguen igual. La cola sin enviar de los celulares queda guardada, no se envía.
+- La base de Supabase no se cerró (regla de pruebas libres).
