@@ -1664,11 +1664,10 @@ cargarFotos();   // el ícono 📷 aparece en cuanto llega la lista de fotos
       .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
   }
   function poner(si,txt){
-    var b=$('btnRegistrar'); b.disabled=!si; b.textContent=si?'Registrar':'Registro en el sistema';
+    var b=$('btnRegistrar'); b.disabled=!si; b.textContent=si?'Registrar':'Solo para auditoras';
     b.title=si?'Registrar una auditoría':(txt||'Solo para las auditoras de Calidad Manufactura');
   }
   async function comprobar(){
-    poner(false,'El registro de auditorías ahora se hace en el sistema de LIVES'); return;  /* registro cerrado 09/11/2026 */
     var s=sesion(), login=String((s&&s.usuario)||'').trim().toLowerCase(), nombre=String((s&&s.nombre)||NOMBRE||'').trim();
     if(login==='rcamogliano'){ poner(false,'Modo supervisión: ves todo, no se guarda nada'); return; }
     if(login==='ctalepcio' || norm(NOMBRE)==='CTALEPCIO'){ poner(true); return; }
