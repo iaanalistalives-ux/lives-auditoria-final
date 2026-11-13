@@ -16,7 +16,7 @@ Auditoría final de calidad (AQL) de un lote, desde el portal LIVES. Tres pantal
   - Auditorías: `publico_vista_piloto` (de `auditorias`), `publico_detalle_piloto` (de `auditoria_defectos`) y `publico_fotos_auditoria`, que cuenta las fotos.
   - `ver.html` además lee directo la tabla `fotos_auditoria`, para encontrar dónde quedaron guardadas las fotos antiguas que estaban en Drive.
 - Fotos: bucket privado `auditorias-fotos`. Se suben a `nuevas/<fecha>/<id_envio>/` y se ven con enlaces firmados que vencen en 1 hora.
-- La base de OPs (`ops`) se actualiza en `lives-registro-auditorias/ops.html`.
+- La base de OPs (`ops`) la carga Claude a pedido de Christian con `lives-registro-auditorias/carga/cargar_base.py` (desde el 13/11/2026 ya no hay pantalla `ops.html`).
 - Las mismas tablas `auditorias*` las usa también `lives-registro-auditorias/registro.html` (tipo FINAL y otros).
 
 ## Quién la usa
